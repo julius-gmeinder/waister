@@ -1,4 +1,4 @@
-import type { Message, PageInfo } from './messages';
+import type { Message, PageInfo } from '../shared/messages';
 
 chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) => {
   if (message.type === 'GET_PAGE_INFO') {

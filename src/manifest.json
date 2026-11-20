@@ -5,7 +5,7 @@
   "description": "A browser extension written in TypeScript.",
   "action": {
     "default_title": "Waister",
-    "default_popup": "popup/popup.html"
+    "default_popup": "popup/index.html"
   },
   "background": {
     "service_worker": "background.js",

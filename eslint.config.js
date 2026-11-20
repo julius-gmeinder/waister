@@ -14,6 +14,40 @@ export default tseslint.config(
     },
   },
   {
+    // Each context runs in its own JS world. Only shared/ may be imported across contexts,
+    // everything else must go through messages.
+    files: ['src/popup/**/*.ts', 'src/content/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/background', '**/background/**'],
+              message: 'Background code only runs in the background. Send a message instead.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/shared/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/background/**', '**/content/**', '**/popup/**'],
+              message: 'shared/ must not depend on a specific context.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['scripts/**/*.mjs', '*.js'],
     languageOptions: { globals: globals.node },
   },

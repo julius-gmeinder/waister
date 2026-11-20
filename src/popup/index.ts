@@ -1,4 +1,4 @@
-import type { Message, PageInfo } from '../messages';
+import type { Message, PageInfo } from '../shared/messages';
 
 const status = document.querySelector<HTMLParagraphElement>('#status')!;
 
