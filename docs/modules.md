@@ -154,37 +154,29 @@ May import: `dto/`. Must not import: `handlers/`, `readers/`, `ui/`, `messages/`
 
 ### Tokenizer service
 
-`src/services/tokenizer/`: counts tokens for everything in the `ChatCaptureDto` that is text:
-`userInput`, `response` and each `chatHistory[]` turn. Returns per-field counts, and the handler
-sums them.
+`src/services/tokenizer/`: counts visible tokens for `userInput`, `response` and each `chatHistory[]`
+turn, and calculates hidden tokens (`overhead` for the system prompt and `thinking` from
+`thinkingTimeMs`) using `tokenizer-lookup.json` in the same folder.
 
-| File                     | Provider    | Accuracy                                                            |
-| ------------------------ | ----------- | ------------------------------------------------------------------- |
-| `tokenizer.service.ts`   | (router)    | Picks the module by `dto.provider` and returns the counts           |
-| `openai.tokenizer.ts`    | `openai`    | Exact: OpenAI publishes its BPE encodings                           |
-| `anthropic.tokenizer.ts` | `anthropic` | Approximate: no public tokenizer for current Claude models          |
-| `google.tokenizer.ts`    | `google`    | Approximate: SentencePiece-based, no official client-side tokenizer |
-
-Each provider module exposes the same shape (planned): `countTokens(text, model) → number`.
-Mark approximate counts as such so the result can say how exact it is.
-
-Open: which libraries or vocabularies to use, and how big they may get in the bundle.
+| File                     | Provider    | Role / Difference across sites                                                                                                      |
+| ------------------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `tokenizer.service.ts`   | (router)    | Orchestrates `countInputTokens`, `countOutputTokens`, `countHistoryTokens`, `estimateThinkingTokensFromTime`, and `tokenizeCapture` |
+| `tokenizer-lookup.json`  | (lookup)    | Plain JSON lookup table for `systemPromptTokens`, `tokensPerMsThinking`, `turnFramingTokens`, and `effortMultipliers`               |
+| `openai.tokenizer.ts`    | `openai`    | Calibrated for OpenAI's `o200k_base` BPE (~4.0 chars/token, 1–3 digit number chunks) + 4 ChatML turn-framing tokens                 |
+| `anthropic.tokenizer.ts` | `anthropic` | Calibrated for Claude's BPE (~3.7 chars/token, denser subword splits) + 5 turn-framing tokens                                       |
+| `google.tokenizer.ts`    | `google`    | Calibrated for Gemini's 256k SentencePiece unigram vocabulary (~4.1 chars/token) + 4 turn-delimiter tokens                          |
 
 ### Estimation service
 
-`src/services/estimation/`: estimates the tokens the page does **not** show:
+`src/services/estimation/`: converts the token counts from `TokenizerService` into environmental
+impact (`energyWh`, `waterMl`, `co2Grams`) using `energy-lookup.json` (rates per 1,000,000 tokens)
+and builds the final `TokenEstimateDto` for the popup.
 
-- **Thinking/reasoning tokens:** derived from `latencyMs`, the model's output speed and the
-  visible output length, scaled by the thinking effort.
-- **Overhead tokens:** system prompt, tool definitions and similar per-model constants.
-
-| File                    | Role                                                                                                                 |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `estimation.service.ts` | `estimateHiddenTokens(model, latencyMs, visibleCounts)`                                                              |
-| `model-profiles.ts`     | Data table, one entry per provider + model + version: output tokens/s, time to first token, overhead, effort factors |
-
-Unknown models fall back to a per-provider default profile. That fallback must show up in the
-result. Formula sketch: [pipeline.md](pipeline.md#3-estimationservice-hidden-tokens).
+| File                    | Role                                                                                                                        |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `estimation.service.ts` | `calculateEnvironmentalImpact(totalTokens, provider, model)` and `buildTokenEstimateDto(capture, tokenization)`             |
+| `model-profiles.ts`     | Resolves the per-1M-token energy/water/CO2 rates for a provider + model from `energy-lookup.json`                           |
+| `energy-lookup.json`    | Plain JSON lookup table mapping each provider/model to `energyWhPer1M`, `waterMlPer1M`, and `co2GramsPer1M` (per 1M tokens) |
 
 ### Estimate cache service
 

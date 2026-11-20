@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Waister Estimate</title>
+  </head>
+  <body style="font-family: system-ui, sans-serif; width: 320px; margin: 12px; color: #111">
+    <h2 style="margin: 0 0 8px 0; font-size: 18px">Waister Impact Estimate</h2>
+
+    <div id="empty-state" style="font-size: 13px; color: #555">
+      No prompt captured yet. Send a message on ChatGPT, Claude, or Gemini.
+    </div>
+
+    <div id="estimate-content" hidden>
+      <p style="margin: 4px 0; font-size: 13px">
+        <strong>Provider / Model:</strong>
+        <span id="meta-model">-</span>
+      </p>
+
+      <hr style="border: 0; border-top: 1px solid #ddd; margin: 8px 0" />
+
+      <p style="margin: 4px 0; font-size: 16px">
+        <strong>Total Tokens:</strong>
+        <span id="total-tokens">0</span>
+      </p>
+
+      <table style="width: 100%; font-size: 12px; border-collapse: collapse; margin: 6px 0">
+        <tbody>
+          <tr>
+            <td>Input (prompt)</td>
+            <td id="tokens-input" style="text-align: right">0</td>
+          </tr>
+          <tr>
+            <td>Chat History (context)</td>
+            <td id="tokens-history" style="text-align: right">0</td>
+          </tr>
+          <tr>
+            <td>Output (response)</td>
+            <td id="tokens-output" style="text-align: right">0</td>
+          </tr>
+          <tr>
+            <td>Thinking (hidden)</td>
+            <td id="tokens-thinking" style="text-align: right">0</td>
+          </tr>
+          <tr>
+            <td>System Overhead</td>
+            <td id="tokens-overhead" style="text-align: right">0</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <hr style="border: 0; border-top: 1px solid #ddd; margin: 8px 0" />
+
+      <h3 style="margin: 4px 0; font-size: 14px">Environmental Impact</h3>
+      <table style="width: 100%; font-size: 13px; border-collapse: collapse; margin: 6px 0">
+        <tbody>
+          <tr>
+            <td><strong>Energy:</strong></td>
+            <td id="impact-energy" style="text-align: right">0 Wh</td>
+          </tr>
+          <tr>
+            <td><strong>Water:</strong></td>
+            <td id="impact-water" style="text-align: right">0 mL</td>
+          </tr>
+          <tr>
+            <td><strong>Carbon:</strong></td>
+            <td id="impact-co2" style="text-align: right">0 gCO2e</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <hr style="border: 0; border-top: 1px solid #ddd; margin: 8px 0" />
+
+      <p style="margin: 4px 0; font-size: 11px; color: #666">
+        Thinking time: <span id="timing-thinking">0</span> ms · Total latency:
+        <span id="timing-latency">0</span> ms
+      </p>
+    </div>
+
+    <script src="index.js"></script>
+  </body>
+</html>

@@ -5,4 +5,9 @@
  * Context: popup
  * Docs: docs/modules.md#entries
  */
-export {};
+
+import { initPopupView } from '../ui/popup/popup.view';
+
+document.addEventListener('DOMContentLoaded', () => {
+  void initPopupView();
+});

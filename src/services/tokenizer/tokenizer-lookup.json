@@ -1,0 +1,72 @@
+{
+  "description": "Lookup table for system prompt / tool overhead tokens and thinking tokens per ms of thinkingTimeMs.",
+  "defaults": {
+    "systemPromptTokens": 1200,
+    "tokensPerMsThinking": 0.06,
+    "turnFramingTokens": 4,
+    "effortMultipliers": {
+      "none": 0,
+      "low": 0.6,
+      "medium": 1.0,
+      "high": 1.4,
+      "unknown": 0.5
+    }
+  },
+  "providers": {
+    "openai": {
+      "default": {
+        "systemPromptTokens": 1400,
+        "tokensPerMsThinking": 0.075,
+        "turnFramingTokens": 4
+      },
+      "models": {
+        "gpt": {
+          "systemPromptTokens": 1400,
+          "tokensPerMsThinking": 0.065
+        },
+        "openai-o": {
+          "systemPromptTokens": 1600,
+          "tokensPerMsThinking": 0.095
+        }
+      }
+    },
+    "anthropic": {
+      "default": {
+        "systemPromptTokens": 1800,
+        "tokensPerMsThinking": 0.07,
+        "turnFramingTokens": 5
+      },
+      "models": {
+        "claude-sonnet": {
+          "systemPromptTokens": 1800,
+          "tokensPerMsThinking": 0.075
+        },
+        "claude-opus": {
+          "systemPromptTokens": 2000,
+          "tokensPerMsThinking": 0.055
+        },
+        "claude-haiku": {
+          "systemPromptTokens": 1200,
+          "tokensPerMsThinking": 0.1
+        }
+      }
+    },
+    "google": {
+      "default": {
+        "systemPromptTokens": 1500,
+        "tokensPerMsThinking": 0.08,
+        "turnFramingTokens": 4
+      },
+      "models": {
+        "gemini-pro": {
+          "systemPromptTokens": 1600,
+          "tokensPerMsThinking": 0.075
+        },
+        "gemini-flash": {
+          "systemPromptTokens": 1300,
+          "tokensPerMsThinking": 0.11
+        }
+      }
+    }
+  }
+}

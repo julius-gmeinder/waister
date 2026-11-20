@@ -1,0 +1,73 @@
+{
+  "description": "Environmental impact lookup table per 1,000,000 (1M) tokens: energy in watt-hours (Wh), water in milliliters (mL), and carbon in grams of CO2e (gCO2e).",
+  "perTokensUnit": 1000000,
+  "defaults": {
+    "energyWhPer1M": 380,
+    "waterMlPer1M": 1350,
+    "co2GramsPer1M": 150
+  },
+  "providers": {
+    "openai": {
+      "default": {
+        "energyWhPer1M": 400,
+        "waterMlPer1M": 1400,
+        "co2GramsPer1M": 160
+      },
+      "models": {
+        "gpt": {
+          "energyWhPer1M": 390,
+          "waterMlPer1M": 1380,
+          "co2GramsPer1M": 155
+        },
+        "openai-o": {
+          "energyWhPer1M": 520,
+          "waterMlPer1M": 1850,
+          "co2GramsPer1M": 205
+        }
+      }
+    },
+    "anthropic": {
+      "default": {
+        "energyWhPer1M": 410,
+        "waterMlPer1M": 1450,
+        "co2GramsPer1M": 165
+      },
+      "models": {
+        "claude-sonnet": {
+          "energyWhPer1M": 390,
+          "waterMlPer1M": 1380,
+          "co2GramsPer1M": 155
+        },
+        "claude-opus": {
+          "energyWhPer1M": 620,
+          "waterMlPer1M": 2200,
+          "co2GramsPer1M": 245
+        },
+        "claude-haiku": {
+          "energyWhPer1M": 180,
+          "waterMlPer1M": 640,
+          "co2GramsPer1M": 72
+        }
+      }
+    },
+    "google": {
+      "default": {
+        "energyWhPer1M": 340,
+        "waterMlPer1M": 1200,
+        "co2GramsPer1M": 135
+      },
+      "models": {
+        "gemini-pro": {
+          "energyWhPer1M": 420,
+          "waterMlPer1M": 1480,
+          "co2GramsPer1M": 168
+        },
+        "gemini-flash": {
+          "energyWhPer1M": 160,
+          "waterMlPer1M": 560,
+          "co2GramsPer1M": 64
+        }
+      }
+    }
+  }
+}

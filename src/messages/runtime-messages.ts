@@ -7,6 +7,7 @@
  */
 
 import type { ChatCaptureDto } from '../dto/chat-capture.dto';
+import type { TokenEstimateDto } from '../dto/token-estimate.dto';
 
 /**
  * Sent by the content script (`dom-capture.strategy.ts`) to the background service worker
@@ -18,12 +19,13 @@ export interface EstimatePromptMessage {
 }
 
 /**
- * Sent by the toolbar popup to retrieve the latest token estimate for the active tab.
+ * Sent by the toolbar popup to retrieve the latest token & environmental impact estimate
+ * for the active tab.
  */
 export interface GetLatestEstimateMessage {
   type: 'GET_LATEST_ESTIMATE';
   payload: {
-    tabId: number;
+    tabId?: number;
   };
 }
 
@@ -31,3 +33,8 @@ export interface GetLatestEstimateMessage {
  * Discriminated union of all runtime messages exchanged across extension contexts.
  */
 export type RuntimeMessage = EstimatePromptMessage | GetLatestEstimateMessage;
+
+/**
+ * Response type returned by `ESTIMATE_PROMPT` and `GET_LATEST_ESTIMATE`.
+ */
+export type EstimateResponse = TokenEstimateDto | null;

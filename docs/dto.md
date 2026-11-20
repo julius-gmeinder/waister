@@ -37,14 +37,16 @@ EstimationHandler. One DTO per sent prompt.
 
 ## TokenEstimateDto
 
-`src/dto/token-estimate.dto.ts`. Built by the EstimationHandler, cached per tab, shown by the
-popup.
+`src/dto/token-estimate.dto.ts`. Built by the EstimationHandler + EstimationService, cached per
+tab, shown by the popup.
 
-| Field         | Type        | Description                                                                       |
-| ------------- | ----------- | --------------------------------------------------------------------------------- |
-| `totalTokens` | `number`    | **The single number:** sum of all breakdown fields                                |
-| `breakdown`   | object      | `{ input, history, output, thinking, overhead }` (see [pipeline.md](pipeline.md)) |
-| `provider`    | `Provider`  | Echoed from the capture                                                           |
-| `model`       | `ModelInfo` | Echoed from the capture                                                           |
-| `approximate` | `boolean`   | `true` if any part used an approximate tokenizer or a fallback model profile      |
-| `capturedAt`  | `number`    | Echoed from the capture                                                           |
+| Field         | Type                  | Description                                                                                                |
+| ------------- | --------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `totalTokens` | `number`              | **The single token total:** sum of all breakdown fields (`input + history + output + thinking + overhead`) |
+| `breakdown`   | `TokenBreakdown`      | `{ input, history, output, thinking, overhead }` (see [pipeline.md](pipeline.md))                          |
+| `impact`      | `EnvironmentalImpact` | `{ energyWh, waterMl, co2Grams }` derived from the 1M-token lookup table (`energy-lookup.json`)            |
+| `provider`    | `Provider`            | Echoed from the capture                                                                                    |
+| `model`       | `ModelInfo`           | Echoed from the capture                                                                                    |
+| `timings`     | object                | `{ latencyMs, thinkingTimeMs }` echoed from the capture                                                    |
+| `approximate` | `boolean`             | `true` if any part used an approximate tokenizer or a fallback model profile                               |
+| `capturedAt`  | `number`              | Echoed from the capture                                                                                    |
