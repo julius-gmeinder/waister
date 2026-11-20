@@ -85,6 +85,8 @@ export function observeTurns(
   /** Prompt send time, null while no prompt is in flight. */
   let t0: number | null = null;
   let tStreamStart: number | null = null;
+  /** User prompt count before the current prompt. A higher count means a new prompt was sent. */
+  let baselineUserCount = adapter.countUserMessages();
   /** Response count before the current prompt. A higher count means its response exists. */
   let baselineCount = adapter.countResponses();
   let lastText = '';
@@ -105,6 +107,7 @@ export function observeTurns(
     tStreamStart = null;
     lastText = '';
     sawGenerating = false;
+    baselineUserCount = adapter.countUserMessages();
     baselineCount = adapter.countResponses();
   };
 
@@ -115,6 +118,7 @@ export function observeTurns(
     lastText = '';
     lastActivity = t0;
     sawGenerating = false;
+    baselineUserCount = adapter.countUserMessages();
     baselineCount = adapter.countResponses();
     schedule(CHECK_DELAY_MS);
   };
@@ -130,17 +134,23 @@ export function observeTurns(
     timer = null;
     const now = Date.now();
     const generating = adapter.isGenerating();
+    const userCount = adapter.countUserMessages();
     const count = adapter.countResponses();
 
     if (t0 === null) {
-      if (!generating) {
-        // Idle: track the count so loading an older chat isn't mistaken for a new response.
+      // A new user message appeared together with a generating state or without a matching new response yet
+      const userPromptJustAppeared =
+        userCount > baselineUserCount && (generating || count <= baselineCount);
+      if (!generating && !userPromptJustAppeared) {
+        // Idle (or navigating between chats): keep baselines in sync.
+        baselineUserCount = userCount;
         baselineCount = count;
         return;
       }
-      // The send event was missed, but the site is generating, so a prompt was just sent.
+      // The send event was missed, but a prompt was just sent.
       t0 = now;
       lastActivity = now;
+      baselineUserCount = userCount;
     }
 
     const hasNewResponse = count > baselineCount;

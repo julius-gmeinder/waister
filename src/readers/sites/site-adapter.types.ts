@@ -38,6 +38,9 @@ export interface SiteAdapter {
    */
   readHistory(): ChatTurn[];
 
+  /** Number of user messages currently in the DOM. A newly sent prompt raises the count. */
+  countUserMessages(): number;
+
   /** Number of assistant responses currently in the DOM. A new response raises the count. */
   countResponses(): number;
 

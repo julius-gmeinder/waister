@@ -19,9 +19,10 @@ export const CHATGPT_SELECTORS = {
   /** Prompt input element (ProseMirror contenteditable div or fallback textarea). */
   promptInput: '#prompt-textarea, [contenteditable="true"]#prompt-textarea',
   /** Send button in the composer footer. */
-  sendButton: 'button[data-testid="send-button"]',
+  sendButton:
+    'button[data-testid="send-button"], button[aria-label*="Send"], form button[type="submit"]',
   /** Stop button shown only while ChatGPT is actively generating/streaming a response. */
-  stopButton: 'button[data-testid="stop-button"]',
+  stopButton: 'button[data-testid="stop-button"], button[aria-label*="Stop"]',
   /** Conversation turn articles rendered in the thread. */
   turnArticle: 'article[data-testid^="conversation-turn-"]',
   /** Elements carrying the author role ('user' | 'assistant') inside each turn. */
@@ -50,14 +51,21 @@ function parseChatGptModel(rawLabel: string, hasThinkingToggle: boolean): ModelI
   const cleaned = rawLabel.trim();
   const lower = cleaned.toLowerCase();
 
-  let thinkingEffort: ThinkingEffort = hasThinkingToggle ? 'medium' : 'none';
+  let thinkingEffort: ThinkingEffort = hasThinkingToggle ? 'medium' : 'unknown';
   if (lower.includes('high')) {
     thinkingEffort = 'high';
   } else if (lower.includes('medium')) {
     thinkingEffort = 'medium';
   } else if (lower.includes('low')) {
     thinkingEffort = 'low';
-  } else if (lower.includes('thinking') || lower.includes('pro') || /\bo[134]\b/.test(lower)) {
+  } else if (lower.includes('instant') || lower.includes('non-reasoning') || lower.includes('4o')) {
+    thinkingEffort = hasThinkingToggle ? 'medium' : 'none';
+  } else if (
+    lower.includes('thinking') ||
+    lower.includes('pro') ||
+    /\bo[134]\b/.test(lower) ||
+    /\b5(?:\.\d+)?\b/.test(lower)
+  ) {
     thinkingEffort = 'medium';
   }
 
@@ -160,6 +168,10 @@ export const chatgptSite: SiteAdapter = {
     if (!latestAssistant) return false;
     const prose = latestAssistant.querySelector('.markdown.prose') ?? latestAssistant;
     return extractCleanText(prose).length > 0;
+  },
+
+  countUserMessages(): number {
+    return document.querySelectorAll(CHATGPT_SELECTORS.userMessage).length;
   },
 
   countResponses(): number {
