@@ -61,9 +61,8 @@ All docs live in `docs/` only. Start at `docs/README.md`. The per-module referen
 ## Status
 
 Backbone only: every `src/**/*.ts` is a stub (header comment + `export {};`), and `popup.html`
-and `popup.css` are empty. `scripts/build.mjs` and `eslint.config.js` still target the old
-per-context layout, and `src/manifest.json` is missing, so **`npm run build` doesn't work yet**.
-The required changes are in `docs/build-and-tooling.md`.
+and `popup.css` are empty. `npm run build` works. `eslint.config.js` still targets the old
+per-context layout. The required changes are in `docs/build-and-tooling.md`.
 
 ## Commands
 

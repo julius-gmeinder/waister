@@ -29,35 +29,26 @@ esbuild build into `dist/waister/` (the unpacked extension you load in the brows
   minified, no source maps.
 - **Static files** are copied after each successful build by the `copy-static` plugin
   (`[source, destination]`, skipped if the source doesn't exist):
-  `src/manifest.json`, the popup HTML/CSS, `sqlite3.wasm`, and everything in `public/`.
+  `src/manifest.json`, `src/ui/popup/popup.html` → `popup/index.html`,
+  `src/ui/popup/popup.css` → `popup/index.css`, and everything in `public/`.
+- Entries: `src/entries/background.entry.ts` → `background.js`,
+  `src/entries/content.entry.ts` → `content.js`, `src/entries/popup.entry.ts` →
+  `popup/index.js`.
 - Watch mode keeps one esbuild context per build alive.
 
-### Required changes for the new layout (not done yet)
+## Manifest (`src/manifest.json`)
 
-`build.mjs` still points at the old per-context paths, which no longer exist since commit
-`4c0bb6a` ("reset src"). The build fails until these are updated:
+MV3, recreated after commit `4c0bb6a` deleted it.
 
-| Setting             | Old                       | New                                            |
-| ------------------- | ------------------------- | ---------------------------------------------- |
-| background entry    | `src/background/index.ts` | `src/entries/background.entry.ts`              |
-| content entry       | `src/content/index.ts`    | `src/entries/content.entry.ts`                 |
-| popup entry         | `src/popup/index.ts`      | `src/entries/popup.entry.ts`                   |
-| popup HTML          | `src/popup/index.html`    | `src/ui/popup/popup.html` → `popup/index.html` |
-| popup CSS           | `src/popup/index.css`     | `src/ui/popup/popup.css` → `popup/index.css`   |
-| `sqlite3.wasm` copy | present                   | remove (SQLite is out of scope)                |
-| `src/manifest.json` | deleted in `4c0bb6a`      | recreate (see below)                           |
-
-### Manifest (to recreate)
-
-The last version (commit `8c56420`) had: MV3, popup `popup/index.html`, background
-`background.js` as module, content script `content.js` on `<all_urls>` at `document_idle`,
-permission `storage`, and CSP `script-src 'self' 'wasm-unsafe-eval'`. For the new scope:
-
-- Narrow `content_scripts.matches` to `https://chatgpt.com/*`, `https://claude.ai/*`,
-  `https://gemini.google.com/*`.
-- Keep `storage` (for `chrome.storage.session`).
-- Keep `'wasm-unsafe-eval'` only if a tokenizer ships as WASM.
-- For Firefox, add `"scripts": ["background.js"]` next to `service_worker` (see root README).
+- **Popup:** `action.default_popup` = `popup/index.html`.
+- **Background:** `background.js` as ES module (`"type": "module"`). `service_worker` for
+  Chrome, `scripts` for Firefox (see root README).
+- **Content script:** `content.js` at `document_idle`, only on `https://chatgpt.com/*`,
+  `https://claude.ai/*`, `https://gemini.google.com/*`.
+- **Permissions:** `storage` (for `chrome.storage.session`). `chrome.tabs.query` for the
+  active tab's id needs no permission.
+- **Icons:** `icons` (16, 32, 48, 128) and `action.default_icon` (16, 32) from `public/icons/`.
+- No CSP. The old `'wasm-unsafe-eval'` is only needed again if a tokenizer ships as WASM.
 
 ## `scripts/zip.mjs`
 
@@ -114,8 +105,9 @@ yet), via `no-restricted-imports` per folder:
 
 ## `public/`
 
-Copied verbatim into `dist/waister/`. `public/icons/` is empty (`.gitkeep`). See the root README
-for adding icons.
+Copied verbatim into `dist/waister/`. `public/icons/` holds the extension icon PNGs (rendered
+from `public/logo/waister.svg`), and `public/logo/` the logo SVGs. See the root README
+(_Extension icon_).
 
 ## History of removed code
 
@@ -126,5 +118,5 @@ for adding icons.
 | `8c56420` | Backbone v2: site adapters + reader strategies, `parsing.ts`, `estimation.ts` (tokens → water/energy)       |
 | `4c0bb6a` | Deleted all of `src/`                                                                                       |
 
-`@sqlite.org/sqlite-wasm` is still listed in `package.json` `dependencies` but is unused. Remove
-it together with the `sqlite3.wasm` copy step when the build is updated.
+`@sqlite.org/sqlite-wasm` is still listed in `package.json` `dependencies` but is unused (the
+`sqlite3.wasm` copy step is already gone). Remove it with `npm uninstall @sqlite.org/sqlite-wasm`.

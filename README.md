@@ -93,12 +93,12 @@ Temporary add-ons are removed when Firefox closes, so repeat this after every re
 **Firefox notes:**
 
 - Firefox does not support `background.service_worker`. For the background script to load,
-  `src/manifest.json` needs `"scripts": ["background.js"]` next to `service_worker` in the
-  `background` key (keep `"type": "module"`, the background is an ES module). Chrome ignores that key (with a warning), and Firefox uses it.
-- In Manifest V3, Firefox treats host permissions (including the content script's
-  `<all_urls>`) as optional. If the content script doesn't run, open `about:addons` →
-  _Waister_ → _Permissions_ and allow access to all websites. You can also grant access from
-  the extensions (puzzle-piece) menu.
+  `src/manifest.json` has `"scripts": ["background.js"]` next to `service_worker` in the
+  `background` key (with `"type": "module"`, the background is an ES module). Chrome ignores that key (with a warning), and Firefox uses it.
+- In Manifest V3, Firefox treats host permissions (including the content script's matches
+  for chatgpt.com, claude.ai and gemini.google.com) as optional. If the content script doesn't
+  run, open `about:addons` → _Waister_ → _Permissions_ and allow access to those sites. You
+  can also grant access from the extensions (puzzle-piece) menu.
 
 **Optional, `web-ext`:** Mozilla's CLI starts a clean Firefox profile with the extension
 installed and reloads it automatically on every rebuild:
@@ -161,11 +161,18 @@ scripts/            build.mjs (esbuild), zip.mjs (store package)
 
 All documentation lives in [`docs/`](docs/README.md); per-module reference: [`docs/modules.md`](docs/modules.md).
 
-## Adding icons
+## Extension icon
 
-Put PNGs in `public/icons/` (e.g. 16, 32, 48, 128 px) and reference them in
-`src/manifest.json`:
+The browser draws the toolbar button, the extensions page and the store listing itself, so it
+takes the extension icon from `src/manifest.json` (`icons`, plus `action.default_icon` for the
+toolbar). This is separate from the lucide icons inside the popup.
 
-```json
-"icons": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+`public/icons/icon{16,32,48,128}.png` are rendered from `public/logo/waister.svg`. Manifest
+icons must be PNG (Chrome doesn't accept SVG there). To regenerate them after changing the logo,
+render the SVG at each size, e.g. with headless Chrome:
+
+```sh
+chrome --headless=new --hide-scrollbars --force-device-scale-factor=1 \
+  --default-background-color=00000000 --window-size=128,128 \
+  --screenshot=public/icons/icon128.png page-showing-the-svg-at-128px.html
 ```
