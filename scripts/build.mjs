@@ -2,13 +2,16 @@ import * as esbuild from 'esbuild';
 import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 
 const watch = process.argv.includes('--watch');
-const outdir = 'dist';
+/** The unpacked extension. Load this folder in the browser. */
+const outdir = 'dist/waister';
 
-/** Files copied as-is into dist/ ([source, destination]). */
+/** Files copied as-is into the extension folder ([source, destination]). */
 const staticFiles = [
   ['src/manifest.json', 'manifest.json'],
   ['src/popup/popup.html', 'popup/popup.html'],
   ['src/popup/popup.css', 'popup/popup.css'],
+  // sqlite-wasm resolves this relative to background.js (via import.meta.url).
+  ['node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm', 'sqlite3.wasm'],
   ['public', '.'],
 ];
 
@@ -35,27 +38,39 @@ rmSync(outdir, { recursive: true, force: true });
 mkdirSync(outdir, { recursive: true });
 
 /** @type {esbuild.BuildOptions} */
-const options = {
-  entryPoints: {
-    background: 'src/background.ts',
-    content: 'src/content.ts',
-    'popup/popup': 'src/popup/popup.ts',
-  },
+const shared = {
   outdir,
   bundle: true,
-  // IIFE keeps every entry self-contained: content scripts can't use ES module imports.
-  format: 'iife',
   target: 'es2022',
   sourcemap: watch ? 'inline' : false,
   minify: !watch,
   logLevel: 'info',
-  plugins: [copyStaticPlugin],
 };
 
+/** @type {esbuild.BuildOptions[]} */
+const builds = [
+  {
+    ...shared,
+    // ES module so sqlite-wasm can find sqlite3.wasm through import.meta.url
+    // (the manifest declares the background as "type": "module").
+    entryPoints: { background: 'src/background.ts' },
+    format: 'esm',
+  },
+  {
+    ...shared,
+    entryPoints: {
+      content: 'src/content.ts',
+      'popup/popup': 'src/popup/popup.ts',
+    },
+    // IIFE keeps every entry self-contained: content scripts can't use ES module imports.
+    format: 'iife',
+    plugins: [copyStaticPlugin],
+  },
+];
+
 if (watch) {
-  const ctx = await esbuild.context(options);
-  await ctx.watch();
+  for (const options of builds) await (await esbuild.context(options)).watch();
   console.log('[build] watching for changes…');
 } else {
-  await esbuild.build(options);
+  await Promise.all(builds.map((options) => esbuild.build(options)));
 }

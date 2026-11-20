@@ -10,10 +10,10 @@ A browser extension (Manifest V3) written in TypeScript.
 
 ```sh
 npm install
-npm run dev      # build into dist/ and rebuild on change
+npm run dev      # build into dist/waister/ and rebuild on change
 ```
 
-Then load `dist/` into your browser as described below.
+Then load `dist/waister/` into your browser as described below.
 
 ## Using the extension in the browser
 
@@ -31,7 +31,7 @@ original `.ts` files.
 
 ### Development loop
 
-1. Keep `npm run dev` running. It rebuilds `dist/` on every save.
+1. Keep `npm run dev` running. It rebuilds `dist/waister/` on every save.
 2. Reload the extension in the browser (see below). Changes to the background, popup and
    manifest need this.
 3. Refresh any open tabs you are testing on. Already-open pages keep the old content script
@@ -43,7 +43,7 @@ original `.ts` files.
 
 1. Open `chrome://extensions` (`edge://extensions`, `brave://extensions`).
 2. Turn on _Developer mode_ (top right).
-3. Click _Load unpacked_ and select the `dist/` folder.
+3. Click _Load unpacked_ and select the `dist/waister/` folder.
 4. Pin the extension from the puzzle-piece menu so its toolbar icon is visible.
 
 The extension stays installed across browser restarts. **Reload** it with the ↻ icon on its
@@ -69,7 +69,7 @@ card, or run `chrome.runtime.reload()` in the background console.
 **Load:**
 
 1. Open `about:debugging#/runtime/this-firefox`.
-2. Click _Load Temporary Add-on…_ and select `dist/manifest.json`.
+2. Click _Load Temporary Add-on…_ and select `dist/waister/manifest.json`.
 
 Temporary add-ons are removed when Firefox closes, so repeat this after every restart.
 **Reload** the extension with the _Reload_ button on its entry in `about:debugging`.
@@ -90,7 +90,7 @@ Temporary add-ons are removed when Firefox closes, so repeat this after every re
 
 - Firefox does not support `background.service_worker`. For the background script to load,
   `src/manifest.json` needs `"scripts": ["background.js"]` next to `service_worker` in the
-  `background` key. Chrome ignores that key (with a warning), and Firefox uses it.
+  `background` key (keep `"type": "module"`, the background is an ES module). Chrome ignores that key (with a warning), and Firefox uses it.
 - In Manifest V3, Firefox treats host permissions (including the content script's
   `<all_urls>`) as optional. If the content script doesn't run, open `about:addons` →
   _Waister_ → _Permissions_ and allow access to all websites. You can also grant access from
@@ -100,9 +100,9 @@ Temporary add-ons are removed when Firefox closes, so repeat this after every re
 installed and reloads it automatically on every rebuild:
 
 ```sh
-npx web-ext run --source-dir dist                      # Firefox
-npx web-ext run --source-dir dist --target chromium    # Chrome/Chromium
-npx web-ext lint --source-dir dist                     # validate the manifest/package
+npx web-ext run --source-dir dist/waister                      # Firefox
+npx web-ext run --source-dir dist/waister --target chromium    # Chrome/Chromium
+npx web-ext lint --source-dir dist/waister                     # validate the manifest/package
 ```
 
 ### Troubleshooting
@@ -118,31 +118,62 @@ npx web-ext lint --source-dir dist                     # validate the manifest/p
 - **Logs are missing.** You are probably looking at the wrong console. See the table at the
   top of this section.
 
+## Database (SQLite)
+
+The background worker uses [SQLite WASM](https://sqlite.org/wasm) (`@sqlite.org/sqlite-wasm`)
+through `src/db.ts`:
+
+```ts
+import { getDb, persist } from './db';
+
+const db = await getDb(); // initialises SQLite on first use
+db.exec('INSERT INTO kv (key, value) VALUES (?, ?)', { bind: ['a', 'b'] });
+const value = db.selectValue('SELECT value FROM kv WHERE key = ?', ['a']);
+await persist(); // save, see below
+```
+
+- **Schema:** edit `SCHEMA` in `src/db.ts`. It runs on every start, so keep the statements
+  idempotent (`CREATE TABLE IF NOT EXISTS …`).
+- **Persistence:** the database lives in memory, and `persist()` saves a snapshot of the
+  whole database to IndexedDB, which `getDb()` restores on the next start. Call it after every
+  write you want to keep. The browser stops the background worker when it's idle, and anything
+  not persisted is lost. (The OPFS-backed SQLite VFSes need a dedicated Worker, which MV3
+  service workers can't create.)
+- **Try it:** from the popup's DevTools console:
+  `await chrome.runtime.sendMessage({ type: 'KV_SET', key: 'hello', value: 'world' })`, then
+  `await chrome.runtime.sendMessage({ type: 'KV_GET', key: 'hello' })`.
+- **Build details:** `sqlite3.wasm` is copied next to `background.js`, which is bundled as an ES
+  module so that SQLite can find the `.wasm` file via `import.meta.url`. The manifest's CSP allows
+  `'wasm-unsafe-eval'`, which is needed to compile WebAssembly.
+- **Only the background** can use the database. The popup and content scripts talk to it through
+  messages (see `src/messages.ts`).
+
 ## Scripts
 
 | Command             | Description                                          |
 | ------------------- | ---------------------------------------------------- |
 | `npm run dev`       | Watch mode with inline source maps                   |
-| `npm run build`     | Production build (minified) into `dist/`             |
+| `npm run build`     | Production build (minified) into `dist/waister/`     |
 | `npm run typecheck` | Type-check with `tsc`                                |
 | `npm run lint`      | Lint with ESLint                                     |
 | `npm run format`    | Format with Prettier                                 |
 | `npm run check`     | Typecheck + lint + format check                      |
-| `npm run zip`       | Build and package `dist/` as `waister-<version>.zip` |
+| `npm run zip`       | Build and package it as `dist/waister-<version>.zip` |
 
 ## Project structure
 
 ```
 src/
-  manifest.json     Extension manifest (copied to dist/)
+  manifest.json     Extension manifest (copied to dist/waister/)
   background.ts     Background service worker
   content.ts        Content script injected into web pages
+  db.ts             SQLite (WASM) database used by the background worker
   messages.ts       Shared message types
   popup/            Toolbar popup (HTML, CSS, TS)
-public/             Static assets copied verbatim into dist/ (e.g. icons/)
+public/             Static assets copied verbatim into dist/waister/ (e.g. icons/)
 scripts/
   build.mjs         esbuild build script
-  zip.mjs           Packages dist/ for store upload
+  zip.mjs           Packages dist/waister/ for store upload
 ```
 
 Each TypeScript entry point is bundled by esbuild into a single self-contained file (IIFE),
