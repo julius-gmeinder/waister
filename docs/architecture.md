@@ -10,8 +10,8 @@ the tokens, and the popup shows the result.
         │
         ▼
 ┌─ content script ──────────────────────────────────────────────────────────┐
-│  readers/sites/<site>.site.ts            WHERE (DOM hooks & stream done)  │
-│  readers/strategies/dom-capture.strategy CONSOLIDATES sites → DTO         │
+│  readers/sites/<site>.site.ts            WHERE (selectors & DOM reads)    │
+│  readers/strategies/dom-capture.strategy WHEN (turn detection) → DTO      │
 │    (latencyMs = t1 - t0, thinkingTimeMs = tStreamStart - t0)              │
 └───────────────────────────┬───────────────────────────────────────────────┘
                             │ chrome.runtime message ESTIMATE_PROMPT

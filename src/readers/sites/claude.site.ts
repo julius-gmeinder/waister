@@ -1,24 +1,21 @@
 /**
  * SiteAdapter for Claude (claude.ai). Provider: anthropic.
  *
- * Responsibility: Only hooks into Claude's DOM and exposes selectors/reads.
- * Waits until a response stream is completely finished before forwarding timings to the
- * dom-capture.strategy.
+ * Responsibility: Only knows Claude's DOM and exposes selectors/reads.
+ * Timing (when a prompt was sent / finished) lives in dom-capture.strategy.
  *
  * Context: content script
  * Docs: docs/modules.md#site-adapters
  */
 
 import type { ChatTurn, ModelInfo, ThinkingEffort } from '../../dto/chat-capture.dto';
-import type { OnTurnCompleted, SiteAdapter } from './site-adapter.types';
+import type { SiteAdapter } from './site-adapter.types';
 
 /**
  * Centralized DOM selectors for Claude (claude.ai).
  * Kept at the top of the file so UI updates only require selector adjustments here.
  */
 export const CLAUDE_SELECTORS = {
-  /** Main conversation feed container in Claude's web app. */
-  chatContainer: 'main, [data-testid="chat-feed"]',
   /** ProseMirror contenteditable input box in the Claude composer. */
   promptInput: 'div.ProseMirror[contenteditable="true"], [data-testid="chat-input"]',
   /** Send button in the Claude composer. */
@@ -94,10 +91,6 @@ export const claudeSite: SiteAdapter = {
     return host === 'claude.ai' || host.endsWith('.claude.ai');
   },
 
-  getChatContainer(): Element {
-    return document.querySelector(CLAUDE_SELECTORS.chatContainer) ?? document.body;
-  },
-
   readModel(): ModelInfo {
     const selectorNode = document.querySelector(CLAUDE_SELECTORS.modelSelector);
     const rawLabel = extractCleanText(selectorNode);
@@ -162,117 +155,15 @@ export const claudeSite: SiteAdapter = {
     return extractCleanText(latestAssistant).length > 0;
   },
 
-  /**
-   * Hooks into Claude's DOM to capture t0 (user sends prompt), tStreamStart (first visible
-   * response tokens appear after any extended thinking phase), and t1 (stream finished).
-   * Only invokes `onCompleted` once the response stream is completely done.
-   */
-  observeTurnCompletion(onCompleted: OnTurnCompleted): () => void {
-    let t0: number | null = null;
-    let tStreamStart: number | null = null;
-    let wasGenerating = false;
-    let initialAssistantCount = document.querySelectorAll(CLAUDE_SELECTORS.assistantMessage).length;
-    let settleTimer: number | null = null;
+  countResponses(): number {
+    return document.querySelectorAll(CLAUDE_SELECTORS.assistantMessage).length;
+  },
 
-    const markPromptSent = () => {
-      if (t0 === null) {
-        t0 = Date.now();
-        tStreamStart = null;
-        initialAssistantCount = document.querySelectorAll(CLAUDE_SELECTORS.assistantMessage).length;
-      }
-    };
+  isPromptInput(target: Element): boolean {
+    return target.closest(CLAUDE_SELECTORS.promptInput) !== null;
+  },
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Enter' && !event.shiftKey) {
-        const target = event.target as Element | null;
-        if (target && target.closest(CLAUDE_SELECTORS.promptInput)) {
-          markPromptSent();
-        }
-      }
-    };
-
-    const onClick = (event: MouseEvent) => {
-      const target = event.target as Element | null;
-      if (target?.closest(CLAUDE_SELECTORS.sendButton)) {
-        markPromptSent();
-      }
-    };
-
-    document.addEventListener('keydown', onKeyDown, true);
-    document.addEventListener('click', onClick, true);
-
-    const observer = new MutationObserver(() => {
-      const generating = this.isGenerating();
-      const assistantCount = document.querySelectorAll(CLAUDE_SELECTORS.assistantMessage).length;
-      const hasNewAssistantTurn = assistantCount > initialAssistantCount;
-
-      if (generating && t0 === null) {
-        t0 = Date.now();
-        initialAssistantCount = Math.max(0, assistantCount - 1);
-      }
-
-      if (generating) {
-        wasGenerating = true;
-        if (settleTimer !== null) {
-          window.clearTimeout(settleTimer);
-          settleTimer = null;
-        }
-      }
-
-      // Record tStreamStart when the new assistant response block starts showing visible characters
-      if (
-        t0 !== null &&
-        tStreamStart === null &&
-        hasNewAssistantTurn &&
-        this.isStreamingVisibleText()
-      ) {
-        tStreamStart = Date.now();
-      }
-
-      // Trigger completion only after streaming stops and remains settled
-      if (wasGenerating && !generating && t0 !== null) {
-        if (settleTimer !== null) {
-          window.clearTimeout(settleTimer);
-        }
-        const capturedT0 = t0;
-        const capturedStreamStart = tStreamStart;
-
-        settleTimer = window.setTimeout(() => {
-          if (this.isGenerating()) return;
-          const t1 = Date.now();
-          const effectiveStreamStart = capturedStreamStart ?? t1;
-
-          t0 = null;
-          tStreamStart = null;
-          wasGenerating = false;
-          initialAssistantCount = document.querySelectorAll(
-            CLAUDE_SELECTORS.assistantMessage,
-          ).length;
-          settleTimer = null;
-
-          onCompleted({
-            t0: capturedT0,
-            tStreamStart: effectiveStreamStart,
-            t1,
-          });
-        }, 300);
-      }
-    });
-
-    observer.observe(this.getChatContainer(), {
-      childList: true,
-      subtree: true,
-      characterData: true,
-      attributes: true,
-    });
-
-    return () => {
-      observer.disconnect();
-      document.removeEventListener('keydown', onKeyDown, true);
-      document.removeEventListener('click', onClick, true);
-      if (settleTimer !== null) {
-        window.clearTimeout(settleTimer);
-      }
-    };
+  isSendButton(target: Element): boolean {
+    return target.closest(CLAUDE_SELECTORS.sendButton) !== null;
   },
 };

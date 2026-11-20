@@ -31,3 +31,4 @@ _Superseded by NNNN_ instead.
 | 0005 | [Scope ends at one token number](decisions/0005-tokens-only-scope.md)                  | Accepted |
 | 0006 | [One tokenizer per provider](decisions/0006-per-provider-tokenizers.md)                | Accepted |
 | 0007 | [Response as its own DTO field](decisions/0007-response-field.md)                      | Accepted |
+| 0008 | [Turn detection in the strategy](decisions/0008-turn-detection-in-strategy.md)         | Accepted |

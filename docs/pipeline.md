@@ -29,22 +29,26 @@ Visible stream starts (tStreamStart)  ──▶ thinkingTimeMs = tStreamStart �
 Stream finishes & settles (t1)        ──▶ latencyMs = t1 − t0
   │
   ▼
-SiteAdapter notifies dom-capture.strategy.ts
-  │
-  ▼
 Strategy reads { model, userInput, response, chatHistory[] } from SiteAdapter
   │
   ▼
 Builds ChatCaptureDto & sends ESTIMATE_PROMPT ──▶ message.handler.ts ──▶ handleEstimation(dto)
 ```
 
-1. **Prompt sent (`t0`)**: The site adapter's DOM hook detects the user pressing Enter in the
-   composer or clicking the Send button (with a fallback when `isGenerating()` turns true).
-2. **Start of visible stream (`tStreamStart`)**: The site adapter's `MutationObserver` watches for
-   the new assistant turn to render its first visible output characters (`isStreamingVisibleText()`).
-3. **Response finished (`t1`)**: The site adapter waits until `isGenerating()` transitions from
-   `true` to `false` and remains settled (300 ms debounce so multi-chunk streams finish completely).
-   Only then does the site adapter invoke the strategy callback with `{ t0, tStreamStart, t1 }`.
+`observeTurns(adapter, onCompleted)` in the strategy runs this for every site. It watches the whole
+`document.body` with one `MutationObserver` (chat apps are SPAs and replace their containers on
+navigation) and coalesces mutation bursts into one check per 150 ms. The adapter only answers DOM
+questions (`countResponses()`, `isGenerating()`, `readResponse()`, …).
+
+1. **Prompt sent (`t0`)**: Enter (without Shift) in the composer with non-empty text
+   (`isPromptInput`), or a click on the send button (`isSendButton`). Fallback: `isGenerating()`
+   turns true while no prompt is in flight. The current `countResponses()` becomes the baseline.
+2. **Start of visible stream (`tStreamStart`)**: the first check where `countResponses()` is above
+   the baseline and `isStreamingVisibleText()` is true.
+3. **Response finished (`t1`)**: `isGenerating()` is false and the response text has not changed
+   for 400 ms. If `isGenerating()` was never true during the turn (e.g. the stop-button selector
+   doesn't match a localized UI), the text must stay unchanged for 2.5 s instead. `t1` is the time
+   of the last change, not of the check. A prompt that never gets a response is dropped after 2 min.
 4. **DTO consolidation**: `dom-capture.strategy.ts` computes both:
    - `thinkingTimeMs = tStreamStart − t0` (delta between prompt send and start of visible stream)
    - `latencyMs = t1 − t0` (total time from prompt send until response completion)

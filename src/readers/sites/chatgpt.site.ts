@@ -1,24 +1,21 @@
 /**
  * SiteAdapter for ChatGPT (chatgpt.com). Provider: openai.
  *
- * Responsibility: Only hooks into ChatGPT's DOM and exposes selectors/reads.
- * Waits until a response stream is completely finished before forwarding timings to the
- * dom-capture.strategy.
+ * Responsibility: Only knows ChatGPT's DOM and exposes selectors/reads.
+ * Timing (when a prompt was sent / finished) lives in dom-capture.strategy.
  *
  * Context: content script
  * Docs: docs/modules.md#site-adapters
  */
 
 import type { ChatTurn, ModelInfo, ThinkingEffort } from '../../dto/chat-capture.dto';
-import type { OnTurnCompleted, SiteAdapter } from './site-adapter.types';
+import type { SiteAdapter } from './site-adapter.types';
 
 /**
  * Centralized DOM selectors for ChatGPT (chatgpt.com).
  * Kept at the top of the file so UI updates only require selector adjustments here.
  */
 export const CHATGPT_SELECTORS = {
-  /** Main scrollable thread container holding conversation turns. */
-  chatContainer: 'main',
   /** Prompt input element (ProseMirror contenteditable div or fallback textarea). */
   promptInput: '#prompt-textarea, [contenteditable="true"]#prompt-textarea',
   /** Send button in the composer footer. */
@@ -95,10 +92,6 @@ export const chatgptSite: SiteAdapter = {
     return host === 'chatgpt.com' || host.endsWith('.chatgpt.com');
   },
 
-  getChatContainer(): Element {
-    return document.querySelector(CHATGPT_SELECTORS.chatContainer) ?? document.body;
-  },
-
   readModel(): ModelInfo {
     const button = document.querySelector(CHATGPT_SELECTORS.modelSelector);
     const rawLabel = extractCleanText(button);
@@ -169,125 +162,15 @@ export const chatgptSite: SiteAdapter = {
     return extractCleanText(prose).length > 0;
   },
 
-  /**
-   * Hooks into ChatGPT's DOM to detect when the user submits a prompt (t0),
-   * when visible output streaming starts (tStreamStart), and when streaming is
-   * completely finished (t1). Only calls `onCompleted` once the stream is done.
-   */
-  observeTurnCompletion(onCompleted: OnTurnCompleted): () => void {
-    let t0: number | null = null;
-    let tStreamStart: number | null = null;
-    let wasGenerating = false;
-    let initialAssistantCount = document.querySelectorAll(
-      CHATGPT_SELECTORS.assistantMessage,
-    ).length;
-    let settleTimer: number | null = null;
+  countResponses(): number {
+    return document.querySelectorAll(CHATGPT_SELECTORS.assistantMessage).length;
+  },
 
-    // Mark t0 when the user presses Enter in the prompt input or clicks the send button
-    const markPromptSent = () => {
-      if (t0 === null) {
-        t0 = Date.now();
-        tStreamStart = null;
-        initialAssistantCount = document.querySelectorAll(
-          CHATGPT_SELECTORS.assistantMessage,
-        ).length;
-      }
-    };
+  isPromptInput(target: Element): boolean {
+    return target.closest(CHATGPT_SELECTORS.promptInput) !== null;
+  },
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Enter' && !event.shiftKey) {
-        const target = event.target as Element | null;
-        if (target && target.matches(CHATGPT_SELECTORS.promptInput)) {
-          markPromptSent();
-        }
-      }
-    };
-
-    const onClick = (event: MouseEvent) => {
-      const target = event.target as Element | null;
-      if (target?.closest(CHATGPT_SELECTORS.sendButton)) {
-        markPromptSent();
-      }
-    };
-
-    document.addEventListener('keydown', onKeyDown, true);
-    document.addEventListener('click', onClick, true);
-
-    const observer = new MutationObserver(() => {
-      const generating = this.isGenerating();
-      const assistantCount = document.querySelectorAll(CHATGPT_SELECTORS.assistantMessage).length;
-      const hasNewAssistantTurn = assistantCount > initialAssistantCount;
-
-      // Fallback t0 detection if generation started without catching the key/click event
-      if (generating && t0 === null) {
-        t0 = Date.now();
-        initialAssistantCount = Math.max(0, assistantCount - 1);
-      }
-
-      if (generating) {
-        wasGenerating = true;
-        if (settleTimer !== null) {
-          window.clearTimeout(settleTimer);
-          settleTimer = null;
-        }
-      }
-
-      // Record tStreamStart as soon as the new assistant message starts rendering visible text
-      if (
-        t0 !== null &&
-        tStreamStart === null &&
-        hasNewAssistantTurn &&
-        this.isStreamingVisibleText()
-      ) {
-        tStreamStart = Date.now();
-      }
-
-      // Wait until generation/streaming has completely stopped before notifying the strategy
-      if (wasGenerating && !generating && t0 !== null) {
-        if (settleTimer !== null) {
-          window.clearTimeout(settleTimer);
-        }
-        const capturedT0 = t0;
-        const capturedStreamStart = tStreamStart;
-
-        // Short settle debounce (300ms) ensures ChatGPT's DOM stream is completely finished
-        settleTimer = window.setTimeout(() => {
-          if (this.isGenerating()) return; // Resumed streaming; keep waiting
-          const t1 = Date.now();
-          const effectiveStreamStart = capturedStreamStart ?? t1;
-
-          // Reset state for the next prompt turn
-          t0 = null;
-          tStreamStart = null;
-          wasGenerating = false;
-          initialAssistantCount = document.querySelectorAll(
-            CHATGPT_SELECTORS.assistantMessage,
-          ).length;
-          settleTimer = null;
-
-          onCompleted({
-            t0: capturedT0,
-            tStreamStart: effectiveStreamStart,
-            t1,
-          });
-        }, 300);
-      }
-    });
-
-    observer.observe(this.getChatContainer(), {
-      childList: true,
-      subtree: true,
-      characterData: true,
-      attributes: true,
-    });
-
-    return () => {
-      observer.disconnect();
-      document.removeEventListener('keydown', onKeyDown, true);
-      document.removeEventListener('click', onClick, true);
-      if (settleTimer !== null) {
-        window.clearTimeout(settleTimer);
-      }
-    };
+  isSendButton(target: Element): boolean {
+    return target.closest(CHATGPT_SELECTORS.sendButton) !== null;
   },
 };

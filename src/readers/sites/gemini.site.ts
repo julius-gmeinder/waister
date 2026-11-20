@@ -1,33 +1,35 @@
 /**
  * SiteAdapter for Gemini (gemini.google.com). Provider: google.
  *
- * Responsibility: Only hooks into Gemini's DOM (Angular custom elements like <user-query> and
- * <model-response>) and exposes selectors/reads. Waits until a response stream is completely
- * finished before forwarding timings to the dom-capture.strategy.
+ * Responsibility: Only knows Gemini's DOM (Angular custom elements like <user-query> and
+ * <model-response>) and exposes selectors/reads.
+ * Timing (when a prompt was sent / finished) lives in dom-capture.strategy.
  *
  * Context: content script
  * Docs: docs/modules.md#site-adapters
  */
 
 import type { ChatTurn, ModelInfo, ThinkingEffort } from '../../dto/chat-capture.dto';
-import type { OnTurnCompleted, SiteAdapter } from './site-adapter.types';
+import type { SiteAdapter } from './site-adapter.types';
 
 /**
  * Centralized DOM selectors for Google Gemini (gemini.google.com).
  * Kept at the top of the file so UI updates only require selector adjustments here.
  */
 export const GEMINI_SELECTORS = {
-  /** Main chat history scroll container in Gemini's web app. */
-  chatContainer: 'chat-window, main, #chat-history',
   /** Rich-textarea / Quill contenteditable prompt field in the Gemini input area. */
   promptInput: 'rich-textarea .ql-editor, div[contenteditable="true"][role="textbox"]',
-  /** Send message button in the composer. */
-  sendButton: 'button.send-button, button[aria-label="Send message"]',
-  /** Stop button or active streaming indicator during generation. */
-  stopButton: 'button[aria-label="Stop response"], button[aria-label="Stop generating"]',
+  /** Send message button in the composer (it turns into the stop button while generating). */
+  sendButton: 'button.send-button:not(.stop), button[aria-label="Send message"]',
+  /**
+   * Stop button shown during generation. Matched by class/icon first because aria-labels are
+   * localized (e.g. German UI), the English labels are only a fallback.
+   */
+  stopButton:
+    'button.send-button.stop, .send-button [fonticon="stop"], .send-button [data-mat-icon-name="stop"], button[aria-label="Stop response"], button[aria-label="Stop generating"]',
   /** Loading / streaming state indicators on the active model-response custom element. */
   streamingIndicator:
-    'model-response[is-streaming="true"], .mat-mdc-progress-spinner, [data-test-id="streaming-indicator"]',
+    'model-response[is-streaming="true"], model-response .mat-mdc-progress-spinner, [data-test-id="streaming-indicator"]',
   /** Custom element or class wrapping user prompts. */
   userMessage: 'user-query .query-text, user-query, .user-query-container',
   /** Custom element or class wrapping Gemini model responses (excludes thought summary drawers). */
@@ -102,10 +104,6 @@ export const geminiSite: SiteAdapter = {
     return host === 'gemini.google.com';
   },
 
-  getChatContainer(): Element {
-    return document.querySelector(GEMINI_SELECTORS.chatContainer) ?? document.body;
-  },
-
   readModel(): ModelInfo {
     const selectorNode = document.querySelector(GEMINI_SELECTORS.modelSelector);
     const rawLabel = extractCleanText(selectorNode);
@@ -174,115 +172,15 @@ export const geminiSite: SiteAdapter = {
     return extractGeminiResponseText(latestResponse).length > 0;
   },
 
-  /**
-   * Hooks into Gemini's DOM to capture t0 (user sends prompt), tStreamStart (when the visible
-   * <message-content> begins populating after any thinking spinner/drawer), and t1 (when the
-   * stream finishes). Only invokes `onCompleted` once the stream is completely done.
-   */
-  observeTurnCompletion(onCompleted: OnTurnCompleted): () => void {
-    let t0: number | null = null;
-    let tStreamStart: number | null = null;
-    let wasGenerating = false;
-    let initialResponseCount = document.querySelectorAll('model-response').length;
-    let settleTimer: number | null = null;
+  countResponses(): number {
+    return document.querySelectorAll('model-response').length;
+  },
 
-    const markPromptSent = () => {
-      if (t0 === null) {
-        t0 = Date.now();
-        tStreamStart = null;
-        initialResponseCount = document.querySelectorAll('model-response').length;
-      }
-    };
+  isPromptInput(target: Element): boolean {
+    return target.closest(GEMINI_SELECTORS.promptInput) !== null;
+  },
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Enter' && !event.shiftKey) {
-        const target = event.target as Element | null;
-        if (target && target.closest(GEMINI_SELECTORS.promptInput)) {
-          markPromptSent();
-        }
-      }
-    };
-
-    const onClick = (event: MouseEvent) => {
-      const target = event.target as Element | null;
-      if (target?.closest(GEMINI_SELECTORS.sendButton)) {
-        markPromptSent();
-      }
-    };
-
-    document.addEventListener('keydown', onKeyDown, true);
-    document.addEventListener('click', onClick, true);
-
-    const observer = new MutationObserver(() => {
-      const generating = this.isGenerating();
-      const responseCount = document.querySelectorAll('model-response').length;
-      const hasNewResponseTurn = responseCount > initialResponseCount;
-
-      if (generating && t0 === null) {
-        t0 = Date.now();
-        initialResponseCount = Math.max(0, responseCount - 1);
-      }
-
-      if (generating) {
-        wasGenerating = true;
-        if (settleTimer !== null) {
-          window.clearTimeout(settleTimer);
-          settleTimer = null;
-        }
-      }
-
-      // Record tStreamStart once the new <model-response> renders visible answer characters
-      if (
-        t0 !== null &&
-        tStreamStart === null &&
-        hasNewResponseTurn &&
-        this.isStreamingVisibleText()
-      ) {
-        tStreamStart = Date.now();
-      }
-
-      // Only notify the strategy once the stream is finished and settled
-      if (wasGenerating && !generating && t0 !== null) {
-        if (settleTimer !== null) {
-          window.clearTimeout(settleTimer);
-        }
-        const capturedT0 = t0;
-        const capturedStreamStart = tStreamStart;
-
-        settleTimer = window.setTimeout(() => {
-          if (this.isGenerating()) return;
-          const t1 = Date.now();
-          const effectiveStreamStart = capturedStreamStart ?? t1;
-
-          t0 = null;
-          tStreamStart = null;
-          wasGenerating = false;
-          initialResponseCount = document.querySelectorAll('model-response').length;
-          settleTimer = null;
-
-          onCompleted({
-            t0: capturedT0,
-            tStreamStart: effectiveStreamStart,
-            t1,
-          });
-        }, 300);
-      }
-    });
-
-    observer.observe(this.getChatContainer(), {
-      childList: true,
-      subtree: true,
-      characterData: true,
-      attributes: true,
-    });
-
-    return () => {
-      observer.disconnect();
-      document.removeEventListener('keydown', onKeyDown, true);
-      document.removeEventListener('click', onClick, true);
-      if (settleTimer !== null) {
-        window.clearTimeout(settleTimer);
-      }
-    };
+  isSendButton(target: Element): boolean {
+    return target.closest(GEMINI_SELECTORS.sendButton) !== null;
   },
 };
