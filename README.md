@@ -1,6 +1,10 @@
 # Waister
 
-A browser extension (Manifest V3) written in TypeScript.
+A browser extension (Manifest V3, TypeScript) that estimates the total token usage of a single
+prompt in ChatGPT, Claude and Gemini, including tokens you cannot see (thinking, system prompt).
+
+> **Status:** backbone only. `src/` contains stubs, and the build is not yet wired to the new
+> layout. See [`docs/build-and-tooling.md`](docs/build-and-tooling.md).
 
 ## Requirements
 
@@ -19,11 +23,11 @@ Then load `dist/waister/` into your browser as described below.
 
 The extension is made of three parts, and each one is debugged in a different place:
 
-| Part           | Source            | Runs in                                       |
-| -------------- | ----------------- | --------------------------------------------- |
-| Background     | `src/background/` | Its own context (service worker / event page) |
-| Content script | `src/content/`    | Every web page you open (isolated world)      |
-| Popup          | `src/popup/`      | The toolbar popup, only while it is open      |
+| Part           | Source                                                      | Runs in                                       |
+| -------------- | ----------------------------------------------------------- | --------------------------------------------- |
+| Background     | `src/entries/background.entry.ts`, `handlers/`, `services/` | Its own context (service worker / event page) |
+| Content script | `src/entries/content.entry.ts`, `readers/`                  | The supported chat sites (isolated world)     |
+| Popup          | `src/entries/popup.entry.ts`, `ui/popup/`                   | The toolbar popup, only while it is open      |
 
 `console.log` output from each part shows up in **that part's** DevTools, not in a shared
 console. In `npm run dev` builds, inline source maps let you see and set breakpoints in the
@@ -118,35 +122,12 @@ npx web-ext lint --source-dir dist/waister                     # validate the ma
 - **Logs are missing.** You are probably looking at the wrong console. See the table at the
   top of this section.
 
-## Database (SQLite)
+## Database
 
-The background worker uses [SQLite WASM](https://sqlite.org/wasm) (`@sqlite.org/sqlite-wasm`)
-through `src/background/db.ts`:
-
-```ts
-import { getDb, persist } from './db';
-
-const db = await getDb(); // initialises SQLite on first use
-db.exec('INSERT INTO kv (key, value) VALUES (?, ?)', { bind: ['a', 'b'] });
-const value = db.selectValue('SELECT value FROM kv WHERE key = ?', ['a']);
-await persist(); // save, see below
-```
-
-- **Schema:** edit `SCHEMA` in `src/background/db.ts`. It runs on every start, so keep the statements
-  idempotent (`CREATE TABLE IF NOT EXISTS …`).
-- **Persistence:** the database lives in memory, and `persist()` saves a snapshot of the
-  whole database to IndexedDB, which `getDb()` restores on the next start. Call it after every
-  write you want to keep. The browser stops the background worker when it's idle, and anything
-  not persisted is lost. (The OPFS-backed SQLite VFSes need a dedicated Worker, which MV3
-  service workers can't create.)
-- **Try it:** from the popup's DevTools console:
-  `await chrome.runtime.sendMessage({ type: 'KV_SET', key: 'hello', value: 'world' })`, then
-  `await chrome.runtime.sendMessage({ type: 'KV_GET', key: 'hello' })`.
-- **Build details:** `sqlite3.wasm` is copied next to `background.js`, which is bundled as an ES
-  module so that SQLite can find the `.wasm` file via `import.meta.url`. The manifest's CSP allows
-  `'wasm-unsafe-eval'`, which is needed to compile WebAssembly.
-- **Only the background** can use the database. The popup and content scripts talk to it through
-  messages (see `src/shared/messages.ts` and `src/background/handlers.ts`).
+There is none. Earlier versions used SQLite WASM in the background, but it was removed when the
+scope was narrowed to token estimation ([ADR 0005](docs/decisions/0005-tokens-only-scope.md)).
+The latest estimate per tab lives in `chrome.storage.session`. The unused
+`@sqlite.org/sqlite-wasm` dependency is still in `package.json`.
 
 ## Scripts
 
@@ -162,68 +143,23 @@ await persist(); // save, see below
 
 ## Project structure
 
+`src/` is organized by layer. Each layer belongs to one runtime context:
+
 ```
 src/
-  manifest.json             Extension manifest (copied to dist/waister/)
-
-  shared/                   Used by more than one context
-    messages.ts               Message types
-    types.ts                  Data contracts (page data, estimates)
-
-  content/                  READ: runs on the chat sites
-    index.ts                  Entry: wires a site adapter to a reader
-    sites/                    Layer 1, WHERE: one adapter per chat site
-    readers/                  Layer 2, WHEN/HOW: swappable read strategies
-
-  background/               PARSE + ESTIMATE + STORE
-    index.ts                  Entry: registers listeners
-    handlers.ts               Routes messages
-    parsing.ts                Clean page data, resolve the model
-    estimation.ts             Tokens → water + energy (via lookup table)
-    db.ts                     SQLite (WASM), background-only
-
-  popup/                    PRESENT ("Tacho" UI)
-    index.html index.ts index.css
-
-public/                     Static assets copied verbatim into dist/waister/ (e.g. icons/)
-scripts/
-  build.mjs                 esbuild build script
-  zip.mjs                   Packages dist/waister/ for store upload
+  entries/          esbuild entry points, one per context (wiring only)
+  readers/          content:    DOM → ChatCaptureDto (sites/ = where, strategies/ = when)
+  handlers/         background: message routing, EstimationHandler
+  services/         background: tokenizer/, estimation/, estimate-cache/
+  ui/popup/         popup:      shows the token number
+  dto/              shared:     ChatCaptureDto, TokenEstimateDto
+  messages/         shared:     chrome.runtime message contracts
+docs/               architecture, pipeline, DTOs, build/tooling, ADRs
+public/             static assets copied verbatim into dist/waister/ (e.g. icons/)
+scripts/            build.mjs (esbuild), zip.mjs (store package)
 ```
 
-### Data flow
-
-```
-chat page DOM
-  └─ content:    sites/<site> (where) ← readers/<strategy> (when) → page data
-                    │ runtime message
-  └─ background: parsing → estimation (db lookup) → db
-                    │ runtime message
-  └─ popup:      UI
-```
-
-- **Swapping how pages are read:** readers only call the adapter's DOM reads. A different
-  strategy is a new file in `content/readers/` plus a one-line change in `content/index.ts`. A
-  site redesign only touches that site's adapter.
-- **Content scripts stay thin:** they only send plain text and timestamps. Tokenizers and the
-  SQLite lookup are heavy and live in the background, where they're loaded once and not into
-  every tab.
-- **Another option for later, network hooking:** instead of reading the DOM, a content script
-  running in the page's `MAIN` world can wrap `fetch` and read the streamed API responses.
-  That's more exact (model and full output), but it breaks more easily and needs a bridge
-  (`window.postMessage`) back to the normal content script. It would plug in as another reader.
-
-There's one folder per runtime context, and each has an `index.ts` entry point. Put code that
-only one context uses inside that context's folder (`background/db.ts`, say). Only code that
-several contexts need goes into `shared/`. ESLint enforces this: the popup and the content
-script can't import from `background/`, and `shared/` can't import from any context.
-
-To add a new context (an options page, side panel, offscreen document, …), create
-`src/<name>/` with an `index.ts` (and an `index.html` for pages). Then add the entry point and
-any static files to `scripts/build.mjs`, and register them in `src/manifest.json`.
-
-esbuild bundles each entry point into a single self-contained file, so `shared/` code can be
-imported anywhere, including from content scripts.
+All documentation lives in [`docs/`](docs/README.md); per-module reference: [`docs/modules.md`](docs/modules.md).
 
 ## Adding icons
 
