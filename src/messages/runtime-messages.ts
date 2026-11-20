@@ -5,4 +5,29 @@
  * Context: shared (any context)
  * Docs: docs/modules.md#messages
  */
-export {};
+
+import type { ChatCaptureDto } from '../dto/chat-capture.dto';
+
+/**
+ * Sent by the content script (`dom-capture.strategy.ts`) to the background service worker
+ * once a prompt's response stream has finished and been consolidated into a `ChatCaptureDto`.
+ */
+export interface EstimatePromptMessage {
+  type: 'ESTIMATE_PROMPT';
+  payload: ChatCaptureDto;
+}
+
+/**
+ * Sent by the toolbar popup to retrieve the latest token estimate for the active tab.
+ */
+export interface GetLatestEstimateMessage {
+  type: 'GET_LATEST_ESTIMATE';
+  payload: {
+    tabId: number;
+  };
+}
+
+/**
+ * Discriminated union of all runtime messages exchanged across extension contexts.
+ */
+export type RuntimeMessage = EstimatePromptMessage | GetLatestEstimateMessage;

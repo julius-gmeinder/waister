@@ -10,15 +10,49 @@ Reader ──ChatCaptureDto──▶ EstimationHandler ──▶ TokenizerServic
                            TokenEstimateDto { totalTokens, breakdown }
 ```
 
-## 1. Reader (content script)
+## 1. Reader & Consolidated Strategy (content script)
 
-`readers/chat.reader.ts`, with a site adapter and a reader strategy.
+`readers/strategies/dom-capture.strategy.ts`, consolidating the site adapters (`chatgpt.site.ts`,
+`claude.site.ts`, `gemini.site.ts`).
 
-1. The strategy notices the user sent a prompt → **t0**.
-2. The strategy notices the response finished streaming (`isGenerating()` turns false) → **t1**.
-3. The reader asks the site adapter for `userInput`, `response`, `chatHistory[]` and `model`.
-4. It builds a [`ChatCaptureDto`](dto.md#chatcapturedto) with `latencyMs = t1 − t0` and sends it
-   as `ESTIMATE_PROMPT` to the background.
+```
+User sends prompt (t0)
+  │
+  ├─▶ [Thinking / pre-stream phase]
+  │
+  ▼
+Visible stream starts (tStreamStart)  ──▶ thinkingTimeMs = tStreamStart − t0
+  │
+  ├─▶ [Tokens streaming into DOM]
+  │
+  ▼
+Stream finishes & settles (t1)        ──▶ latencyMs = t1 − t0
+  │
+  ▼
+SiteAdapter notifies dom-capture.strategy.ts
+  │
+  ▼
+Strategy reads { model, userInput, response, chatHistory[] } from SiteAdapter
+  │
+  ▼
+Builds ChatCaptureDto & sends ESTIMATE_PROMPT ──▶ message.handler.ts ──▶ handleEstimation(dto)
+```
+
+1. **Prompt sent (`t0`)**: The site adapter's DOM hook detects the user pressing Enter in the
+   composer or clicking the Send button (with a fallback when `isGenerating()` turns true).
+2. **Start of visible stream (`tStreamStart`)**: The site adapter's `MutationObserver` watches for
+   the new assistant turn to render its first visible output characters (`isStreamingVisibleText()`).
+3. **Response finished (`t1`)**: The site adapter waits until `isGenerating()` transitions from
+   `true` to `false` and remains settled (300 ms debounce so multi-chunk streams finish completely).
+   Only then does the site adapter invoke the strategy callback with `{ t0, tStreamStart, t1 }`.
+4. **DTO consolidation**: `dom-capture.strategy.ts` computes both:
+   - `thinkingTimeMs = tStreamStart − t0` (delta between prompt send and start of visible stream)
+   - `latencyMs = t1 − t0` (total time from prompt send until response completion)
+     and queries the site adapter for `model`, `userInput`, `response`, and `chatHistory[]` to
+     build a [`ChatCaptureDto`](dto.md#chatcapturedto).
+5. **Dispatch to `estimation.handler.ts`**: The strategy sends `ChatCaptureDto` via `chrome.runtime`
+   message `ESTIMATE_PROMPT`, which `handlers/message.handler.ts` routes into
+   `handleEstimation(captureDto, tabId)` in `handlers/estimation.handler.ts`.
 
 ## 2. TokenizerService: visible tokens
 

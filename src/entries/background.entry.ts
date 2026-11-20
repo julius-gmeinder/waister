@@ -5,4 +5,16 @@
  * Context: background (service worker)
  * Docs: docs/modules.md#entries
  */
-export {};
+
+import { handleRuntimeMessage } from '../handlers/message.handler';
+import type { RuntimeMessage } from '../messages/runtime-messages';
+
+chrome.runtime.onMessage.addListener(
+  (message: RuntimeMessage, sender: chrome.runtime.MessageSender, sendResponse) => {
+    handleRuntimeMessage(message, sender).then(sendResponse, (err: unknown) => {
+      sendResponse({ error: String(err) });
+    });
+    // Return true to keep the message channel open for the async handler response
+    return true;
+  },
+);

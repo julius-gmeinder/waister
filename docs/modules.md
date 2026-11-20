@@ -42,24 +42,21 @@ and produces one [`ChatCaptureDto`](dto.md#chatcapturedto). Nothing here tokeniz
 The content script stays thin and only sends plain text plus timing.
 
 ```
-sites/<site>.site.ts          WHERE: DOM selectors and reads for one site
-strategies/<x>.strategy.ts    WHEN:  detects "sent" (t0) and "response finished" (t1)
-chat.reader.ts                joins both and builds the DTO (latencyMs = t1 - t0)
+sites/<site>.site.ts                 WHERE: DOM selectors, reads, and stream-end hooks for one site
+strategies/dom-capture.strategy.ts   CONSOLIDATOR: combines all sites, calculates latencyMs & thinkingTimeMs, builds ChatCaptureDto
+chat.reader.ts                       Re-exports the consolidated strategy facade
 ```
 
-- **A site redesign** only touches that site's adapter.
-- **A new way of reading** (e.g. polling, or a network hook later) is a new strategy file plus a
-  one-line change in `entries/content.entry.ts`.
-- **A new chat site** is a new `*.site.ts` that implements `SiteAdapter`, registered in the
-  entry.
+- **A site redesign** only touches that site's adapter (`CHATGPT_SELECTORS`, `CLAUDE_SELECTORS`, `GEMINI_SELECTORS`).
+- **A new chat site** is a new `*.site.ts` that implements `SiteAdapter`, added to `SUPPORTED_SITES` in `dom-capture.strategy.ts`.
 
 May import: `dto/`, `messages/`. Must not import: `handlers/`, `services/`, `ui/`.
 
 ### Site adapters
 
-`src/readers/sites/` (WHERE): one adapter per supported chat web app. An adapter only knows
-**where** things are in that site's DOM and exposes synchronous, side-effect-free reads. It never
-decides _when_ to read.
+`src/readers/sites/` (WHERE): one adapter per supported chat web app. Each site adapter is strictly
+for **hooking into the site's DOM** and waiting until the response stream is completely done before
+notifying the strategy with `{ t0, tStreamStart, t1 }`.
 
 | File              | Site    | Host                | Provider    |
 | ----------------- | ------- | ------------------- | ----------- |
@@ -67,37 +64,51 @@ decides _when_ to read.
 | `claude.site.ts`  | Claude  | `claude.ai`         | `anthropic` |
 | `gemini.site.ts`  | Gemini  | `gemini.google.com` | `google`    |
 
-Contract (`site-adapter.types.ts`, planned):
+Contract (`site-adapter.types.ts`):
 
-| Member            | Returns                                                                |
-| ----------------- | ---------------------------------------------------------------------- |
-| `provider`        | `Provider`                                                             |
-| `matches(host)`   | whether this adapter handles the page                                  |
-| `readModel()`     | `ModelInfo` (name, version, thinking effort; `unknown` if not visible) |
-| `readUserInput()` | text of the latest user message                                        |
-| `readResponse()`  | text of the latest assistant message                                   |
-| `readHistory()`   | `ChatTurn[]` of all earlier turns                                      |
-| `isGenerating()`  | whether a response is currently streaming                              |
+| Member                               | Returns                                                                                   |
+| ------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `provider`                           | `Provider`                                                                                |
+| `matches(host)`                      | whether this adapter handles the page                                                     |
+| `getChatContainer()`                 | root DOM element of the conversation thread                                               |
+| `readModel()`                        | `ModelInfo` (name, version, thinking effort; `unknown` if not visible)                    |
+| `readUserInput()`                    | text of the latest user message                                                           |
+| `readResponse()`                     | text of the latest assistant message                                                      |
+| `readHistory()`                      | `ChatTurn[]` of all earlier turns                                                         |
+| `isGenerating()`                     | whether a response is currently streaming                                                 |
+| `isStreamingVisibleText()`           | whether visible output tokens have begun rendering in the latest assistant container      |
+| `observeTurnCompletion(onCompleted)` | hooks prompt send (`t0`), stream start (`tStreamStart`), and stream end (`t1`, debounced) |
 
-Selectors break when the sites ship UI changes. Keep them in one place at the top of each
-adapter so they are quick to fix.
+#### How each site connects to the DOM
+
+1. **ChatGPT (`chatgpt.site.ts` — `chatgpt.com`)**:
+   - **Prompt submission (`t0`)**: Hooks `keydown` (`Enter` without `Shift`) on `#prompt-textarea` and `click` on `button[data-testid="send-button"]`.
+   - **Active generation / streaming**: Checks for `button[data-testid="stop-button"]` or `.result-streaming` / `.streaming-animation`.
+   - **Start of visible stream (`tStreamStart`)**: Recorded when a new `[data-message-author-role="assistant"]` node appears and its `.markdown.prose` block renders its first visible text characters.
+   - **Turns & model**: Reads turns via `[data-message-author-role="user"]` and `[data-message-author-role="assistant"] .markdown.prose`, and reads the active model from `[data-testid="model-switcher-dropdown-button"]`.
+
+2. **Claude (`claude.site.ts` — `claude.ai`)**:
+   - **Prompt submission (`t0`)**: Hooks `keydown` (`Enter` without `Shift`) on `div.ProseMirror[contenteditable="true"]` and `click` on `button[aria-label="Send Message"]`.
+   - **Active generation / streaming**: Checks for `[data-is-streaming="true"]` or `button[aria-label="Stop Response"]`.
+   - **Start of visible stream (`tStreamStart`)**: Recorded when a new `.font-claude-message` / `.font-claude-response` container renders visible characters after any extended thinking phase.
+   - **Turns & model**: Reads user turns from `[data-testid="user-message"]`, assistant turns from `.font-claude-message` / `.font-claude-response`, and model info from `[data-testid="model-selector-dropdown"]` plus `[data-testid*="thinking"]`.
+
+3. **Gemini (`gemini.site.ts` — `gemini.google.com`)**:
+   - **Prompt submission (`t0`)**: Hooks `keydown` (`Enter` without `Shift`) on `rich-textarea .ql-editor` and `click` on `button.send-button` / `button[aria-label="Send message"]`.
+   - **Active generation / streaming**: Checks for `button[aria-label="Stop response"]`, `model-response[is-streaming="true"]`, or `.mat-mdc-progress-spinner`.
+   - **Start of visible stream (`tStreamStart`)**: Recorded when a new `<model-response>` element begins populating visible text inside `<message-content>` / `.model-response-text` (excluding `<model-thoughts>` drawers).
+   - **Turns & model**: Reads `<user-query>` and `<model-response>` custom elements in document order, and reads the model label from `[data-test-id="bard-mode-menu-button"]` / `.input-area-switch-label`.
 
 ### Reader strategies
 
-`src/readers/strategies/` (WHEN/HOW): a strategy decides **when** the reader should look at the
-page. It uses the site adapter's reads but never touches selectors itself, so any strategy works
-with any site.
+`src/readers/strategies/` (CONSOLIDATION & WHEN): consolidates all site adapters and only builds
+the DTO after the site adapter reports that the response stream has completely finished (`t1`).
 
-| File                            | Strategy                                                                                                         |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `mutation-observer.strategy.ts` | Default. Observes DOM mutations and uses `isGenerating()` to detect t0 (prompt sent) and t1 (response finished). |
+| File                      | Strategy                                                                                                                                                                                                                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dom-capture.strategy.ts` | Default consolidated strategy. Resolves the active `SiteAdapter`, receives `{ t0, tStreamStart, t1 }` once streaming finishes, computes `latencyMs` and `thinkingTimeMs`, builds `ChatCaptureDto`, and sends it via `ESTIMATE_PROMPT` to `handleEstimation` in `estimation.handler.ts`. |
 
-Contract (`reader-strategy.types.ts`, planned): `start(adapter, onCapture)` / `stop()`.
-`onCapture` receives the t0/t1 timestamps. The chat reader then reads the texts and builds the
-DTO.
-
-Possible later strategies (not planned yet): polling, or a `MAIN`-world `fetch` hook that reads
-the streamed API responses (more exact, more fragile, needs a `postMessage` bridge).
+Contract (`reader-strategy.types.ts`): `start(onCapture?, host?, customAdapters?)`.
 
 ---
 

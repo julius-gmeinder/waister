@@ -8,15 +8,16 @@ target and are not implemented yet.
 `src/dto/chat-capture.dto.ts`. Built by the reader in the content script, consumed by the
 EstimationHandler. One DTO per sent prompt.
 
-| Field         | Type         | Description                                                                                  |
-| ------------- | ------------ | -------------------------------------------------------------------------------------------- |
-| `provider`    | `Provider`   | `'openai' \| 'anthropic' \| 'google'`                                                        |
-| `model`       | `ModelInfo`  | Model as shown in the site's UI, see below                                                   |
-| `userInput`   | `string`     | Text of the prompt that was just sent                                                        |
-| `response`    | `string`     | Visible text of the answer to that prompt                                                    |
-| `chatHistory` | `ChatTurn[]` | All **earlier** turns of the conversation, oldest first. Excludes `userInput` and `response` |
-| `latencyMs`   | `number`     | ms from sending the prompt (t0) until the response finished (t1)                             |
-| `capturedAt`  | `number`     | Epoch ms at t1 (metadata)                                                                    |
+| Field            | Type         | Description                                                                                  |
+| ---------------- | ------------ | -------------------------------------------------------------------------------------------- |
+| `provider`       | `Provider`   | `'openai' \| 'anthropic' \| 'google'`                                                        |
+| `model`          | `ModelInfo`  | Model as shown in the site's UI, see below                                                   |
+| `userInput`      | `string`     | Text of the prompt that was just sent                                                        |
+| `response`       | `string`     | Visible text of the answer to that prompt                                                    |
+| `chatHistory`    | `ChatTurn[]` | All **earlier** turns of the conversation, oldest first. Excludes `userInput` and `response` |
+| `latencyMs`      | `number`     | ms from sending the prompt (t0) until the response finished (t1)                             |
+| `thinkingTimeMs` | `number`     | ms from sending the prompt (t0) until the visible response stream begins (`tStreamStart`)    |
+| `capturedAt`     | `number`     | Epoch ms at t1 (metadata)                                                                    |
 
 ### ModelInfo
 

@@ -1,9 +1,14 @@
 /**
  * Entry point of the content script (esbuild -> content.js).
- * Picks the site adapter for the current host and the reader strategy, starts the chat reader,
- * and sends each finished ChatCaptureDto to the background as an ESTIMATE_PROMPT message.
+ * Starts `dom-capture.strategy.ts`, which resolves the matching site adapter for the current host,
+ * waits until a prompt's response finishes streaming, consolidates the DOM reads and timings into
+ * a `ChatCaptureDto`, and sends it to `estimation.handler.ts` via `ESTIMATE_PROMPT`.
  *
  * Context: content script
  * Docs: docs/modules.md#entries
  */
-export {};
+
+import { startDomCaptureStrategy } from '../readers/strategies/dom-capture.strategy';
+
+// Boot the consolidated DOM capture strategy when injected into a supported chat site
+startDomCaptureStrategy();

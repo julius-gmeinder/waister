@@ -9,26 +9,26 @@ the tokens, and the popup shows the result.
  chat page DOM (chatgpt.com · claude.ai · gemini.google.com)
         │
         ▼
-┌─ content script ─────────────────────────────────────────────┐
-│  readers/sites/<site>.site.ts      WHERE  (DOM reads)        │
-│  readers/strategies/<x>.strategy   WHEN   (t0 sent, t1 done) │
-│  readers/chat.reader.ts            → ChatCaptureDto          │
-└───────────────────────────┬──────────────────────────────────┘
+┌─ content script ──────────────────────────────────────────────────────────┐
+│  readers/sites/<site>.site.ts            WHERE (DOM hooks & stream done)  │
+│  readers/strategies/dom-capture.strategy CONSOLIDATES sites → DTO         │
+│    (latencyMs = t1 - t0, thinkingTimeMs = tStreamStart - t0)              │
+└───────────────────────────┬───────────────────────────────────────────────┘
                             │ chrome.runtime message ESTIMATE_PROMPT
                             ▼
-┌─ background (service worker) ────────────────────────────────┐
-│  handlers/message.handler.ts       routes by message type    │
-│  handlers/estimation.handler.ts    EstimationHandler         │
-│     ├─ services/tokenizer/         visible tokens            │
-│     ├─ services/estimation/        hidden tokens             │
-│     └─ services/estimate-cache/    latest result per tab     │
-│                                    → TokenEstimateDto        │
-└───────────────────────────┬──────────────────────────────────┘
+┌─ background (service worker) ─────────────────────────────────────────────┐
+│  handlers/message.handler.ts       routes ESTIMATE_PROMPT                 │
+│  handlers/estimation.handler.ts    handleEstimation(ChatCaptureDto)       │
+│     ├─ services/tokenizer/         visible tokens                         │
+│     ├─ services/estimation/        hidden tokens                          │
+│     └─ services/estimate-cache/    latest result per tab                  │
+│                                    → TokenEstimateDto                     │
+└───────────────────────────┬───────────────────────────────────────────────┘
                             │ chrome.runtime message GET_LATEST_ESTIMATE
                             ▼
-┌─ popup ──────────────────────────────────────────────────────┐
-│  ui/popup/popup.view.ts            shows totalTokens         │
-└──────────────────────────────────────────────────────────────┘
+┌─ popup ───────────────────────────────────────────────────────────────────┐
+│  ui/popup/popup.view.ts            shows totalTokens                      │
+└───────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Layers → contexts
