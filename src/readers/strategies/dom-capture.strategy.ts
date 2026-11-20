@@ -49,6 +49,7 @@ const WATCHED_ATTRIBUTES = [
   'aria-label',
   'data-testid',
   'data-is-streaming',
+  'data-message-complete',
   'is-streaming',
   'fonticon',
   'data-mat-icon-name',
@@ -95,6 +96,22 @@ export function observeTurns(
   let sawGenerating = false;
   let timer: number | null = null;
   let timerDue = 0;
+  /** Last logged detection state, so only changes are logged (see `logState`). */
+  let lastLoggedState = '';
+
+  /**
+   * Logs what the strategy currently detects while a prompt is in flight, once per change.
+   * Makes a stuck capture debuggable from the page console without reading the DOM by hand.
+   */
+  const logState = (generating: boolean, userCount: number, count: number) => {
+    const state =
+      `generating=${generating} users=${userCount}/${baselineUserCount} ` +
+      `responses=${count}/${baselineCount} responseChars=${lastText.length} ` +
+      `visibleText=${tStreamStart !== null}`;
+    if (state === lastLoggedState) return;
+    lastLoggedState = state;
+    console.info(LOG_PREFIX, 'state', state);
+  };
 
   const schedule = (delayMs: number) => {
     if (timer !== null) window.clearTimeout(timer);
@@ -107,12 +124,14 @@ export function observeTurns(
     tStreamStart = null;
     lastText = '';
     sawGenerating = false;
+    lastLoggedState = '';
     baselineUserCount = adapter.countUserMessages();
     baselineCount = adapter.countResponses();
   };
 
-  const markPromptSent = () => {
+  const markPromptSent = (source: 'enter' | 'click') => {
     if (t0 !== null) return;
+    console.info(LOG_PREFIX, `prompt sent (${source})`);
     t0 = Date.now();
     tStreamStart = null;
     lastText = '';
@@ -148,6 +167,7 @@ export function observeTurns(
         return;
       }
       // The send event was missed, but a prompt was just sent.
+      console.info(LOG_PREFIX, 'prompt sent (detected from the page)');
       t0 = now;
       lastActivity = now;
       baselineUserCount = userCount;
@@ -168,6 +188,7 @@ export function observeTurns(
         tStreamStart = now;
       }
     }
+    logState(generating, userCount, count);
 
     if (!generating && hasNewResponse && lastText) {
       const quietMs = sawGenerating ? SETTLE_MS : TEXT_STABLE_MS;
@@ -181,6 +202,7 @@ export function observeTurns(
     }
 
     if (!generating && !hasNewResponse && now - t0 > STALE_PROMPT_MS) {
+      console.info(LOG_PREFIX, 'prompt dropped: no response appeared');
       reset();
       return;
     }
@@ -192,14 +214,14 @@ export function observeTurns(
     if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
     const target = event.target;
     if (target instanceof Element && adapter.isPromptInput(target) && readDraftText(target)) {
-      markPromptSent();
+      markPromptSent('enter');
     }
   };
 
   const onClick = (event: MouseEvent) => {
     const target = event.target;
     if (target instanceof Element && adapter.isSendButton(target)) {
-      markPromptSent();
+      markPromptSent('click');
     }
   };
 
@@ -290,6 +312,7 @@ export function startDomCaptureStrategy(
     const dto = buildChatCaptureDto(adapter, timings);
     // Only dispatch when the finished turn actually has text
     if (!dto.response && !dto.userInput) {
+      console.info(LOG_PREFIX, 'capture dropped: prompt and response text are empty', dto);
       return;
     }
     console.info(LOG_PREFIX, 'captured prompt', dto);
