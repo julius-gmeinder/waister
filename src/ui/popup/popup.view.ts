@@ -1,65 +1,91 @@
 /**
  * Popup view: asks the background for the active tab's latest estimate (GET_LATEST_ESTIMATE)
- * and populates the elements in `popup.html` with `totalTokens`, the token breakdown, and
- * the energy/water usage from `TokenEstimateDto`.
+ * and renders totalTokens, its breakdown, and the environmental impact (energy, water) into
+ * the `[data-field]` elements in `popup.html`.
+ *
+ * Icons: lucide. popup.html holds `<i data-lucide="name">` placeholders and renderIcons() swaps
+ * them for inline SVGs. Only icons listed in POPUP_ICONS are bundled.
  *
  * Context: popup
  * Docs: docs/modules.md#popup
  */
 
+import {
+  Brain,
+  Coins,
+  Cpu,
+  createIcons,
+  Droplet,
+  History,
+  MessageSquare,
+  MessageSquareText,
+  Settings2,
+  Timer,
+  Zap,
+} from 'lucide';
 import type { TokenEstimateDto } from '../../dto/token-estimate.dto';
 import type { GetLatestEstimateMessage } from '../../messages/runtime-messages';
 
 /**
- * Helper to write text content into a DOM element by ID.
+ * Every icon the popup uses. Add an icon here and use its kebab-case name in popup.html
+ * (`MessageSquareText` → `data-lucide="message-square-text"`). Names missing here render nothing.
  */
-function setText(id: string, value: string): void {
-  const el = document.getElementById(id);
+const POPUP_ICONS = {
+  Brain,
+  Coins,
+  Cpu,
+  Droplet,
+  History,
+  MessageSquare,
+  MessageSquareText,
+  Settings2,
+  Timer,
+  Zap,
+};
+
+function renderIcons(): void {
+  createIcons({ icons: POPUP_ICONS, attrs: { 'stroke-width': 2 } });
+}
+
+/**
+ * Helper to write text content into a `[data-field="<name>"]` element in `popup.html`.
+ */
+function setField(field: string, value: string): void {
+  const el = document.querySelector<HTMLElement>(`[data-field="${field}"]`);
   if (el) {
     el.textContent = value;
   }
 }
 
 /**
- * Renders a `TokenEstimateDto` into `popup.html`.
+ * Renders a `TokenEstimateDto` into the `[data-field]` placeholders in `popup.html`.
  */
 export function renderEstimate(estimate: TokenEstimateDto | null): void {
-  const emptyState = document.getElementById('empty-state');
-  const content = document.getElementById('estimate-content');
-
   if (!estimate) {
-    if (emptyState) emptyState.hidden = false;
-    if (content) content.hidden = true;
     return;
   }
 
-  if (emptyState) emptyState.hidden = true;
-  if (content) content.hidden = false;
+  setField('totalTokens', estimate.totalTokens.toLocaleString());
+  setField('model', `${estimate.model.name} (${estimate.model.version})`);
+  setField('latencyMs', `${estimate.timings.latencyMs.toLocaleString()} ms`);
 
-  setText(
-    'meta-model',
-    `${estimate.provider} / ${estimate.model.name} (${estimate.model.version}, effort: ${estimate.model.thinkingEffort})`,
-  );
-  setText('total-tokens', estimate.totalTokens.toLocaleString());
+  setField('input', estimate.breakdown.input.toLocaleString());
+  setField('history', estimate.breakdown.history.toLocaleString());
+  setField('output', estimate.breakdown.output.toLocaleString());
+  setField('thinking', estimate.breakdown.thinking.toLocaleString());
+  setField('overhead', estimate.breakdown.overhead.toLocaleString());
 
-  setText('tokens-input', estimate.breakdown.input.toLocaleString());
-  setText('tokens-history', estimate.breakdown.history.toLocaleString());
-  setText('tokens-output', estimate.breakdown.output.toLocaleString());
-  setText('tokens-thinking', estimate.breakdown.thinking.toLocaleString());
-  setText('tokens-overhead', estimate.breakdown.overhead.toLocaleString());
-
-  setText('impact-energy', `${estimate.impact.energyWh} Wh`);
-  setText('impact-water', `${estimate.impact.waterMl} mL`);
-  setText('impact-co2', `${estimate.impact.co2Grams} gCO2e`);
-
-  setText('timing-thinking', estimate.timings.thinkingTimeMs.toLocaleString());
-  setText('timing-latency', estimate.timings.latencyMs.toLocaleString());
+  setField('energyWh', `${estimate.impact.energyWh} Wh`);
+  setField('waterMl', `${estimate.impact.waterMl} mL`);
 }
 
 /**
- * Queries the active browser tab and requests its latest `TokenEstimateDto` from the background.
+ * Called by entries/popup.entry.ts once the popup document is ready.
+ * Renders Lucide icons and fetches the latest estimate for the active tab.
  */
 export async function initPopupView(): Promise<void> {
+  renderIcons();
+
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     const activeTabId = tabs[0]?.id;

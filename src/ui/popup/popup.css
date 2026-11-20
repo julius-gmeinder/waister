@@ -1,0 +1,90 @@
+/* Colors: docs/styling.md */
+:root {
+  --bg: #fffbeb;
+  --surface: #fff6cc;
+  --accent: #fde100;
+  --contrast: #4f46e5;
+  --contrast-dark: #2e2a8c;
+  --text: #1c1917;
+}
+
+body {
+  margin: 0;
+  min-width: 260px;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    14px/1.4 system-ui,
+    sans-serif;
+}
+
+.popup {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+/* Lucide renders <svg class="lucide lucide-<name>">. Size and color come from here, not from
+   the SVG attributes, so icons follow the surrounding text. */
+.lucide {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+.total {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--contrast-dark);
+}
+
+.total .lucide {
+  width: 24px;
+  height: 24px;
+  color: var(--contrast);
+}
+
+.total-value {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+}
+
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.breakdown {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  background: var(--surface);
+  border-radius: 8px;
+}
+
+.breakdown li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.breakdown li .lucide {
+  color: var(--contrast);
+}
+
+.breakdown [data-field] {
+  font-variant-numeric: tabular-nums;
+}

@@ -8,6 +8,5 @@
 
 import { initPopupView } from '../ui/popup/popup.view';
 
-document.addEventListener('DOMContentLoaded', () => {
-  void initPopupView();
-});
+// Loaded with `defer`, so the DOM is already parsed when this runs.
+void initPopupView();
