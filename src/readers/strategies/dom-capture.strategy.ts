@@ -236,6 +236,8 @@ export function buildChatCaptureDto(adapter: SiteAdapter, timings: TurnTimings):
     latencyMs,
     thinkingTimeMs,
     capturedAt: timings.t1,
+    // Read at t1: a new chat gets its final URL (e.g. /c/<id>) once the first answer exists.
+    conversationUrl: window.location.origin + window.location.pathname,
   };
 }
 

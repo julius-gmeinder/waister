@@ -1,6 +1,6 @@
 # 0005: Scope ends at one token number
 
-**Status:** Accepted (2026-11-20)
+**Status:** Superseded by [0009](0009-sqlite-prompt-store.md) (2026-11-20)
 
 ## Context
 

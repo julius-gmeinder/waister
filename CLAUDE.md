@@ -4,8 +4,9 @@
 
 **Waister** is a Manifest V3 browser extension (TypeScript, esbuild) that estimates the
 **total token usage of a single prompt** in AI chat web apps: **ChatGPT** (`chatgpt.com`),
-**Claude** (`claude.ai`) and **Gemini** (`gemini.google.com`). The output is one number per
-prompt, shown in the toolbar popup. University project (semester 3).
+**Claude** (`claude.ai`) and **Gemini** (`gemini.google.com`). Every prompt is saved to a local
+SQLite database, and the toolbar popup shows the token usage of the last 24 hours. University
+project (semester 3).
 
 ## Domain
 
@@ -22,7 +23,8 @@ prompt, shown in the toolbar popup. University project (semester 3).
 - **Provider:** `openai`, `anthropic` or `google`. **Model:** name + version + thinking effort, as
   far as the site's UI shows them.
 - **latencyMs:** time from sending the prompt until the response finished streaming.
-- **Out of scope:** anything beyond tokens, and long-term storage. SQLite was removed.
+- **Prompt record:** one saved prompt = estimate + UUID + conversation URL. Metrics only, no chat
+  text ([ADR 0009](docs/decisions/0009-sqlite-prompt-store.md)).
 
 ## Architecture (by layer)
 
@@ -32,9 +34,9 @@ content:     readers/  (sites/ = WHERE, strategies/ = WHEN) → ChatCaptureDto
 background:  handlers/estimation.handler (EstimationHandler)
                  ├─ services/tokenizer   (TokenizerService, one module per provider)
                  ├─ services/estimation  (EstimationService + model-profiles)
-                 └─ services/estimate-cache (chrome.storage.session)
-                 → TokenEstimateDto
-popup:       ui/popup  ← GET_LATEST_ESTIMATE
+                 └─ services/prompt-store (SQLite WASM, snapshot in IndexedDB) ← PromptRecordDto
+             handlers/usage.handler → services/prompt-store → UsageSummaryDto
+popup:       ui/popup  ← GET_USAGE_SUMMARY (reads only the database)
 shared:      dto/, messages/
 entries/:    one esbuild entry per context, wiring only
 ```
@@ -60,9 +62,10 @@ All docs live in `docs/` only. Start at `docs/README.md`. The per-module referen
 
 ## Status
 
-Pipeline implemented end to end (readers → handler → tokenizer/estimation services → cache →
-popup). The popup shows token usage only (total + breakdown). The background also computes an
-energy/water `impact`, which is not displayed. `npm run build` works. `eslint.config.js` still targets the old
+Pipeline implemented end to end (readers → handler → tokenizer/estimation services → SQLite
+prompt store). The popup reads the database and shows the last 24h of token usage (total,
+breakdown, prompt count). The UI is deliberately plain for now. The energy/water `impact` is
+saved per prompt but not displayed. `npm run build` works. `eslint.config.js` still targets the old
 per-context layout. The required changes are in `docs/build-and-tooling.md`.
 
 ## Commands

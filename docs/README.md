@@ -10,7 +10,7 @@ All project documentation lives in this folder.
 | [architecture.md](architecture.md)           | Layers, runtime contexts, import rules, data flow                             |
 | [modules.md](modules.md)                     | Reference for every folder and file in `src/`                                 |
 | [pipeline.md](pipeline.md)                   | The estimation pipeline step by step, and how the single number is built      |
-| [dto.md](dto.md)                             | Field reference for `ChatCaptureDto` and `TokenEstimateDto`                   |
+| [dto.md](dto.md)                             | Field reference for all DTOs                                                  |
 | [build-and-tooling.md](build-and-tooling.md) | Existing build scripts and configs, and what has to change for the new layout |
 | [decisions/](#architecture-decision-records) | Architecture decision records (ADRs)                                          |
 
@@ -22,13 +22,14 @@ Short records of structural decisions: context, decision, consequences. Add a ne
 to `decisions/` when a decision changes. Don't rewrite old ones; mark them
 _Superseded by NNNN_ instead.
 
-| #    | Decision                                                                               | Status   |
-| ---- | -------------------------------------------------------------------------------------- | -------- |
-| 0001 | [Organize `src/` by layer](decisions/0001-layered-structure.md)                        | Accepted |
-| 0002 | [Reader in content script, estimation in background](decisions/0002-context-split.md)  | Accepted |
-| 0003 | [DOM reading with site adapters + swappable strategies](decisions/0003-dom-readers.md) | Accepted |
-| 0004 | [Plain function modules, no classes](decisions/0004-plain-function-modules.md)         | Accepted |
-| 0005 | [Scope ends at one token number](decisions/0005-tokens-only-scope.md)                  | Accepted |
-| 0006 | [One tokenizer per provider](decisions/0006-per-provider-tokenizers.md)                | Accepted |
-| 0007 | [Response as its own DTO field](decisions/0007-response-field.md)                      | Accepted |
-| 0008 | [Turn detection in the strategy](decisions/0008-turn-detection-in-strategy.md)         | Accepted |
+| #    | Decision                                                                                            | Status             |
+| ---- | --------------------------------------------------------------------------------------------------- | ------------------ |
+| 0001 | [Organize `src/` by layer](decisions/0001-layered-structure.md)                                     | Accepted           |
+| 0002 | [Reader in content script, estimation in background](decisions/0002-context-split.md)               | Accepted           |
+| 0003 | [DOM reading with site adapters + swappable strategies](decisions/0003-dom-readers.md)              | Accepted           |
+| 0004 | [Plain function modules, no classes](decisions/0004-plain-function-modules.md)                      | Accepted           |
+| 0005 | [Scope ends at one token number](decisions/0005-tokens-only-scope.md)                               | Superseded by 0009 |
+| 0006 | [One tokenizer per provider](decisions/0006-per-provider-tokenizers.md)                             | Accepted           |
+| 0007 | [Response as its own DTO field](decisions/0007-response-field.md)                                   | Accepted           |
+| 0008 | [Turn detection in the strategy](decisions/0008-turn-detection-in-strategy.md)                      | Accepted           |
+| 0009 | [Save every prompt to SQLite, popup reads only the database](decisions/0009-sqlite-prompt-store.md) | Accepted           |

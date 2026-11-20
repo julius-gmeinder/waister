@@ -7,18 +7,19 @@
  *   2. `countVisibleTokens` (`tokenizer.service.ts`): visible input, history, output tokens.
  *   3. `estimateHiddenTokens` (`estimation.service.ts`): hidden thinking + overhead tokens.
  *   4. `buildTokenEstimateDto` (`estimation.service.ts`): sums `totalTokens` and builds the DTO.
- *   5. `setLatestEstimate` (`estimate-cache.service.ts`): caches the resulting DTO for the popup.
+ *   5. `createPromptRecord` + `savePromptRecord` (`prompt-store.service.ts`): gives the prompt a
+ *      UUID and saves it to the SQLite database, where the popup reads it from.
  *
  * Context: background
  * Docs: docs/modules.md#handlers, docs/pipeline.md
  */
 
 import type { ChatCaptureDto } from '../dto/chat-capture.dto';
-import type { TokenEstimateDto } from '../dto/token-estimate.dto';
+import type { PromptRecordDto } from '../dto/prompt-record.dto';
 import {
-  getLatestEstimate,
-  setLatestEstimate,
-} from '../services/estimate-cache/estimate-cache.service';
+  createPromptRecord,
+  savePromptRecord,
+} from '../services/prompt-store/prompt-store.service';
 import {
   buildTokenEstimateDto,
   estimateHiddenTokens,
@@ -46,18 +47,16 @@ export function normalizeCaptureDto(captureDto: ChatCaptureDto): ChatCaptureDto 
     latencyMs: Math.max(0, captureDto.latencyMs),
     thinkingTimeMs: Math.max(0, captureDto.thinkingTimeMs),
     capturedAt: captureDto.capturedAt,
+    conversationUrl: captureDto.conversationUrl,
   };
 }
 
 /**
  * High-level orchestration for estimating a captured prompt:
- * visible tokens from `tokenizer.service`, hidden tokens from `estimation.service`, then stores the result
- * in `estimate-cache.service` so the popup can display it.
+ * visible tokens from `tokenizer.service`, hidden tokens from `estimation.service`, then saves the
+ * prompt via `prompt-store.service`.
  */
-export async function handleEstimation(
-  captureDto: ChatCaptureDto,
-  tabId?: number,
-): Promise<TokenEstimateDto> {
+export async function handleEstimation(captureDto: ChatCaptureDto): Promise<PromptRecordDto> {
   // Step 1: Normalize the raw capture DTO
   const cleanedCapture = normalizeCaptureDto(captureDto);
 
@@ -70,15 +69,9 @@ export async function handleEstimation(
   // Step 4: Sum into totalTokens and assemble the DTO
   const estimateDto = buildTokenEstimateDto(cleanedCapture, visible, hidden);
 
-  // Step 5: Cache the latest TokenEstimateDto per tab for the popup
-  await setLatestEstimate(tabId, estimateDto);
+  // Step 5: Save the prompt (with a new UUID and the conversation link) to the database
+  const record = createPromptRecord(cleanedCapture, estimateDto);
+  await savePromptRecord(record);
 
-  return estimateDto;
-}
-
-/**
- * High-level helper to retrieve the latest cached `TokenEstimateDto` for the popup.
- */
-export async function handleGetLatestEstimate(tabId?: number): Promise<TokenEstimateDto | null> {
-  return getLatestEstimate(tabId);
+  return record;
 }

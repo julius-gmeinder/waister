@@ -1,8 +1,7 @@
 /**
- * Popup view: asks the background for the active tab's latest estimate (GET_LATEST_ESTIMATE)
- * and renders totalTokens and its breakdown (input, history, output, thinking, overhead) into
- * the `[data-field]` elements in `popup.html`. Token usage only: model, timings and the
- * background's energy estimate are not shown.
+ * Popup view: asks the database (GET_USAGE_SUMMARY) for the token usage of the last 24 hours and
+ * renders the summed totalTokens, its breakdown (input, history, output, thinking, overhead) and
+ * the prompt count into the `[data-field]` elements in `popup.html`. Token usage only.
  *
  * Icons: lucide. popup.html holds `<i data-lucide="name">` placeholders and renderIcons() swaps
  * them for inline SVGs. Only icons listed in POPUP_ICONS are bundled.
@@ -20,8 +19,11 @@ import {
   MessageSquareText,
   Settings2,
 } from 'lucide';
-import type { TokenEstimateDto } from '../../dto/token-estimate.dto';
-import type { GetLatestEstimateMessage } from '../../messages/runtime-messages';
+import type { UsageSummaryDto } from '../../dto/usage-summary.dto';
+import type { GetUsageSummaryMessage, UsageSummaryResponse } from '../../messages/runtime-messages';
+
+/** Rolling window the popup sums over. */
+const USAGE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Every icon the popup uses. Add an icon here and use its kebab-case name in popup.html
@@ -51,41 +53,44 @@ function setField(field: string, value: string): void {
 }
 
 /**
- * Renders a `TokenEstimateDto` into the `[data-field]` placeholders in `popup.html`.
+ * Renders a `UsageSummaryDto` into the `[data-field]` placeholders in `popup.html`.
  */
-export function renderEstimate(estimate: TokenEstimateDto | null): void {
-  if (!estimate) {
+export function renderUsageSummary(summary: UsageSummaryDto | null): void {
+  if (!summary) {
+    setField('promptCount', 'No data');
     return;
   }
 
-  setField('totalTokens', estimate.totalTokens.toLocaleString());
+  setField('totalTokens', summary.totalTokens.toLocaleString());
+  setField(
+    'promptCount',
+    `${summary.promptCount.toLocaleString()} ${summary.promptCount === 1 ? 'prompt' : 'prompts'}`,
+  );
 
-  setField('input', estimate.breakdown.input.toLocaleString());
-  setField('history', estimate.breakdown.history.toLocaleString());
-  setField('output', estimate.breakdown.output.toLocaleString());
-  setField('thinking', estimate.breakdown.thinking.toLocaleString());
-  setField('overhead', estimate.breakdown.overhead.toLocaleString());
+  setField('input', summary.breakdown.input.toLocaleString());
+  setField('history', summary.breakdown.history.toLocaleString());
+  setField('output', summary.breakdown.output.toLocaleString());
+  setField('thinking', summary.breakdown.thinking.toLocaleString());
+  setField('overhead', summary.breakdown.overhead.toLocaleString());
 }
 
 /**
  * Called by entries/popup.entry.ts once the popup document is ready.
- * Renders Lucide icons and fetches the latest estimate for the active tab.
+ * Renders Lucide icons and fetches the last 24 hours of token usage from the database.
  */
 export async function initPopupView(): Promise<void> {
   renderIcons();
 
+  const message: GetUsageSummaryMessage = {
+    type: 'GET_USAGE_SUMMARY',
+    payload: { sinceMs: Date.now() - USAGE_WINDOW_MS },
+  };
+
   try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    const activeTabId = tabs[0]?.id;
-
-    const message: GetLatestEstimateMessage = {
-      type: 'GET_LATEST_ESTIMATE',
-      payload: { tabId: activeTabId },
-    };
-
-    const estimate = (await chrome.runtime.sendMessage(message)) as TokenEstimateDto | null;
-    renderEstimate(estimate);
+    const response = (await chrome.runtime.sendMessage(message)) as
+      UsageSummaryResponse | { error: string };
+    renderUsageSummary('error' in response ? null : response);
   } catch {
-    renderEstimate(null);
+    renderUsageSummary(null);
   }
 }

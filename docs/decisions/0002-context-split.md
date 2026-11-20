@@ -17,7 +17,8 @@ service worker).
 
 - Tokenizers load once, not in every tab, and content scripts stay small.
 - The DTO must be structured-clone safe.
-- The service worker can be stopped when idle, so state that has to outlive it (the latest
-  estimate for the popup) goes into `chrome.storage.session`.
+- The service worker can be stopped when idle, so state that has to outlive it goes into
+  persistent storage (since [ADR 0009](0009-sqlite-prompt-store.md): the SQLite snapshot in
+  IndexedDB).
 - Rejected alternative: an offscreen document for estimation. It adds moving parts and can be
   revisited if a tokenizer needs a DOM or a Worker.

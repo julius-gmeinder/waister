@@ -3,7 +3,7 @@
 ## Overview
 
 A Manifest V3 browser extension. A content script reads the chat page, the background estimates
-the tokens, and the popup shows the result.
+the tokens and saves every prompt to a SQLite database, and the popup reads that database.
 
 ```
  chat page DOM (chatgpt.com · claude.ai · gemini.google.com)
@@ -17,17 +17,22 @@ the tokens, and the popup shows the result.
                             │ chrome.runtime message ESTIMATE_PROMPT
                             ▼
 ┌─ background (service worker) ─────────────────────────────────────────────┐
-│  handlers/message.handler.ts       routes ESTIMATE_PROMPT                 │
+│  handlers/message.handler.ts       routes messages by type                │
 │  handlers/estimation.handler.ts    handleEstimation(ChatCaptureDto)       │
 │     ├─ services/tokenizer/         visible tokens                         │
-│     ├─ services/estimation/        hidden tokens                          │
-│     └─ services/estimate-cache/    latest result per tab                  │
-│                                    → TokenEstimateDto                     │
-└───────────────────────────┬───────────────────────────────────────────────┘
-                            │ chrome.runtime message GET_LATEST_ESTIMATE
-                            ▼
+│     ├─ services/estimation/        hidden tokens → TokenEstimateDto       │
+│     └─ services/prompt-store/      + UUID + URL → PromptRecordDto, INSERT │
+│                                                                           │
+│  services/prompt-store/            SQLite WASM (in memory, IndexedDB      │
+│                                    snapshot after every insert)           │
+│                                                                           │
+│  handlers/usage.handler.ts         handleGetUsageSummary(sinceMs)         │
+│     └─ services/prompt-store/      SELECT SUM(...) → UsageSummaryDto      │
+└───────────────────────────▲───────────────────────────────────────────────┘
+                            │ chrome.runtime message GET_USAGE_SUMMARY
+                            │
 ┌─ popup ───────────────────────────────────────────────────────────────────┐
-│  ui/popup/popup.view.ts            shows totalTokens                      │
+│  ui/popup/popup.view.ts            shows the last 24h of token usage      │
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -42,7 +47,7 @@ boundaries visible even without one folder per context.
 | `entries/`  | each       | esbuild entry points, wiring only        | the layers of its own context    |
 | `readers/`  | content    | DOM → `ChatCaptureDto`                   | `dto/`, `messages/`              |
 | `handlers/` | background | Orchestration                            | `services/`, `dto/`, `messages/` |
-| `services/` | background | Domain logic (tokenize, estimate, cache) | `dto/`                           |
+| `services/` | background | Domain logic (tokenize, estimate, store) | `dto/`                           |
 | `ui/`       | popup      | Presentation                             | `dto/`, `messages/`              |
 | `messages/` | shared     | `chrome.runtime` message contracts       | `dto/`                           |
 | `dto/`      | shared     | Data contracts                           | nothing                          |
@@ -73,9 +78,9 @@ and will be enforced by ESLint (see [build-and-tooling.md](build-and-tooling.md#
 
 ## Scope
 
-The pipeline ends at **one token number per prompt**
-([ADR 0005](decisions/0005-tokens-only-scope.md)). Nothing is stored long term. The estimate cache
-is session-only.
+The pipeline produces **one token number per prompt** and saves every prompt (metrics only, no
+chat text) to SQLite ([ADR 0009](decisions/0009-sqlite-prompt-store.md)). The popup never talks to
+the estimation pipeline: estimation writes rows, the popup asks the database for a summary.
 
 ## Extending
 
@@ -85,4 +90,5 @@ is session-only.
 | Different read timing                 | `readers/strategies/<x>.strategy.ts` + swap in `entries/content.entry.ts`                  |
 | New provider tokenizer                | `services/tokenizer/<provider>.tokenizer.ts` + route in `tokenizer.service.ts`             |
 | New model / version                   | entry in `services/estimation/model-profiles.ts`                                           |
+| New saved field / popup query         | `services/prompt-store/prompt-store.service.ts` (schema + query) + DTO + message           |
 | New runtime context (e.g. side panel) | `entries/<ctx>.entry.ts` + its layer folder + `scripts/build.mjs` + manifest               |

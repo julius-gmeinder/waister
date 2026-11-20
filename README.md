@@ -129,10 +129,12 @@ npx web-ext lint --source-dir dist/waister                     # validate the ma
 
 ## Database
 
-There is none. Earlier versions used SQLite WASM in the background, but it was removed when the
-scope was narrowed to token estimation ([ADR 0005](docs/decisions/0005-tokens-only-scope.md)).
-The latest estimate per tab lives in `chrome.storage.session`. The unused
-`@sqlite.org/sqlite-wasm` dependency is still in `package.json`.
+Every estimated prompt is saved as one row in a SQLite database (`@sqlite.org/sqlite-wasm`) in
+the background ([ADR 0009](docs/decisions/0009-sqlite-prompt-store.md)): UUID, conversation
+URL, model, token breakdown, timings and impact. No chat text. The database runs in memory and a
+snapshot is saved to IndexedDB after each insert. To inspect it, open the background console
+(see the table above) and look under _Application → IndexedDB → waister_. Removing the extension
+deletes it.
 
 ## Scripts
 
@@ -157,10 +159,10 @@ The latest estimate per tab lives in `chrome.storage.session`. The unused
 src/
   entries/          esbuild entry points, one per context (wiring only)
   readers/          content:    DOM → ChatCaptureDto (sites/ = where, strategies/ = when)
-  handlers/         background: message routing, EstimationHandler
-  services/         background: tokenizer/, estimation/, estimate-cache/
-  ui/popup/         popup:      shows the token number
-  dto/              shared:     ChatCaptureDto, TokenEstimateDto
+  handlers/         background: message routing, EstimationHandler, UsageHandler
+  services/         background: tokenizer/, estimation/, prompt-store/ (SQLite)
+  ui/popup/         popup:      shows the last 24h of token usage
+  dto/              shared:     ChatCaptureDto, TokenEstimateDto, PromptRecordDto, UsageSummaryDto
   messages/         shared:     chrome.runtime message contracts
 docs/               architecture, pipeline, DTOs, build/tooling, ADRs
 public/             static assets copied verbatim into dist/waister/ (e.g. icons/)

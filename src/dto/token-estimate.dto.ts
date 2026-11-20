@@ -1,5 +1,5 @@
 /**
- * TokenEstimateDto: EstimationHandler -> popup.
+ * TokenEstimateDto: EstimationService -> EstimationHandler (-> PromptRecordDto).
  *
  * Holds the complete token count breakdown (input, history, output, thinking, overhead),
  * the summed `totalTokens`, and the estimated environmental impact (`energyWh`, `waterMl`,
@@ -41,8 +41,8 @@ export interface EnvironmentalImpact {
 }
 
 /**
- * Final estimation DTO produced by `estimation.handler.ts`, cached per tab in
- * `estimate-cache.service.ts`, and displayed in the popup UI (`popup.html` / `popup.view.ts`).
+ * Final estimation DTO produced by `estimation.handler.ts`. Saved as a `PromptRecordDto` by
+ * `prompt-store.service.ts`.
  */
 export interface TokenEstimateDto {
   /** Sum of all breakdown token counts (input + history + output + thinking + overhead). */
@@ -55,7 +55,7 @@ export interface TokenEstimateDto {
   provider: Provider;
   /** Model metadata echoed from the capture. */
   model: ModelInfo;
-  /** Timing metrics echoed from the capture for display/debugging in the popup. */
+  /** Timing metrics echoed from the capture. */
   timings: {
     latencyMs: number;
     thinkingTimeMs: number;

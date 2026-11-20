@@ -12,6 +12,8 @@ const staticFiles = [
   ['src/ui/popup/popup.html', 'popup/index.html'],
   ['src/ui/popup/popup.css', 'popup/index.css'],
   ['public', '.'],
+  // sqlite-wasm resolves this relative to background.js (via import.meta.url).
+  ['node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm', 'sqlite3.wasm'],
 ];
 
 /**
@@ -72,6 +74,7 @@ const builds = [
   {
     ...shared,
     entryPoints: { background: 'src/entries/background.entry.ts' },
+    // ESM so sqlite-wasm can find sqlite3.wasm through import.meta.url.
     format: 'esm',
   },
   {

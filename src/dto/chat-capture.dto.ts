@@ -62,4 +62,9 @@ export interface ChatCaptureDto {
   thinkingTimeMs: number;
   /** Epoch timestamp (Date.now()) recorded when the response finished at t1. */
   capturedAt: number;
+  /**
+   * Link to the conversation on the chat site (origin + path, no query or hash), read at t1 so a
+   * new chat already has its final URL (e.g. `https://claude.ai/chat/<id>`).
+   */
+  conversationUrl: string;
 }

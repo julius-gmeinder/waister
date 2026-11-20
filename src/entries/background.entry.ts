@@ -9,12 +9,11 @@
 import { handleRuntimeMessage } from '../handlers/message.handler';
 import type { RuntimeMessage } from '../messages/runtime-messages';
 
-chrome.runtime.onMessage.addListener(
-  (message: RuntimeMessage, sender: chrome.runtime.MessageSender, sendResponse) => {
-    handleRuntimeMessage(message, sender).then(sendResponse, (err: unknown) => {
-      sendResponse({ error: String(err) });
-    });
-    // Return true to keep the message channel open for the async handler response
-    return true;
-  },
-);
+chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResponse) => {
+  handleRuntimeMessage(message).then(sendResponse, (err: unknown) => {
+    console.error('[waister]', message.type, 'failed', err);
+    sendResponse({ error: String(err) });
+  });
+  // Return true to keep the message channel open for the async handler response
+  return true;
+});

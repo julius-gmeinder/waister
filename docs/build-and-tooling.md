@@ -22,8 +22,8 @@ esbuild build into `dist/waister/` (the unpacked extension you load in the brows
 - Wipes and recreates `dist/waister/` on every start.
 - **Two builds:**
   - **background**: `format: 'esm'`. The manifest declares the background as
-    `"type": "module"`. It was ESM so that sqlite-wasm could find `sqlite3.wasm` through
-    `import.meta.url`. Heavy services (tokenizers, possibly WASM) benefit from the same setup.
+    `"type": "module"`. It is ESM so that sqlite-wasm can find `sqlite3.wasm` through
+    `import.meta.url` (the prompt store, see [ADR 0009](decisions/0009-sqlite-prompt-store.md)).
   - **content + popup**: `format: 'iife'`. Content scripts can't use ES module imports, so
     every entry is a single self-contained file.
 - `bundle: true`, `target: 'es2022'`. With `--watch`: inline source maps, no minify. Without it:
@@ -31,7 +31,9 @@ esbuild build into `dist/waister/` (the unpacked extension you load in the brows
 - **Static files** are copied after each successful build by the `copy-static` plugin
   (`[source, destination]`, skipped if the source doesn't exist):
   `src/ui/popup/popup.html` → `popup/index.html`,
-  `src/ui/popup/popup.css` → `popup/index.css`, and everything in `public/`.
+  `src/ui/popup/popup.css` → `popup/index.css`, everything in `public/`, and
+  `node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm` → `sqlite3.wasm` (next to
+  `background.js`).
 - Entries: `src/entries/background.entry.ts` → `background.js`,
   `src/entries/content.entry.ts` → `content.js`, `src/entries/popup.entry.ts` →
   `popup/index.js`.
@@ -51,11 +53,12 @@ MV3, recreated after commit `4c0bb6a` deleted it.
   `scripts`, because Firefox has no background service workers (see root README).
 - **Content script:** `content.js` at `document_idle`, only on `https://chatgpt.com/*`,
   `https://claude.ai/*`, `https://gemini.google.com/*`.
-- **Permissions:** `storage` (for `chrome.storage.session`) and `tabs`. The popup's
-  `chrome.tabs.query` for the active tab's id works without `tabs`. That permission is only
-  needed to read tab URLs/titles, and Chrome shows an install warning for it.
+- **Permissions:** only `unlimitedStorage`, so the SQLite snapshot in IndexedDB is not evicted
+  under storage pressure (no install warning). `storage` and `tabs` were dropped with the
+  estimate cache: the conversation URL comes from the content script, not from `chrome.tabs`.
 - **Icons:** `icons` (16, 32, 48, 128) and `action.default_icon` (16, 32) from `public/icons/`.
-- No CSP. The old `'wasm-unsafe-eval'` is only needed again if a tokenizer ships as WASM.
+- **CSP:** `extension_pages` = `script-src 'self' 'wasm-unsafe-eval'; object-src 'self'`.
+  `'wasm-unsafe-eval'` lets the background compile `sqlite3.wasm`.
 
 ## `scripts/zip.mjs`
 
@@ -125,5 +128,5 @@ from `public/logo/waister.svg`), and `public/logo/` the logo SVGs. See the root 
 | `8c56420` | Backbone v2: site adapters + reader strategies, `parsing.ts`, `estimation.ts` (tokens → water/energy)       |
 | `4c0bb6a` | Deleted all of `src/`                                                                                       |
 
-`@sqlite.org/sqlite-wasm` is still listed in `package.json` `dependencies` but is unused (the
-`sqlite3.wasm` copy step is already gone). Remove it with `npm uninstall @sqlite.org/sqlite-wasm`.
+SQLite came back in [ADR 0009](decisions/0009-sqlite-prompt-store.md) with the same in-memory +
+IndexedDB snapshot approach as `a3805a8`, now as `services/prompt-store/`.

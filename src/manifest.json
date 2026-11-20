@@ -28,5 +28,8 @@
       "run_at": "document_idle"
     }
   ],
-  "permissions": ["storage", "tabs"]
+  "permissions": ["unlimitedStorage"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
 }

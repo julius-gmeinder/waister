@@ -1,13 +1,18 @@
 # Estimation pipeline
 
 Goal: for every prompt the user sends in a supported chat app, produce **one number**, the
-estimated total token usage of that prompt.
+estimated total token usage of that prompt, and save it to the database.
 
 ```
 Reader ──ChatCaptureDto──▶ EstimationHandler ──▶ TokenizerService   (visible)
                                     │         └─▶ EstimationService  (hidden)
                                     ▼
                            TokenEstimateDto { totalTokens, breakdown }
+                                    │ + UUID + conversationUrl
+                                    ▼
+                           PromptStoreService ──INSERT──▶ SQLite `prompts`
+
+Popup ──GET_USAGE_SUMMARY──▶ UsageHandler ──▶ PromptStoreService ──SELECT──▶ UsageSummaryDto
 ```
 
 ## 1. Reader & Consolidated Strategy (content script)
@@ -53,10 +58,11 @@ questions (`countResponses()`, `isGenerating()`, `readResponse()`, …).
    - `thinkingTimeMs = tStreamStart − t0` (delta between prompt send and start of visible stream)
    - `latencyMs = t1 − t0` (total time from prompt send until response completion)
      and queries the site adapter for `model`, `userInput`, `response`, and `chatHistory[]` to
-     build a [`ChatCaptureDto`](dto.md#chatcapturedto).
+     build a [`ChatCaptureDto`](dto.md#chatcapturedto). `conversationUrl` is
+     `location.origin + location.pathname` at `t1`, so a new chat already has its final URL.
 5. **Dispatch to `estimation.handler.ts`**: The strategy sends `ChatCaptureDto` via `chrome.runtime`
    message `ESTIMATE_PROMPT`, which `handlers/message.handler.ts` routes into
-   `handleEstimation(captureDto, tabId)` in `handlers/estimation.handler.ts`.
+   `handleEstimation(captureDto)` in `handlers/estimation.handler.ts`.
 
 ## 2. TokenizerService: visible tokens
 
@@ -103,12 +109,23 @@ Assembles the final [`TokenEstimateDto`](dto.md#tokenestimatedto) containing `to
 2. `countVisibleTokens(cleanedCapture)` (TokenizerService) counts input, history, output.
 3. `estimateHiddenTokens(cleanedCapture)` (EstimationService) estimates thinking + overhead.
 4. `buildTokenEstimateDto(cleanedCapture, visible, hidden)` sums `totalTokens` and builds the DTO.
-5. `setLatestEstimate(tabId, estimateDto)` caches the DTO in `chrome.storage.session` for the popup.
+5. `createPromptRecord(cleanedCapture, estimateDto)` (PromptStoreService) adds a random UUID
+   and the conversation URL, and `savePromptRecord(record)` inserts it into SQLite.
 
-## 5. Popup
+## 5. PromptStoreService: saving
 
-When opened, `ui/popup/popup.view.ts` sends `GET_LATEST_ESTIMATE` for the active tab and shows
-`totalTokens` and its breakdown. Nothing else.
+`services/prompt-store/`. One row per prompt in the `prompts` table: id, conversation URL,
+`captured_at`, provider, model (name, version, thinking effort, raw label), the five breakdown
+counts, `total_tokens`, latency, thinking time, `approximate` and the impact. **No chat text.**
+The database lives in memory, and a snapshot of it is written to IndexedDB after every insert and
+restored when the service worker starts.
+
+## 6. Popup
+
+When opened, `ui/popup/popup.view.ts` sends `GET_USAGE_SUMMARY { sinceMs: now − 24 h }`.
+`handlers/usage.handler.ts` passes it to `getUsageSummary(sinceMs)`, which sums all rows with
+`captured_at >= sinceMs`. The popup shows the summed `totalTokens`, the breakdown and the prompt
+count. It has no link to the estimation pipeline.
 
 ## Open questions
 

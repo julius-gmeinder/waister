@@ -12,8 +12,8 @@ approximations, and the readers depend on each site's current DOM.
 | [`entries/`](#entries)   | Entry points (one per context)         | each its own context |
 | [`readers/`](#readers)   | Reads the chat page → `ChatCaptureDto` | content script       |
 | [`handlers/`](#handlers) | Orchestration (messages, estimation)   | background           |
-| [`services/`](#services) | Tokenizing, estimating, caching        | background           |
-| [`ui/`](#ui)             | Popup that shows the token number      | popup                |
+| [`services/`](#services) | Tokenizing, estimating, storing        | background           |
+| [`ui/`](#ui)             | Popup that shows the last 24h of usage | popup                |
 | [`dto/`](#dtos)          | Data contracts between layers          | shared               |
 | [`messages/`](#messages) | `chrome.runtime` message contracts     | shared               |
 
@@ -108,9 +108,9 @@ Contract (`site-adapter.types.ts`):
 adapters. It builds the DTO only once the response has completely finished (`t1`). Timing details:
 [pipeline.md](pipeline.md#1-reader--consolidated-strategy-content-script).
 
-| File                      | Strategy                                                                                                                                                                                                                                                                                                                       |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `dom-capture.strategy.ts` | Default consolidated strategy. Resolves the active `SiteAdapter`, detects `{ t0, tStreamStart, t1 }` with `observeTurns`, computes `latencyMs` and `thinkingTimeMs`, builds `ChatCaptureDto`, and sends it via `ESTIMATE_PROMPT` to `handleEstimation` in `estimation.handler.ts`. Logs `[waister]` lines to the page console. |
+| File                      | Strategy                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dom-capture.strategy.ts` | Default consolidated strategy. Resolves the active `SiteAdapter`, detects `{ t0, tStreamStart, t1 }` with `observeTurns`, computes `latencyMs` and `thinkingTimeMs`, reads `conversationUrl` (`location.origin + location.pathname` at `t1`), builds `ChatCaptureDto`, and sends it via `ESTIMATE_PROMPT` to `handleEstimation` in `estimation.handler.ts`. Logs `[waister]` lines to the page console. |
 
 Contract (`reader-strategy.types.ts`): `start(onCapture?, host?, customAdapters?)`, plus the
 `TurnTimings` type `{ t0, tStreamStart, t1 }`.
@@ -123,10 +123,11 @@ Contract (`reader-strategy.types.ts`): `start(onCapture?, host?, customAdapters?
 right order and return a result. They hold no domain logic of their own (no tokenizing, no
 estimation formulas).
 
-| File                    | Role                                                                                                                                                                                                                                                    |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `message.handler.ts`    | Routes each `chrome.runtime` message by `type` to the matching handler or service.                                                                                                                                                                      |
-| `estimation.handler.ts` | **EstimationHandler**: `ChatCaptureDto` → `TokenEstimateDto`. Gets visible counts from the TokenizerService and hidden counts from the EstimationService, has the EstimationService build the DTO (`totalTokens`), and stores it in the estimate cache. |
+| File                    | Role                                                                                                                                                                                                                                                                                                                 |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `message.handler.ts`    | Routes each `chrome.runtime` message by `type` to the matching handler: `ESTIMATE_PROMPT` → EstimationHandler, `GET_USAGE_SUMMARY` → UsageHandler.                                                                                                                                                                   |
+| `estimation.handler.ts` | **EstimationHandler**: `ChatCaptureDto` → `PromptRecordDto`. Gets visible counts from the TokenizerService and hidden counts from the EstimationService, has the EstimationService build the `TokenEstimateDto` (`totalTokens`), then has the PromptStoreService add a UUID + the conversation URL and save the row. |
+| `usage.handler.ts`      | **UsageHandler**: `handleGetUsageSummary(sinceMs)` → `UsageSummaryDto`, read straight from the PromptStoreService. No link to the estimation pipeline.                                                                                                                                                               |
 
 Style: plain exported functions (no classes). Services are imported directly. Pipeline details:
 [pipeline.md](pipeline.md).
@@ -141,11 +142,11 @@ May import: `services/`, `dto/`, `messages/`. Must not import: `readers/`, `ui/`
 plain exported functions with a `*.service.ts` facade. Other files in the same folder are
 internal to that service.
 
-| Folder            | Service                                         | Job                                                          |
-| ----------------- | ----------------------------------------------- | ------------------------------------------------------------ |
-| `tokenizer/`      | [TokenizerService](#tokenizer-service)          | Counts the tokens of all **visible** text in the DTO         |
-| `estimation/`     | [EstimationService](#estimation-service)        | Estimates **hidden** tokens (thinking, system/tool overhead) |
-| `estimate-cache/` | [EstimateCacheService](#estimate-cache-service) | Holds the latest estimate per tab for the popup              |
+| Folder          | Service                                     | Job                                                          |
+| --------------- | ------------------------------------------- | ------------------------------------------------------------ |
+| `tokenizer/`    | [TokenizerService](#tokenizer-service)      | Counts the tokens of all **visible** text in the DTO         |
+| `estimation/`   | [EstimationService](#estimation-service)    | Estimates **hidden** tokens (thinking, system/tool overhead) |
+| `prompt-store/` | [PromptStoreService](#prompt-store-service) | Saves every prompt to SQLite and answers the popup's queries |
 
 Rules:
 
@@ -189,15 +190,27 @@ It also computes an environmental `impact` (`energyWh`, `waterMl`, `co2Grams`) f
 | `model-profiles.ts`     | Per provider + model: hidden-token rates (`systemPromptTokens`, `tokensPerMsThinking`), `THINKING_EFFORT_MULTIPLIERS`, and the energy rates from `energy-lookup.json` |
 | `energy-lookup.json`    | Plain JSON lookup table mapping each provider/model to `energyWhPer1M`, `waterMlPer1M`, and `co2GramsPer1M` (per 1M tokens)                                           |
 
-### Estimate cache service
+### Prompt store service
 
-`src/services/estimate-cache/`: keeps the **latest** `TokenEstimateDto` per tab so the popup can
-show it. Backed by `chrome.storage.session` because MV3 stops the background worker when it is
-idle, which wipes in-memory state.
+`src/services/prompt-store/`: the database. Every estimated prompt becomes one row in the SQLite
+`prompts` table, and the popup's queries are answered from it
+([ADR 0009](decisions/0009-sqlite-prompt-store.md)). **Metrics only, no chat text.**
 
-- Session-scoped only: cleared when the browser closes. No history, no SQLite.
-- API: `setLatestEstimate(tabId, estimate)`, `getLatestEstimate(tabId)`. It also writes an
-  `estimate:latest` key, which is used when the active tab has no estimate of its own.
+| File                      | Role                                                                                                                                                             |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prompt-store.service.ts` | Schema + SQL. `createPromptRecord(capture, estimate)` (adds `crypto.randomUUID()` and `conversationUrl`), `savePromptRecord(record)`, `getUsageSummary(sinceMs)` |
+| `sqlite-database.ts`      | Internal. Inits `@sqlite.org/sqlite-wasm` once, restores/saves the IndexedDB snapshot, `getDatabase(schema)`, `writeAndPersist(schema, write)`                   |
+
+- **Persistence:** MV3 service workers can't use the OPFS VFSes, so the database runs in memory.
+  After every insert the whole database is exported and written to IndexedDB (`waister` →
+  store `sqlite`, key `main`). The next start of the worker restores it. Writes are queued, so
+  snapshots land in the same order as the inserts.
+- **Table `prompts`:** `id` (UUID, PK), `conversation_url`, `captured_at` (indexed), `provider`,
+  `model_name`, `model_version`, `thinking_effort`, `model_raw_label`, `input_tokens`,
+  `history_tokens`, `output_tokens`, `thinking_tokens`, `overhead_tokens`, `total_tokens`,
+  `latency_ms`, `thinking_time_ms`, `approximate` (0/1), `energy_wh`, `water_ml`, `co2_grams`.
+- The schema runs on every start and must stay idempotent (`IF NOT EXISTS`). A column change on
+  an existing table needs an `ALTER TABLE` migration.
 
 ---
 
@@ -209,15 +222,16 @@ May import: `dto/`, `messages/`. Must not import: `handlers/`, `services/`, `rea
 
 ### Popup
 
-`src/ui/popup/`: when opened, the popup asks the background for the active tab's latest estimate
-(`GET_LATEST_ESTIMATE`) and shows **token usage only**: `totalTokens` plus the breakdown (input,
-history, output, thinking, overhead). Model, timings and `impact` are in the DTO but not displayed.
+`src/ui/popup/`: when opened, the popup asks the database for the last 24 hours
+(`GET_USAGE_SUMMARY { sinceMs: now − 24 h }`) and shows the summed `totalTokens`, the breakdown
+(input, history, output, thinking, overhead) and the prompt count. It never talks to the
+estimation pipeline. The layout is deliberately plain for now.
 
 | File            | Role                                   | Copied/bundled to                    |
 | --------------- | -------------------------------------- | ------------------------------------ |
 | `popup.html`    | Markup, loads `index.js` + `index.css` | `popup/index.html`                   |
 | `popup.css`     | Styles                                 | `popup/index.css`                    |
-| `popup.view.ts` | Fetches the estimate and renders it    | bundled via `entries/popup.entry.ts` |
+| `popup.view.ts` | Fetches the 24h summary and renders it | bundled via `entries/popup.entry.ts` |
 
 The popup only lives while it is open, so it keeps no state of its own.
 
@@ -237,10 +251,12 @@ replaces them with inline SVGs through `createIcons`. Only the icons listed in `
 `chrome.runtime` messages. Types only: no logic and no imports from other layers. Everything
 here must survive structured cloning (no classes, functions or DOM nodes).
 
-| File                    | DTO                | From → To                       |
-| ----------------------- | ------------------ | ------------------------------- |
-| `chat-capture.dto.ts`   | `ChatCaptureDto`   | chat reader → EstimationHandler |
-| `token-estimate.dto.ts` | `TokenEstimateDto` | EstimationHandler → popup       |
+| File                    | DTO                | From → To                                 |
+| ----------------------- | ------------------ | ----------------------------------------- |
+| `chat-capture.dto.ts`   | `ChatCaptureDto`   | chat reader → EstimationHandler           |
+| `token-estimate.dto.ts` | `TokenEstimateDto` | EstimationService → EstimationHandler     |
+| `prompt-record.dto.ts`  | `PromptRecordDto`  | EstimationHandler → PromptStoreService    |
+| `usage-summary.dto.ts`  | `UsageSummaryDto`  | PromptStoreService → UsageHandler → popup |
 
 Field reference: [dto.md](dto.md).
 
@@ -253,9 +269,9 @@ May import: nothing.
 `src/messages/` (shared): the contract for every `chrome.runtime` message, a discriminated union
 on `type`, plus the response type of each message.
 
-| `type`                | Sender  | Receiver   | Payload          | Response                   |
-| --------------------- | ------- | ---------- | ---------------- | -------------------------- |
-| `ESTIMATE_PROMPT`     | content | background | `ChatCaptureDto` | `TokenEstimateDto`         |
-| `GET_LATEST_ESTIMATE` | popup   | background | `{ tabId }`      | `TokenEstimateDto \| null` |
+| `type`              | Sender  | Receiver   | Payload          | Response          |
+| ------------------- | ------- | ---------- | ---------------- | ----------------- |
+| `ESTIMATE_PROMPT`   | content | background | `ChatCaptureDto` | `PromptRecordDto` |
+| `GET_USAGE_SUMMARY` | popup   | background | `{ sinceMs }`    | `UsageSummaryDto` |
 
 May import: `dto/`.
