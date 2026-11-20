@@ -41,7 +41,8 @@ export const GEMINI_SELECTORS = {
   modelSelector:
     '[data-test-id="bard-mode-menu-button"], .input-area-switch-label, button[aria-label*="mode"]',
   /** Expandable thinking drawer shown when Gemini is using a Thinking/Pro model. */
-  thinkingDrawer: 'model-thoughts, [data-test-id="model-thoughts"], .thoughts-container',
+  thinkingDrawer:
+    'model-thoughts, [data-test-id="model-thoughts"], .thoughts-container, [data-test-id*="thought"]',
 } as const;
 
 /**
@@ -62,9 +63,11 @@ function parseGeminiModel(rawLabel: string, hasThinkingDrawer: boolean): ModelIn
   const versionMatch = cleaned.match(/(\d+(?:\.\d+)?)/);
   const version = versionMatch?.[1] ?? 'unknown';
 
-  let thinkingEffort: ThinkingEffort = 'none';
+  let thinkingEffort: ThinkingEffort = 'unknown';
   if (hasThinkingDrawer || lower.includes('thinking') || lower.includes('pro')) {
     thinkingEffort = 'medium';
+  } else if (lower.includes('flash')) {
+    thinkingEffort = 'low';
   }
 
   return {
@@ -84,14 +87,38 @@ function extractCleanText(element: Element | null | undefined): string {
 }
 
 /**
+ * Selector matching collapsible thought/reasoning containers inside a `<model-response>` that must
+ * not be mistaken for the visible output text.
+ */
+const GEMINI_THOUGHT_SELECTOR =
+  'model-thoughts, [data-test-id="model-thoughts"], .thoughts-container, [data-test-id*="thought"]';
+
+/**
  * Reads the visible response text from a `<model-response>` element while excluding
- * any collapsible `<model-thoughts>` drawer so thinking summaries aren't double-counted as output.
+ * any collapsible `<model-thoughts>` drawer so thinking summaries aren't double-counted as output
+ * and don't prematurely trigger `tStreamStart` while the model is still thinking.
  */
 function extractGeminiResponseText(modelResponseEl: Element | null | undefined): string {
   if (!modelResponseEl) return '';
-  const messageContent =
-    modelResponseEl.querySelector('message-content, .model-response-text') ?? modelResponseEl;
-  return extractCleanText(messageContent);
+  const candidates = Array.from(
+    modelResponseEl.querySelectorAll('message-content, .model-response-text'),
+  ).filter((el) => el.closest(GEMINI_THOUGHT_SELECTOR) === null);
+
+  if (candidates.length > 0) {
+    return candidates
+      .map((el) => extractCleanText(el))
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+  }
+
+  // No answer container rendered yet: if a thinking drawer is already present, visible answer
+  // streaming has not started yet.
+  if (modelResponseEl.querySelector(GEMINI_THOUGHT_SELECTOR) !== null) {
+    return '';
+  }
+
+  return extractCleanText(modelResponseEl);
 }
 
 /**
@@ -170,6 +197,10 @@ export const geminiSite: SiteAdapter = {
     const responses = document.querySelectorAll('model-response');
     const latestResponse = responses[responses.length - 1];
     return extractGeminiResponseText(latestResponse).length > 0;
+  },
+
+  countUserMessages(): number {
+    return document.querySelectorAll('user-query').length;
   },
 
   countResponses(): number {

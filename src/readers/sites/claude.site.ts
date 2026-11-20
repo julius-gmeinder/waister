@@ -19,10 +19,11 @@ export const CLAUDE_SELECTORS = {
   /** ProseMirror contenteditable input box in the Claude composer. */
   promptInput: 'div.ProseMirror[contenteditable="true"], [data-testid="chat-input"]',
   /** Send button in the Claude composer. */
-  sendButton: 'button[aria-label="Send Message"], button[aria-label="Send message"]',
+  sendButton:
+    'button[aria-label="Send Message"], button[aria-label="Send message"], button[aria-label*="Send"], fieldset button[type="button"]:last-of-type',
   /** Stop button visible while Claude is streaming an answer. */
   stopButton:
-    'button[aria-label="Stop Response"], button[aria-label="Stop response"], button[aria-label="Stop generating"]',
+    'button[aria-label="Stop Response"], button[aria-label="Stop response"], button[aria-label="Stop generating"], button[aria-label*="Stop"]',
   /** Active streaming attribute placed on the streaming container by Claude's frontend. */
   streamingContainer: '[data-is-streaming="true"]',
   /** User turn containers in the conversation list. */
@@ -60,9 +61,11 @@ function parseClaudeModel(rawLabel: string, hasExtendedThinking: boolean): Model
   const versionMatch = cleaned.match(/(\d+(?:\.\d+)?)/);
   const version = versionMatch?.[1] ?? 'unknown';
 
-  let thinkingEffort: ThinkingEffort = 'none';
+  let thinkingEffort: ThinkingEffort = 'unknown';
   if (hasExtendedThinking || lower.includes('thinking') || lower.includes('extended')) {
     thinkingEffort = 'medium';
+  } else if (lower.includes('haiku')) {
+    thinkingEffort = 'none';
   }
 
   return {
@@ -153,6 +156,10 @@ export const claudeSite: SiteAdapter = {
     const assistantNodes = document.querySelectorAll(CLAUDE_SELECTORS.assistantMessage);
     const latestAssistant = assistantNodes[assistantNodes.length - 1];
     return extractCleanText(latestAssistant).length > 0;
+  },
+
+  countUserMessages(): number {
+    return document.querySelectorAll(CLAUDE_SELECTORS.userMessage).length;
   },
 
   countResponses(): number {
