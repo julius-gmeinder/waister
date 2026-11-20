@@ -8,10 +8,8 @@ const outdir = 'dist/waister';
 /** Files copied as-is into the extension folder ([source, destination]). */
 const staticFiles = [
   ['src/manifest.json', 'manifest.json'],
-  ['src/popup/index.html', 'popup/index.html'],
-  ['src/popup/index.css', 'popup/index.css'],
-  // sqlite-wasm resolves this relative to background.js (via import.meta.url).
-  ['node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm', 'sqlite3.wasm'],
+  ['src/ui/popup/popup.html', 'popup/index.html'],
+  ['src/ui/popup/popup.css', 'popup/index.css'],
   ['public', '.'],
 ];
 
@@ -51,16 +49,14 @@ const shared = {
 const builds = [
   {
     ...shared,
-    // ES module so sqlite-wasm can find sqlite3.wasm through import.meta.url
-    // (the manifest declares the background as "type": "module").
-    entryPoints: { background: 'src/background/index.ts' },
+    entryPoints: { background: 'src/entries/background.entry.ts' },
     format: 'esm',
   },
   {
     ...shared,
     entryPoints: {
-      content: 'src/content/index.ts',
-      'popup/index': 'src/popup/index.ts',
+      content: 'src/entries/content.entry.ts',
+      'popup/index': 'src/entries/popup.entry.ts',
     },
     // IIFE keeps every entry self-contained: content scripts can't use ES module imports.
     format: 'iife',
