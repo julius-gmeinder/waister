@@ -205,6 +205,14 @@ May import: `dto/`, `messages/`. Must not import: `handlers/`, `services/`, `rea
 
 The popup only lives while it is open, so it keeps no state of its own.
 
+**Icons** come from [lucide](https://lucide.dev/icons/) (npm `lucide`, bundled into
+`popup/index.js`). `popup.html` holds `<i data-lucide="name">` placeholders, and `popup.view.ts`
+replaces them with inline SVGs through `createIcons`. Only the icons listed in `POPUP_ICONS` in
+`popup.view.ts` get bundled, so a new icon has to be added in two places: imported and listed in
+`POPUP_ICONS` as `PascalCase`, and used in the HTML as `kebab-case`. Size and color are set in
+`popup.css` (`.lucide`), and icons inherit `currentColor`. The icon list is in
+[styling.md](styling.md#icons).
+
 ---
 
 ## DTOs

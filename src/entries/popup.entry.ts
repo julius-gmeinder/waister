@@ -5,4 +5,7 @@
  * Context: popup
  * Docs: docs/modules.md#entries
  */
-export {};
+import { initPopupView } from '../ui/popup/popup.view';
+
+// Loaded with `defer`, so the DOM is already parsed when this runs.
+initPopupView();

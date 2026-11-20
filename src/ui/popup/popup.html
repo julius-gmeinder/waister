@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Waister</title>
+    <link rel="stylesheet" href="index.css" />
+    <script src="index.js" defer></script>
+  </head>
+  <body>
+    <!-- Icons: <i data-lucide="name"> placeholders, swapped for SVGs by popup.view.ts.
+         Every name used here must be registered in POPUP_ICONS there. -->
+    <main class="popup">
+      <section class="total">
+        <i data-lucide="coins"></i>
+        <span class="total-value" data-field="totalTokens">–</span>
+        <span class="total-label">tokens</span>
+      </section>
+
+      <section class="meta">
+        <span class="meta-item"> <i data-lucide="cpu"></i><span data-field="model">–</span> </span>
+        <span class="meta-item">
+          <i data-lucide="timer"></i><span data-field="latencyMs">–</span>
+        </span>
+      </section>
+
+      <ul class="breakdown">
+        <li>
+          <i data-lucide="message-square"></i><span>Input</span><span data-field="input">–</span>
+        </li>
+        <li>
+          <i data-lucide="history"></i><span>History</span><span data-field="history">–</span>
+        </li>
+        <li>
+          <i data-lucide="message-square-text"></i><span>Output</span
+          ><span data-field="output">–</span>
+        </li>
+        <li>
+          <i data-lucide="brain"></i><span>Thinking</span><span data-field="thinking">–</span>
+        </li>
+        <li>
+          <i data-lucide="settings-2"></i><span>Overhead</span><span data-field="overhead">–</span>
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>
