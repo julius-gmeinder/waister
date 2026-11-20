@@ -45,8 +45,9 @@ MV3, recreated after commit `4c0bb6a` deleted it.
   Chrome, `scripts` for Firefox (see root README).
 - **Content script:** `content.js` at `document_idle`, only on `https://chatgpt.com/*`,
   `https://claude.ai/*`, `https://gemini.google.com/*`.
-- **Permissions:** `storage` (for `chrome.storage.session`). `chrome.tabs.query` for the
-  active tab's id needs no permission.
+- **Permissions:** `storage` (for `chrome.storage.session`) and `tabs`. The popup's
+  `chrome.tabs.query` for the active tab's id works without `tabs`. That permission is only
+  needed to read tab URLs/titles, and Chrome shows an install warning for it.
 - **Icons:** `icons` (16, 32, 48, 128) and `action.default_icon` (16, 32) from `public/icons/`.
 - No CSP. The old `'wasm-unsafe-eval'` is only needed again if a tokenizer ships as WASM.
 

@@ -49,7 +49,6 @@ const shared = {
 const builds = [
   {
     ...shared,
-    // ES module (the manifest declares the background as "type": "module").
     entryPoints: { background: 'src/entries/background.entry.ts' },
     format: 'esm',
   },
