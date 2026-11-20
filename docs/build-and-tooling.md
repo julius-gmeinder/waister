@@ -4,15 +4,16 @@ Documents the existing (pre-`src`) code and configs. Requirements: Node.js 20+, 
 
 ## npm scripts (`package.json`)
 
-| Script              | Runs                            |
-| ------------------- | ------------------------------- |
-| `npm run dev`       | `scripts/build.mjs --watch`     |
-| `npm run build`     | `scripts/build.mjs` (minified)  |
-| `npm run typecheck` | `tsc --noEmit`                  |
-| `npm run lint`      | `eslint .`                      |
-| `npm run format`    | `prettier --write .`            |
-| `npm run check`     | typecheck + lint + format check |
-| `npm run zip`       | build, then `scripts/zip.mjs`   |
+| Script                                                  | Runs                                     |
+| ------------------------------------------------------- | ---------------------------------------- |
+| `npm run dev`                                           | `scripts/build.mjs --watch`              |
+| `npm run build`                                         | `scripts/build.mjs` (minified)           |
+| `npm run typecheck`                                     | `tsc --noEmit`                           |
+| `npm run lint`                                          | `eslint .`                               |
+| `npm run format`                                        | `prettier --write .`                     |
+| `npm run check`                                         | typecheck + lint + format check          |
+| `npm run zip`                                           | build, then `scripts/zip.mjs`            |
+| `npm run dev:firefox` / `build:firefox` / `zip:firefox` | same with `--firefox` (Firefox manifest) |
 
 ## `scripts/build.mjs`
 
@@ -29,20 +30,25 @@ esbuild build into `dist/waister/` (the unpacked extension you load in the brows
   minified, no source maps.
 - **Static files** are copied after each successful build by the `copy-static` plugin
   (`[source, destination]`, skipped if the source doesn't exist):
-  `src/manifest.json`, `src/ui/popup/popup.html` → `popup/index.html`,
+  `src/ui/popup/popup.html` → `popup/index.html`,
   `src/ui/popup/popup.css` → `popup/index.css`, and everything in `public/`.
 - Entries: `src/entries/background.entry.ts` → `background.js`,
   `src/entries/content.entry.ts` → `content.js`, `src/entries/popup.entry.ts` →
   `popup/index.js`.
 - Watch mode keeps one esbuild context per build alive.
+- **Manifest per browser:** after each build, `writeManifest()` writes
+  `dist/waister/manifest.json` from `src/manifest.json`. By default (Chrome) it is copied
+  unchanged. With `--firefox`, `background.service_worker` is replaced by
+  `background.scripts: ["background.js"]`.
 
 ## Manifest (`src/manifest.json`)
 
 MV3, recreated after commit `4c0bb6a` deleted it.
 
 - **Popup:** `action.default_popup` = `popup/index.html`.
-- **Background:** `background.js` as ES module (`"type": "module"`). `service_worker` for
-  Chrome, `scripts` for Firefox (see root README).
+- **Background:** `background.js` as ES module (`"type": "module"`). The source declares only
+  `service_worker` (Chrome warns about `scripts` in MV3). The `--firefox` build swaps it for
+  `scripts`, because Firefox has no background service workers (see root README).
 - **Content script:** `content.js` at `document_idle`, only on `https://chatgpt.com/*`,
   `https://claude.ai/*`, `https://gemini.google.com/*`.
 - **Permissions:** `storage` (for `chrome.storage.session`) and `tabs`. The popup's
@@ -53,8 +59,8 @@ MV3, recreated after commit `4c0bb6a` deleted it.
 
 ## `scripts/zip.mjs`
 
-Packages `dist/waister/` into `dist/<name>-<version>.zip` (name and version from
-`package.json`) for store upload. On Windows it uses PowerShell `Compress-Archive`, elsewhere
+Packages `dist/waister/` into `dist/<name>-<version>-<browser>.zip` (name and version from
+`package.json`, browser `chrome` or `firefox` read from the built manifest) for store upload. On Windows it uses PowerShell `Compress-Archive`, elsewhere
 the `zip` CLI. Deletes an old zip of the same name first.
 
 ## TypeScript (`tsconfig.json`)

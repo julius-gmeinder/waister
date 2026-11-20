@@ -35,7 +35,8 @@ original `.ts` files.
 
 ### Development loop
 
-1. Keep `npm run dev` running. It rebuilds `dist/waister/` on every save.
+1. Keep `npm run dev` running (Firefox: `npm run dev:firefox`). It rebuilds `dist/waister/` on
+   every save.
 2. Reload the extension in the browser (see below). Changes to the background, popup and
    manifest need this.
 3. Refresh any open tabs you are testing on. Already-open pages keep the old content script
@@ -72,8 +73,10 @@ card, or run `chrome.runtime.reload()` in the background console.
 
 **Load:**
 
-1. Open `about:debugging#/runtime/this-firefox`.
-2. Click _Load Temporary Add-on…_ and select `dist/waister/manifest.json`.
+1. Build with `npm run dev:firefox` (or `npm run build:firefox`). The default build writes a
+   Chrome manifest that Firefox can't load the background from.
+2. Open `about:debugging#/runtime/this-firefox`.
+3. Click _Load Temporary Add-on…_ and select `dist/waister/manifest.json`.
 
 Temporary add-ons are removed when Firefox closes, so repeat this after every restart.
 **Reload** the extension with the _Reload_ button on its entry in `about:debugging`.
@@ -92,9 +95,11 @@ Temporary add-ons are removed when Firefox closes, so repeat this after every re
 
 **Firefox notes:**
 
-- Firefox does not support `background.service_worker`. For the background script to load,
-  `src/manifest.json` has `"scripts": ["background.js"]` next to `service_worker` in the
-  `background` key (with `"type": "module"`, the background is an ES module). Chrome ignores that key (with a warning), and Firefox uses it.
+- Firefox does not support `background.service_worker`, and Chrome MV3 rejects
+  `background.scripts` with a warning. So `src/manifest.json` is the Chrome manifest, and the
+  `--firefox` build (`dev:firefox`, `build:firefox`, `zip:firefox`) replaces `service_worker`
+  with `"scripts": ["background.js"]` in `dist/waister/manifest.json`. With
+  `"type": "module"` the background is an ES module in both browsers.
 - In Manifest V3, Firefox treats host permissions (including the content script's matches
   for chatgpt.com, claude.ai and gemini.google.com) as optional. If the content script doesn't
   run, open `about:addons` → _Waister_ → _Permissions_ and allow access to those sites. You
@@ -104,7 +109,7 @@ Temporary add-ons are removed when Firefox closes, so repeat this after every re
 installed and reloads it automatically on every rebuild:
 
 ```sh
-npx web-ext run --source-dir dist/waister                      # Firefox
+npx web-ext run --source-dir dist/waister                      # Firefox (after build:firefox)
 npx web-ext run --source-dir dist/waister --target chromium    # Chrome/Chromium
 npx web-ext lint --source-dir dist/waister                     # validate the manifest/package
 ```
@@ -131,15 +136,18 @@ The latest estimate per tab lives in `chrome.storage.session`. The unused
 
 ## Scripts
 
-| Command             | Description                                          |
-| ------------------- | ---------------------------------------------------- |
-| `npm run dev`       | Watch mode with inline source maps                   |
-| `npm run build`     | Production build (minified) into `dist/waister/`     |
-| `npm run typecheck` | Type-check with `tsc`                                |
-| `npm run lint`      | Lint with ESLint                                     |
-| `npm run format`    | Format with Prettier                                 |
-| `npm run check`     | Typecheck + lint + format check                      |
-| `npm run zip`       | Build and package it as `dist/waister-<version>.zip` |
+| Command                 | Description                                                     |
+| ----------------------- | --------------------------------------------------------------- |
+| `npm run dev`           | Watch mode with inline source maps (Chrome manifest)            |
+| `npm run dev:firefox`   | Same, with the Firefox manifest                                 |
+| `npm run build`         | Production build (minified) into `dist/waister/`                |
+| `npm run build:firefox` | Same, with the Firefox manifest                                 |
+| `npm run typecheck`     | Type-check with `tsc`                                           |
+| `npm run lint`          | Lint with ESLint                                                |
+| `npm run format`        | Format with Prettier                                            |
+| `npm run check`         | Typecheck + lint + format check                                 |
+| `npm run zip`           | Build and package it as `dist/waister-<version>-chrome.zip`     |
+| `npm run zip:firefox`   | Firefox build, packaged as `dist/waister-<version>-firefox.zip` |
 
 ## Project structure
 

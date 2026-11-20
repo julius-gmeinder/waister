@@ -54,25 +54,32 @@ Builds ChatCaptureDto & sends ESTIMATE_PROMPT ──▶ message.handler.ts ─�
    message `ESTIMATE_PROMPT`, which `handlers/message.handler.ts` routes into
    `handleEstimation(captureDto, tabId)` in `handlers/estimation.handler.ts`.
 
-## 2. TokenizerService: visible & hidden tokens
+## 2. TokenizerService: visible tokens
 
-`services/tokenizer/tokenizer.service.ts` + `services/tokenizer/tokenizer-lookup.json`.
+`services/tokenizer/tokenizer.service.ts` + `services/tokenizer/tokenizer-lookup.json`
+(`turnFramingTokens` per provider). Entry point: `countVisibleTokens(capture)`.
 
-| Count      | Source                        | How it works & why sites differ                                                                                                                              |
-| ---------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `input`    | `userInput`                   | Tokenized with the provider's tokenizer (`openai`, `anthropic`, or `google`) plus `turnFramingTokens` (4–5 control tokens wrapping the user turn).           |
-| `history`  | every turn in `chatHistory[]` | Chat apps re-send the whole conversation as context on every prompt. Each turn is tokenized with the provider's tokenizer plus `turnFramingTokens` per turn. |
-| `output`   | `response`                    | Tokenized with the provider's tokenizer (OpenAI `o200k_base` ~4.0 chars/tok, Claude BPE ~3.7 chars/tok, Gemini SentencePiece ~4.1 chars/tok).                |
-| `thinking` | `thinkingTimeMs`              | Looked up in `tokenizer-lookup.json`: `max(0, thinkingTimeMs − 250) × tokensPerMsThinking × effortMultiplier[thinkingEffort]`.                               |
-| `overhead` | `tokenizer-lookup.json`       | Per-provider/model `systemPromptTokens` from `tokenizer-lookup.json`.                                                                                        |
+| Count     | Source                        | How it works & why sites differ                                                                                                                              |
+| --------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `input`   | `userInput`                   | Tokenized with the provider's tokenizer (`openai`, `anthropic`, or `google`) plus `turnFramingTokens` (4–5 control tokens wrapping the user turn).           |
+| `history` | every turn in `chatHistory[]` | Chat apps re-send the whole conversation as context on every prompt. Each turn is tokenized with the provider's tokenizer plus `turnFramingTokens` per turn. |
+| `output`  | `response`                    | Tokenized with the provider's tokenizer (OpenAI `o200k_base` ~4.0 chars/tok, Claude BPE ~3.7 chars/tok, Gemini SentencePiece ~4.1 chars/tok).                |
 
-## 3. EstimationService: environmental impact (1M-token lookup)
+## 3. EstimationService: hidden tokens + DTO
 
-`services/estimation/estimation.service.ts` + `services/estimation/energy-lookup.json`.
+`services/estimation/estimation.service.ts` + `services/estimation/model-profiles.ts`.
+Entry points: `estimateHiddenTokens(capture)`, `buildTokenEstimateDto(capture, visible, hidden)`.
 
-Uses `totalTokens = input + history + output + thinking + overhead` together with `energy-lookup.json`
-(which defines `energyWhPer1M`, `waterMlPer1M`, and `co2GramsPer1M` per 1,000,000 tokens for each
-provider and model):
+| Count      | Source                             | How                                                                                     |
+| ---------- | ---------------------------------- | --------------------------------------------------------------------------------------- |
+| `thinking` | `thinkingTimeMs`, `thinkingEffort` | `max(0, thinkingTimeMs − 250) × tokensPerMsThinking × effortMultiplier[thinkingEffort]` |
+| `overhead` | model profile                      | `systemPromptTokens` of the provider/model (system prompt + tool definitions)           |
+
+Unknown models fall back to the provider default and set `approximate: true`.
+`buildTokenEstimateDto` sums `totalTokens = input + history + output + thinking + overhead`.
+
+**Background only, not displayed:** the service also attaches an environmental `impact` from
+`energy-lookup.json` (`energyWhPer1M`, `waterMlPer1M`, `co2GramsPer1M` per 1,000,000 tokens):
 
 ```
 scale     = totalTokens / 1_000_000
@@ -89,14 +96,15 @@ Assembles the final [`TokenEstimateDto`](dto.md#tokenestimatedto) containing `to
 `handlers/estimation.handler.ts`
 
 1. `normalizeCaptureDto(captureDto)` cleans the incoming capture data.
-2. `tokenizeCapture(cleanedCapture)` computes the token breakdown and `totalTokens`.
-3. `buildTokenEstimateDto(cleanedCapture, tokenization)` attaches the environmental impact from the 1M-token lookup table.
-4. `setLatestEstimate(tabId, estimateDto)` caches the DTO in `chrome.storage.session` for the popup.
+2. `countVisibleTokens(cleanedCapture)` (TokenizerService) counts input, history, output.
+3. `estimateHiddenTokens(cleanedCapture)` (EstimationService) estimates thinking + overhead.
+4. `buildTokenEstimateDto(cleanedCapture, visible, hidden)` sums `totalTokens` and builds the DTO.
+5. `setLatestEstimate(tabId, estimateDto)` caches the DTO in `chrome.storage.session` for the popup.
 
 ## 5. Popup
 
 When opened, `ui/popup/popup.view.ts` sends `GET_LATEST_ESTIMATE` for the active tab and shows
-`totalTokens`.
+`totalTokens` and its breakdown. Nothing else.
 
 ## Open questions
 

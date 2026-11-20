@@ -52,18 +52,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.meta {
-  display: flex;
-  gap: 16px;
-  font-size: 12px;
-}
-
-.meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
 .breakdown {
   display: grid;
   gap: 4px;

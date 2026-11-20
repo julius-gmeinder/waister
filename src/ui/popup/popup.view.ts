@@ -1,7 +1,8 @@
 /**
  * Popup view: asks the background for the active tab's latest estimate (GET_LATEST_ESTIMATE)
- * and renders totalTokens, its breakdown, and the environmental impact (energy, water) into
- * the `[data-field]` elements in `popup.html`.
+ * and renders totalTokens and its breakdown (input, history, output, thinking, overhead) into
+ * the `[data-field]` elements in `popup.html`. Token usage only: model, timings and the
+ * background's energy estimate are not shown.
  *
  * Icons: lucide. popup.html holds `<i data-lucide="name">` placeholders and renderIcons() swaps
  * them for inline SVGs. Only icons listed in POPUP_ICONS are bundled.
@@ -13,15 +14,11 @@
 import {
   Brain,
   Coins,
-  Cpu,
   createIcons,
-  Droplet,
   History,
   MessageSquare,
   MessageSquareText,
   Settings2,
-  Timer,
-  Zap,
 } from 'lucide';
 import type { TokenEstimateDto } from '../../dto/token-estimate.dto';
 import type { GetLatestEstimateMessage } from '../../messages/runtime-messages';
@@ -33,14 +30,10 @@ import type { GetLatestEstimateMessage } from '../../messages/runtime-messages';
 const POPUP_ICONS = {
   Brain,
   Coins,
-  Cpu,
-  Droplet,
   History,
   MessageSquare,
   MessageSquareText,
   Settings2,
-  Timer,
-  Zap,
 };
 
 function renderIcons(): void {
@@ -66,17 +59,12 @@ export function renderEstimate(estimate: TokenEstimateDto | null): void {
   }
 
   setField('totalTokens', estimate.totalTokens.toLocaleString());
-  setField('model', `${estimate.model.name} (${estimate.model.version})`);
-  setField('latencyMs', `${estimate.timings.latencyMs.toLocaleString()} ms`);
 
   setField('input', estimate.breakdown.input.toLocaleString());
   setField('history', estimate.breakdown.history.toLocaleString());
   setField('output', estimate.breakdown.output.toLocaleString());
   setField('thinking', estimate.breakdown.thinking.toLocaleString());
   setField('overhead', estimate.breakdown.overhead.toLocaleString());
-
-  setField('energyWh', `${estimate.impact.energyWh} Wh`);
-  setField('waterMl', `${estimate.impact.waterMl} mL`);
 }
 
 /**

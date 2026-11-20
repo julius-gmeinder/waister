@@ -4,7 +4,8 @@ Reference for every folder and file in `src/`. The code is organized **by layer*
 runs in exactly one runtime context or is shared. Import rules are in
 [architecture.md](architecture.md#layers--contexts).
 
-Status: backbone only. All `.ts` files are stubs (header comment + `export {};`).
+Status: the pipeline is implemented end to end. The tokenizers are character-based
+approximations, and the readers depend on each site's current DOM.
 
 | Folder                   | Layer                                  | Runs in              |
 | ------------------------ | -------------------------------------- | -------------------- |
@@ -118,10 +119,10 @@ Contract (`reader-strategy.types.ts`): `start(onCapture?, host?, customAdapters?
 right order and return a result. They hold no domain logic of their own (no tokenizing, no
 estimation formulas).
 
-| File                    | Role                                                                                                                                                                                                  |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `message.handler.ts`    | Routes each `chrome.runtime` message by `type` to the matching handler or service.                                                                                                                    |
-| `estimation.handler.ts` | **EstimationHandler**: `ChatCaptureDto` → `TokenEstimateDto`. Calls the TokenizerService, then the EstimationService, sums everything into `totalTokens` and stores the result in the estimate cache. |
+| File                    | Role                                                                                                                                                                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `message.handler.ts`    | Routes each `chrome.runtime` message by `type` to the matching handler or service.                                                                                                                                                                      |
+| `estimation.handler.ts` | **EstimationHandler**: `ChatCaptureDto` → `TokenEstimateDto`. Gets visible counts from the TokenizerService and hidden counts from the EstimationService, has the EstimationService build the DTO (`totalTokens`), and stores it in the estimate cache. |
 
 Style: plain exported functions (no classes). Services are imported directly. Pipeline details:
 [pipeline.md](pipeline.md).
@@ -154,29 +155,35 @@ May import: `dto/`. Must not import: `handlers/`, `readers/`, `ui/`, `messages/`
 
 ### Tokenizer service
 
-`src/services/tokenizer/`: counts visible tokens for `userInput`, `response` and each `chatHistory[]`
-turn, and calculates hidden tokens (`overhead` for the system prompt and `thinking` from
-`thinkingTimeMs`) using `tokenizer-lookup.json` in the same folder.
+`src/services/tokenizer/`: counts the **visible** tokens for `userInput`, `response` and each
+`chatHistory[]` turn. Per-turn framing tokens come from `tokenizer-lookup.json` in the same folder.
+Hidden tokens are not counted here (see [EstimationService](#estimation-service)).
 
-| File                     | Provider    | Role / Difference across sites                                                                                                      |
-| ------------------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `tokenizer.service.ts`   | (router)    | Orchestrates `countInputTokens`, `countOutputTokens`, `countHistoryTokens`, `estimateThinkingTokensFromTime`, and `tokenizeCapture` |
-| `tokenizer-lookup.json`  | (lookup)    | Plain JSON lookup table for `systemPromptTokens`, `tokensPerMsThinking`, `turnFramingTokens`, and `effortMultipliers`               |
-| `openai.tokenizer.ts`    | `openai`    | Calibrated for OpenAI's `o200k_base` BPE (~4.0 chars/token, 1–3 digit number chunks) + 4 ChatML turn-framing tokens                 |
-| `anthropic.tokenizer.ts` | `anthropic` | Calibrated for Claude's BPE (~3.7 chars/token, denser subword splits) + 5 turn-framing tokens                                       |
-| `google.tokenizer.ts`    | `google`    | Calibrated for Gemini's 256k SentencePiece unigram vocabulary (~4.1 chars/token) + 4 turn-delimiter tokens                          |
+| File                     | Provider    | Role / Difference across sites                                                                                                                      |
+| ------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tokenizer.service.ts`   | (router)    | `countVisibleTokens(capture)` → `{ input, history, output, approximate }`, built from `countInputTokens`, `countHistoryTokens`, `countOutputTokens` |
+| `tokenizer-lookup.json`  | (lookup)    | `turnFramingTokens` per provider (chat-template control tokens per turn)                                                                            |
+| `openai.tokenizer.ts`    | `openai`    | Calibrated for OpenAI's `o200k_base` BPE (~4.0 chars/token, 1–3 digit number chunks) + 4 ChatML turn-framing tokens                                 |
+| `anthropic.tokenizer.ts` | `anthropic` | Calibrated for Claude's BPE (~3.7 chars/token, denser subword splits) + 5 turn-framing tokens                                                       |
+| `google.tokenizer.ts`    | `google`    | Calibrated for Gemini's 256k SentencePiece unigram vocabulary (~4.1 chars/token) + 4 turn-delimiter tokens                                          |
 
 ### Estimation service
 
-`src/services/estimation/`: converts the token counts from `TokenizerService` into environmental
-impact (`energyWh`, `waterMl`, `co2Grams`) using `energy-lookup.json` (rates per 1,000,000 tokens)
-and builds the final `TokenEstimateDto` for the popup.
+`src/services/estimation/`: estimates the **hidden** tokens and builds the final `TokenEstimateDto`.
 
-| File                    | Role                                                                                                                        |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `estimation.service.ts` | `calculateEnvironmentalImpact(totalTokens, provider, model)` and `buildTokenEstimateDto(capture, tokenization)`             |
-| `model-profiles.ts`     | Resolves the per-1M-token energy/water/CO2 rates for a provider + model from `energy-lookup.json`                           |
-| `energy-lookup.json`    | Plain JSON lookup table mapping each provider/model to `energyWhPer1M`, `waterMlPer1M`, and `co2GramsPer1M` (per 1M tokens) |
+- `thinking` = `max(0, thinkingTimeMs − 250) × tokensPerMsThinking × effortMultiplier[thinkingEffort]`
+- `overhead` = `systemPromptTokens` of the model (system prompt + tool definitions)
+- `totalTokens` = input + history + output + thinking + overhead. The handler passes the visible
+  counts in, so the services don't call each other.
+
+It also computes an environmental `impact` (`energyWh`, `waterMl`, `co2Grams`) from
+`energy-lookup.json`. That value stays in the background and is **not shown** in the popup.
+
+| File                    | Role                                                                                                                                                                  |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `estimation.service.ts` | `estimateHiddenTokens(capture)`, `estimateThinkingTokens(...)`, `buildTokenEstimateDto(capture, visible, hidden)`, `calculateEnvironmentalImpact(...)`                |
+| `model-profiles.ts`     | Per provider + model: hidden-token rates (`systemPromptTokens`, `tokensPerMsThinking`), `THINKING_EFFORT_MULTIPLIERS`, and the energy rates from `energy-lookup.json` |
+| `energy-lookup.json`    | Plain JSON lookup table mapping each provider/model to `energyWhPer1M`, `waterMlPer1M`, and `co2GramsPer1M` (per 1M tokens)                                           |
 
 ### Estimate cache service
 
@@ -185,7 +192,8 @@ show it. Backed by `chrome.storage.session` because MV3 stops the background wor
 idle, which wipes in-memory state.
 
 - Session-scoped only: cleared when the browser closes. No history, no SQLite.
-- Planned API: `setLatest(tabId, estimate)`, `getLatest(tabId)`.
+- API: `setLatestEstimate(tabId, estimate)`, `getLatestEstimate(tabId)`. It also writes an
+  `estimate:latest` key, which is used when the active tab has no estimate of its own.
 
 ---
 
@@ -198,7 +206,8 @@ May import: `dto/`, `messages/`. Must not import: `handlers/`, `services/`, `rea
 ### Popup
 
 `src/ui/popup/`: when opened, the popup asks the background for the active tab's latest estimate
-(`GET_LATEST_ESTIMATE`) and shows `totalTokens`. The breakdown is optional.
+(`GET_LATEST_ESTIMATE`) and shows **token usage only**: `totalTokens` plus the breakdown (input,
+history, output, thinking, overhead). Model, timings and `impact` are in the DTO but not displayed.
 
 | File            | Role                                   | Copied/bundled to                    |
 | --------------- | -------------------------------------- | ------------------------------------ |

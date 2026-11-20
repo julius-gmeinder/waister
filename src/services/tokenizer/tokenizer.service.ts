@@ -1,7 +1,7 @@
 /**
- * TokenizerService: counts visible tokens (`input`, `output`, `history`) using provider-specific
- * tokenizers AND looks up hidden tokens (`overhead` for system prompt and `thinking` from
- * `thinkingTimeMs`) using `tokenizer-lookup.json` in this same folder.
+ * TokenizerService: counts the **visible** tokens (`input`, `history`, `output`) with the
+ * provider-specific tokenizers. Per-turn framing tokens come from `tokenizer-lookup.json`.
+ * Hidden tokens (thinking, overhead) are estimated by EstimationService, not here.
  *
  * Why sites/providers differ for input, output, and chatHistory:
  *   1. Different sub-word vocabularies:
@@ -17,73 +17,34 @@
  * Docs: docs/modules.md#tokenizer-service, docs/pipeline.md
  */
 
-import type {
-  ChatCaptureDto,
-  ChatTurn,
-  ModelInfo,
-  Provider,
-  ThinkingEffort,
-} from '../../dto/chat-capture.dto';
-import type { TokenBreakdown } from '../../dto/token-estimate.dto';
+import type { ChatCaptureDto, ChatTurn, Provider } from '../../dto/chat-capture.dto';
 import { countAnthropicTextTokens } from './anthropic.tokenizer';
 import { countGoogleTextTokens } from './google.tokenizer';
 import { countOpenAiTextTokens } from './openai.tokenizer';
 import tokenizerLookup from './tokenizer-lookup.json';
 
 /**
- * Resolved lookup configuration for a specific provider + model from `tokenizer-lookup.json`.
+ * Visible token counts returned by `countVisibleTokens` to `estimation.handler.ts`.
  */
-export interface TokenizerLookupEntry {
-  /** Base hidden system prompt & tool-definition token count. */
-  systemPromptTokens: number;
-  /** How many thinking tokens are generated per 1 millisecond of `thinkingTimeMs`. */
-  tokensPerMsThinking: number;
-  /** Per-turn framing control tokens added by the provider's chat template. */
-  turnFramingTokens: number;
-  /** Whether an exact model entry was found in `tokenizer-lookup.json` (false if fallback). */
-  exactModelMatch: boolean;
-}
-
-/**
- * Result returned by `tokenizeCapture` to `estimation.handler.ts`.
- */
-export interface TokenizationResult {
-  /** Per-category token counts (input, history, output, thinking, overhead). */
-  breakdown: TokenBreakdown;
-  /** Total tokens across all visible and hidden categories. */
-  totalTokens: number;
-  /** True if heuristic tokenization or a fallback model lookup entry was used. */
+export interface VisibleTokenizationResult {
+  /** Tokens of the new user message, incl. turn framing. */
+  input: number;
+  /** Tokens of all earlier turns, incl. turn framing per turn. */
+  history: number;
+  /** Tokens of the visible answer. */
+  output: number;
+  /** True while the provider tokenizers are character-based approximations. */
   approximate: boolean;
 }
 
 /**
- * Resolves the lookup parameters (`systemPromptTokens`, `tokensPerMsThinking`, `turnFramingTokens`)
- * for a given `provider` and `model` from `tokenizer-lookup.json`.
+ * Per-turn chat-template framing tokens for `provider` from `tokenizer-lookup.json`.
  */
-export function resolveTokenizerLookup(provider: Provider, model: ModelInfo): TokenizerLookupEntry {
-  const providerTable = tokenizerLookup.providers[provider];
-  if (!providerTable) {
-    return {
-      systemPromptTokens: tokenizerLookup.defaults.systemPromptTokens,
-      tokensPerMsThinking: tokenizerLookup.defaults.tokensPerMsThinking,
-      turnFramingTokens: tokenizerLookup.defaults.turnFramingTokens,
-      exactModelMatch: false,
-    };
-  }
-
-  const modelsMap = providerTable.models as Record<
-    string,
-    { systemPromptTokens: number; tokensPerMsThinking: number } | undefined
+export function resolveTurnFramingTokens(provider: Provider): number {
+  const providers = tokenizerLookup.providers as Partial<
+    Record<Provider, { turnFramingTokens: number }>
   >;
-  const modelEntry = modelsMap[model.name];
-
-  return {
-    systemPromptTokens: modelEntry?.systemPromptTokens ?? providerTable.default.systemPromptTokens,
-    tokensPerMsThinking:
-      modelEntry?.tokensPerMsThinking ?? providerTable.default.tokensPerMsThinking,
-    turnFramingTokens: providerTable.default.turnFramingTokens,
-    exactModelMatch: modelEntry !== undefined,
-  };
+  return providers[provider]?.turnFramingTokens ?? tokenizerLookup.defaults.turnFramingTokens;
 }
 
 /**
@@ -141,63 +102,16 @@ export function countHistoryTokens(
 }
 
 /**
- * Estimates hidden thinking/reasoning tokens from `thinkingTimeMs` (the delta time between t0
- * prompt send and start of the visible stream) using the `tokensPerMsThinking` factor and the
- * model's `thinkingEffort` multiplier from `tokenizer-lookup.json`.
+ * Full visible tokenization pass over a `ChatCaptureDto`: tokenizes `userInput`, `response` and
+ * `chatHistory[]` with the provider-specific tokenizer. Hidden tokens (thinking, overhead) are
+ * estimated by EstimationService.
  */
-export function estimateThinkingTokensFromTime(
-  thinkingTimeMs: number,
-  tokensPerMsThinking: number,
-  thinkingEffort: ThinkingEffort,
-): number {
-  if (thinkingTimeMs <= 0) return 0;
-
-  const effortMultipliers = tokenizerLookup.defaults.effortMultipliers as Record<
-    ThinkingEffort,
-    number
-  >;
-  const effortMultiplier = effortMultipliers[thinkingEffort] ?? 0.5;
-
-  // Subtract a small baseline network/TTFT handshake (250ms) so pure network ping isn't counted as reasoning
-  const effectiveThinkingMs = Math.max(0, thinkingTimeMs - 250);
-  return Math.round(effectiveThinkingMs * tokensPerMsThinking * effortMultiplier);
-}
-
-/**
- * Full tokenization pass over a `ChatCaptureDto`:
- * 1. Looks up `systemPromptTokens`, `tokensPerMsThinking`, and `turnFramingTokens` in `tokenizer-lookup.json`.
- * 2. Tokenizes `userInput`, `response`, and `chatHistory[]` using the provider-specific tokenizer.
- * 3. Computes hidden `thinking` tokens from `capture.thinkingTimeMs` and hidden `overhead` tokens.
- * 4. Sums all categories into `totalTokens`.
- */
-export function tokenizeCapture(capture: ChatCaptureDto): TokenizationResult {
-  const lookup = resolveTokenizerLookup(capture.provider, capture.model);
-
-  const input = countInputTokens(capture.userInput, capture.provider, lookup.turnFramingTokens);
-  const output = countOutputTokens(capture.response, capture.provider);
-  const history = countHistoryTokens(
-    capture.chatHistory,
-    capture.provider,
-    lookup.turnFramingTokens,
-  );
-  const thinking = estimateThinkingTokensFromTime(
-    capture.thinkingTimeMs,
-    lookup.tokensPerMsThinking,
-    capture.model.thinkingEffort,
-  );
-  const overhead = lookup.systemPromptTokens;
-
-  const totalTokens = input + history + output + thinking + overhead;
-
+export function countVisibleTokens(capture: ChatCaptureDto): VisibleTokenizationResult {
+  const turnFramingTokens = resolveTurnFramingTokens(capture.provider);
   return {
-    breakdown: {
-      input,
-      history,
-      output,
-      thinking,
-      overhead,
-    },
-    totalTokens,
+    input: countInputTokens(capture.userInput, capture.provider, turnFramingTokens),
+    history: countHistoryTokens(capture.chatHistory, capture.provider, turnFramingTokens),
+    output: countOutputTokens(capture.response, capture.provider),
     approximate: true,
   };
 }

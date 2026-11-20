@@ -3,12 +3,11 @@
  *
  * Receives a `ChatCaptureDto` from the content script strategy and delegates all domain logic
  * to the services:
- *   1. `normalizeCaptureDto`: cleans and validates incoming capture fields.
- *   2. `tokenizeCapture` (`tokenizer.service.ts`): tokenizes `userInput`, `response`, `chatHistory`
- *      and looks up `overhead` (system prompt) and `thinking` tokens (from `thinkingTimeMs`).
- *   3. `buildTokenEstimateDto` (`estimation.service.ts`): combines the tokenization result with
- *      the 1M-token energy/water lookup table (`energy-lookup.json`) to build `TokenEstimateDto`.
- *   4. `setLatestEstimate` (`estimate-cache.service.ts`): caches the resulting DTO for the popup.
+ *   1. `normalizeCaptureDto`: cleans incoming capture fields.
+ *   2. `countVisibleTokens` (`tokenizer.service.ts`): visible input, history, output tokens.
+ *   3. `estimateHiddenTokens` (`estimation.service.ts`): hidden thinking + overhead tokens.
+ *   4. `buildTokenEstimateDto` (`estimation.service.ts`): sums `totalTokens` and builds the DTO.
+ *   5. `setLatestEstimate` (`estimate-cache.service.ts`): caches the resulting DTO for the popup.
  *
  * Context: background
  * Docs: docs/modules.md#handlers, docs/pipeline.md
@@ -20,8 +19,11 @@ import {
   getLatestEstimate,
   setLatestEstimate,
 } from '../services/estimate-cache/estimate-cache.service';
-import { buildTokenEstimateDto } from '../services/estimation/estimation.service';
-import { tokenizeCapture } from '../services/tokenizer/tokenizer.service';
+import {
+  buildTokenEstimateDto,
+  estimateHiddenTokens,
+} from '../services/estimation/estimation.service';
+import { countVisibleTokens } from '../services/tokenizer/tokenizer.service';
 
 /**
  * Cleans and normalizes the incoming `ChatCaptureDto` before passing it to the services.
@@ -49,7 +51,7 @@ export function normalizeCaptureDto(captureDto: ChatCaptureDto): ChatCaptureDto 
 
 /**
  * High-level orchestration for estimating a captured prompt:
- * delegates to `tokenizer.service`, then `estimation.service`, and stores the result
+ * visible tokens from `tokenizer.service`, hidden tokens from `estimation.service`, then stores the result
  * in `estimate-cache.service` so the popup can display it.
  */
 export async function handleEstimation(
@@ -59,13 +61,16 @@ export async function handleEstimation(
   // Step 1: Normalize the raw capture DTO
   const cleanedCapture = normalizeCaptureDto(captureDto);
 
-  // Step 2: Delegate visible + hidden token counting to TokenizerService
-  const tokenization = tokenizeCapture(cleanedCapture);
+  // Step 2: Visible tokens (input, history, output) via TokenizerService
+  const visible = countVisibleTokens(cleanedCapture);
 
-  // Step 3: Delegate environmental impact calculation & DTO assembly to EstimationService
-  const estimateDto = buildTokenEstimateDto(cleanedCapture, tokenization);
+  // Step 3: Hidden tokens (thinking, overhead) via EstimationService
+  const hidden = estimateHiddenTokens(cleanedCapture);
 
-  // Step 4: Cache the latest TokenEstimateDto per tab for the popup
+  // Step 4: Sum into totalTokens and assemble the DTO
+  const estimateDto = buildTokenEstimateDto(cleanedCapture, visible, hidden);
+
+  // Step 5: Cache the latest TokenEstimateDto per tab for the popup
   await setLatestEstimate(tabId, estimateDto);
 
   return estimateDto;

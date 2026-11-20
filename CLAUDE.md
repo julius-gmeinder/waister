@@ -60,14 +60,16 @@ All docs live in `docs/` only. Start at `docs/README.md`. The per-module referen
 
 ## Status
 
-Backbone only: every `src/**/*.ts` is a stub (header comment + `export {};`), and `popup.html`
-and `popup.css` are empty. `npm run build` works. `eslint.config.js` still targets the old
+Pipeline implemented end to end (readers → handler → tokenizer/estimation services → cache →
+popup). The popup shows token usage only (total + breakdown). The background also computes an
+energy/water `impact`, which is not displayed. `npm run build` works. `eslint.config.js` still targets the old
 per-context layout. The required changes are in `docs/build-and-tooling.md`.
 
 ## Commands
 
 ```sh
 npm run dev        # watch build into dist/waister/ (load unpacked in the browser)
+npm run dev:firefox  # same, with the Firefox manifest (also build:firefox, zip:firefox)
 npm run build      # production build
 npm run check      # typecheck + lint + prettier check, run before committing
 npm run zip        # package for store upload

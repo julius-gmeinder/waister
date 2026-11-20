@@ -1,22 +1,42 @@
 import * as esbuild from 'esbuild';
-import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
 const watch = process.argv.includes('--watch');
+/** Target browser. src/manifest.json is the Chrome manifest, `--firefox` patches it. */
+const firefox = process.argv.includes('--firefox');
 /** The unpacked extension. Load this folder in the browser. */
 const outdir = 'dist/waister';
 
 /** Files copied as-is into the extension folder ([source, destination]). */
 const staticFiles = [
-  ['src/manifest.json', 'manifest.json'],
   ['src/ui/popup/popup.html', 'popup/index.html'],
   ['src/ui/popup/popup.css', 'popup/index.css'],
   ['public', '.'],
 ];
 
+/**
+ * Writes manifest.json for the target browser. Chrome MV3 only accepts
+ * `background.service_worker` (it warns about `scripts`). Firefox doesn't support service
+ * workers and needs `background.scripts` instead.
+ */
+function writeManifest() {
+  const manifest = JSON.parse(readFileSync('src/manifest.json', 'utf8'));
+  if (firefox) {
+    const { service_worker: worker, ...background } = manifest.background;
+    manifest.background = { ...background, scripts: [worker] };
+  }
+  writeFileSync(
+    `${outdir}/manifest.json`,
+    `${JSON.stringify(manifest, null, 2)}
+`,
+  );
+}
+
 function copyStatic() {
   for (const [from, to] of staticFiles) {
     if (existsSync(from)) cpSync(from, `${outdir}/${to}`, { recursive: true });
   }
+  writeManifest();
 }
 
 /** @type {esbuild.Plugin} */
@@ -26,7 +46,9 @@ const copyStaticPlugin = {
     build.onEnd((result) => {
       if (result.errors.length === 0) {
         copyStatic();
-        console.log(`[build] ${new Date().toLocaleTimeString()} done`);
+        console.log(
+          `[build] ${new Date().toLocaleTimeString()} done (${firefox ? 'firefox' : 'chrome'})`,
+        );
       }
     });
   },

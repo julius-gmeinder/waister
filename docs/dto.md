@@ -1,7 +1,6 @@
 # DTOs
 
-Plain, structured-clone-safe data. Defined in `src/dto/`. The shapes below are the agreed
-target and are not implemented yet.
+Plain, structured-clone-safe data. Defined in `src/dto/`. The shapes below match the code.
 
 ## ChatCaptureDto
 
@@ -44,7 +43,7 @@ tab, shown by the popup.
 | ------------- | --------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `totalTokens` | `number`              | **The single token total:** sum of all breakdown fields (`input + history + output + thinking + overhead`) |
 | `breakdown`   | `TokenBreakdown`      | `{ input, history, output, thinking, overhead }` (see [pipeline.md](pipeline.md))                          |
-| `impact`      | `EnvironmentalImpact` | `{ energyWh, waterMl, co2Grams }` derived from the 1M-token lookup table (`energy-lookup.json`)            |
+| `impact`      | `EnvironmentalImpact` | `{ energyWh, waterMl, co2Grams }` from `energy-lookup.json`. Background only, not shown in the popup       |
 | `provider`    | `Provider`            | Echoed from the capture                                                                                    |
 | `model`       | `ModelInfo`           | Echoed from the capture                                                                                    |
 | `timings`     | object                | `{ latencyMs, thinkingTimeMs }` echoed from the capture                                                    |
