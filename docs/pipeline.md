@@ -13,7 +13,7 @@ Reader ──ChatCaptureDto──▶ EstimationHandler ──▶ TokenizerServic
                                     ▼
                            PromptStoreService ──INSERT──▶ SQLite `prompts`
 
-Popup ──GET_USAGE_SUMMARY──▶ UsageHandler ──▶ PromptStoreService ──SELECT──▶ UsageSummaryDto
+Popup / App ──GET_USAGE_SUMMARY──▶ UsageHandler ──▶ PromptStoreService ──SELECT──▶ UsageSummaryDto
 ```
 
 ## 1. Reader & Consolidated Strategy (content script)
@@ -153,6 +153,15 @@ When opened, `PopupApp` (`ui/popup/popup.app.tsx`) sends `GET_USAGE_SUMMARY { si
 `handlers/usage.handler.ts` passes it to `getUsageSummary(sinceMs)`, which sums all rows with
 `captured_at >= sinceMs`. The popup shows the summed `totalTokens`, the breakdown, the accumulated
 energy (Wh) and water (mL) tachos, and the prompt count. It has no link to the estimation pipeline.
+
+## 8. Dashboard (app page)
+
+`App` (`ui/app/app.app.tsx`) sends the same `GET_USAGE_SUMMARY`, with `sinceMs` taken from the
+selected timeframe (Today = local midnight, Last week / Last 30 days = rolling, All time = 0).
+The summary also carries the summed `impact`, the oldest `captured_at` in the window and the
+query time. `DashboardPage` shows the tokens, and the PowerCard and WaterCard show the energy and
+water. Their animation speed follows the usage per active day relative to `ui.dashboard.busyDay`
+([ADR 0014](decisions/0014-dashboard-page.md)).
 
 ## Open questions
 

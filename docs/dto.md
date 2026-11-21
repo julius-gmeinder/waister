@@ -44,16 +44,16 @@ EstimationHandler. One DTO per sent prompt.
 `src/dto/token-estimate.dto.ts`. Built by the EstimationHandler + EstimationService, then saved
 as a `PromptRecordDto`.
 
-| Field         | Type                  | Description                                                                                                        |
-| ------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `totalTokens` | `number`              | **The single token total:** sum of all breakdown fields (`input + history + output + thinking + tools + overhead`) |
-| `breakdown`   | `TokenBreakdown`      | `{ input, history, output, thinking, tools, overhead }` (see [pipeline.md](pipeline.md#thinking-vs-overhead))      |
-| `impact`      | `EnvironmentalImpact` | `{ energyWh, waterMl, co2Grams }` from `ConversionService` (`config/config.json`)                                  |
-| `provider`    | `Provider`            | Echoed from the capture                                                                                            |
-| `model`       | `ModelInfo`           | Echoed from the capture                                                                                            |
-| `timings`     | object                | `{ latencyMs, thinkingTimeMs }` echoed from the capture                                                            |
-| `approximate` | `boolean`             | `true` if any part used an approximate tokenizer or a fallback model profile                                       |
-| `capturedAt`  | `number`              | Echoed from the capture                                                                                            |
+| Field         | Type                  | Description                                                                                                                        |
+| ------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `totalTokens` | `number`              | **The single token total:** sum of all breakdown fields (`input + history + output + thinking + tools + overhead`)                 |
+| `breakdown`   | `TokenBreakdown`      | `{ input, history, output, thinking, tools, overhead }` (see [pipeline.md](pipeline.md#thinking-vs-overhead))                      |
+| `impact`      | `EnvironmentalImpact` | `{ energyWh, waterMl, co2Grams }` from `ConversionService` (`config/config.json`). Summed in the popup tachos and on the Dashboard |
+| `provider`    | `Provider`            | Echoed from the capture                                                                                                            |
+| `model`       | `ModelInfo`           | Echoed from the capture                                                                                                            |
+| `timings`     | object                | `{ latencyMs, thinkingTimeMs }` echoed from the capture                                                                            |
+| `approximate` | `boolean`             | `true` if any part used an approximate tokenizer or a fallback model profile                                                       |
+| `capturedAt`  | `number`              | Echoed from the capture                                                                                                            |
 
 ## PromptRecordDto
 
@@ -72,12 +72,14 @@ No chat text (`userInput`, `response`, `chatHistory`) is saved.
 ## UsageSummaryDto
 
 `src/dto/usage-summary.dto.ts`. Built by `getUsageSummary(sinceMs)` in the PromptStoreService,
-shown by the popup. Response of `GET_USAGE_SUMMARY`.
+shown by the popup and the app page's Dashboard. Response of `GET_USAGE_SUMMARY`.
 
-| Field         | Type                  | Description                                                 |
-| ------------- | --------------------- | ----------------------------------------------------------- |
-| `sinceMs`     | `number`              | Start of the window (epoch ms, inclusive)                   |
-| `promptCount` | `number`              | Number of saved prompts with `capturedAt >= sinceMs`        |
-| `totalTokens` | `number`              | Sum of their `totalTokens`                                  |
-| `breakdown`   | `TokenBreakdown`      | Sum of each breakdown field                                 |
-| `impact`      | `EnvironmentalImpact` | Sum of `energyWh`, `waterMl` and `co2Grams` over the window |
+| Field             | Type                  | Description                                                            |
+| ----------------- | --------------------- | ---------------------------------------------------------------------- |
+| `sinceMs`         | `number`              | Start of the window (epoch ms, inclusive)                              |
+| `queriedAtMs`     | `number`              | When the background ran the query (epoch ms), the end of the window    |
+| `firstCapturedAt` | `number \| null`      | `capturedAt` of the oldest prompt in the window, `null` if it is empty |
+| `promptCount`     | `number`              | Number of saved prompts with `capturedAt >= sinceMs`                   |
+| `totalTokens`     | `number`              | Sum of their `totalTokens`                                             |
+| `breakdown`       | `TokenBreakdown`      | Sum of each breakdown field                                            |
+| `impact`          | `EnvironmentalImpact` | Sum of each impact field (`energyWh`, `waterMl`, `co2Grams`)           |

@@ -14,7 +14,7 @@ export interface EstimatePromptMessage {
   payload: ChatCaptureDto;
 }
 
-/** Popup -> background. */
+/** Popup / app page -> background. */
 export interface GetUsageSummaryMessage {
   type: 'GET_USAGE_SUMMARY';
   payload: {

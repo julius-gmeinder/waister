@@ -41,8 +41,9 @@ background:  handlers/estimation.handler (EstimationHandler)
              handlers/usage.handler → services/prompt-store → UsageSummaryDto
 popup:       ui/popup/  (React, dashboard)  ← GET_USAGE_SUMMARY (reads only the database)
                  │ tab bar → chrome.tabs.create
-app page:    ui/app/    (React, full tab, hash routes: analytics · facts · tips · history)
-             ui/components/ + ui/base.css + ui/app-routes.ts shared by both
+app page:    ui/app/    (React, full tab, hash routes: dashboard · analytics · facts · tips · history)
+                 └─ dashboard ← GET_USAGE_SUMMARY per timeframe (fetched by the App root)
+             ui/components/ + ui/base.css + ui/app-routes.ts + ui/usage-api.ts shared by both
 shared:      dto/, messages/, config/ (config.json: every tunable rate, heuristic and timing)
 entries/:    one esbuild entry per context, wiring only
 ```
@@ -66,8 +67,8 @@ All docs live in `docs/` only. Start at `docs/README.md`. The per-module referen
   `*.strategy.ts`, `*.handler.ts`, `*.service.ts`, `*.tokenizer.ts`, `*.dto.ts`, `*.types.ts`,
   `*.helpers.ts` (folder-internal pure helpers), `*.app.tsx`, `*.page.tsx`, `*.component.tsx`).
   Exception, no suffix needed: folder-internal modules (`model-profiles.ts`,
-  `sqlite-database.ts`) and the shared `messages/`, `config/`, `ui/app-routes.ts` and
-  `entries/css-imports.d.ts` files.
+  `sqlite-database.ts`) and the shared `messages/`, `config/`, `ui/app-routes.ts`,
+  `ui/usage-api.ts` and `entries/css-imports.d.ts` files.
 - **Comments:** every src file starts with a header comment: `/** <ModuleName>: <one line>. <optional
 ≤3 lines WHY>`, then `Context: content | background | popup | app page | shared` and
   `Docs: docs/modules.md#<section>` as separate lines of the same block.
@@ -76,8 +77,8 @@ All docs live in `docs/` only. Start at `docs/README.md`. The per-module referen
   unchecked selectors with `// UNVERIFIED:` (see `site-adapter.types.ts`).
 - **Lint enforces the layers:** `eslint.config.js` has `no-restricted-imports` per layer, matching
   the import table in `docs/architecture.md`.
-- **UI (React):** only the `*.app.tsx` roots fetch data. `components/` only render props (and may
-  navigate). Routes only in `ui/app-routes.ts`. Shared styles in `base.css` / `components.css`,
+- **UI (React):** only the `*.app.tsx` roots fetch data (through `useUsageSummary` in
+  `ui/usage-api.ts`). Pages and `components/` only render props (and may navigate). Routes only in `ui/app-routes.ts`. Shared styles in `base.css` / `components.css`,
   surface layout in `popup.css` / `app.css`, colors only via the CSS variables
   (`docs/styling.md`).
 - **Keep docs in sync:** when you add, move or change a module, update its section in
@@ -92,8 +93,10 @@ Pipeline implemented end to end (readers → handler → tokenizer/estimation/co
 SQLite prompt store). The popup (React + TSX, [ADR 0010](docs/decisions/0010-react-popup.md)) reads
 the database and shows the last 24h of token usage (total, breakdown, accumulated energy & water
 tachos, prompt count). Its tab bar opens the full-page app page
-([ADR 0011](docs/decisions/0011-app-page.md)), whose four pages (Analytics, Facts, Tips, History)
-are empty placeholders so far. The UI is deliberately plain for now. `npm run check` and
+([ADR 0011](docs/decisions/0011-app-page.md)). Its default page, the Dashboard
+([ADR 0014](docs/decisions/0014-dashboard-page.md)), shows tokens plus the energy/water `impact`
+for a chosen timeframe in two animated cards (CSS + inline SVG). The other four pages (Analytics,
+Facts, Tips, History) are empty placeholders so far. `npm run check` and
 `npm run build` pass.
 
 ## Commands

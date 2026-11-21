@@ -5,10 +5,12 @@
  * Docs: docs/modules.md#ui
  */
 
+import { PageTitle } from '../../components/page-title.component';
+
 export function AnalyticsPage() {
   return (
     <section>
-      <h1 className="page-title">Analytics</h1>
+      <PageTitle>Analytics</PageTitle>
       <p className="page-placeholder">Coming soon.</p>
     </section>
   );

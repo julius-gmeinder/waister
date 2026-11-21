@@ -31,15 +31,16 @@ the tokens and saves every prompt to a SQLite database, and the popup reads that
 │     └─ services/prompt-store/      SELECT SUM(...) → UsageSummaryDto      │
 └───────────────────────────▲───────────────────────────────────────────────┘
                             │ chrome.runtime message GET_USAGE_SUMMARY
-                            │
+                            │ (popup: last 24h · app page: selected timeframe)
 ┌─ popup ───────────────────────────────────────────────────────────────────┐
 │  ui/popup/popup.app.tsx (React)    shows the last 24h of token usage      │
 │  ui/components/tab-bar             opens a route in a new browser tab ──┐ │
 └─────────────────────────────────────────────────────────────────────────┼─┘
                                                      chrome.tabs.create   │
 ┌─ app page (full browser tab, app/index.html#/<route>) ──────────────────▼─┐
-│  ui/app/app.app.tsx (React)        Sidebar + Analytics · Facts · Tips ·   │
-│                                    History (hash routes, empty for now)   │
+│  ui/app/app.app.tsx (React)        Sidebar + Dashboard (tokens, energy,   │
+│                                    water per timeframe) · Analytics ·     │
+│                                    Facts · Tips · History (empty for now) │
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 

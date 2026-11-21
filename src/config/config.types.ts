@@ -242,6 +242,33 @@ export interface CaptureConfig {
   };
 }
 
+/** Animation period range, ms: `slowest` at the lowest intensity above 0, `fastest` at 1. */
+export interface AnimationPeriodRange {
+  slowest: number;
+  fastest: number;
+}
+
+/**
+ * Dashboard animations. Intensity = ((usage ÷ active days) ÷ `busyDay`) ^ `intensityExponent`,
+ * clamped to 0..1, separately for energy and water. Active days = from the oldest prompt in the
+ * timeframe until now, at least 1. 0 usage = no pulse / drip.
+ *
+ * Assumptions: `busyDay` is about 1M tokens a day (e.g. 50 prompts with 20k tokens of context
+ * each) at the default rates of ~400 Wh / ~1400 mL per 1M tokens. The exponent < 1 lifts low
+ * usage, so a light day still visibly moves.
+ */
+export interface DashboardConfig {
+  /** Usage per day that counts as intensity 1 (fastest pulse / drip, fullest pool). */
+  busyDay: { energyWh: number; waterMl: number };
+  intensityExponent: number;
+  /** Time between two power pulses (one lightning strike + gear step each). */
+  pulseMs: AnimationPeriodRange;
+  /** Time between two water drops. */
+  dripMs: AnimationPeriodRange;
+  /** Pool fill level, as a fraction of the basin height, at intensity 0 and 1. */
+  poolFill: { min: number; max: number };
+}
+
 export interface UiConfig {
   /** Time window of the popup's usage summary. */
   usageWindowHours: number;
@@ -250,6 +277,7 @@ export interface UiConfig {
     energyWh: number;
     waterMl: number;
   };
+  dashboard: DashboardConfig;
 }
 
 export interface WaisterConfig {

@@ -5,10 +5,12 @@
  * Docs: docs/modules.md#ui
  */
 
+import { PageTitle } from '../../components/page-title.component';
+
 export function TipsPage() {
   return (
     <section>
-      <h1 className="page-title">Tips</h1>
+      <PageTitle>Tips</PageTitle>
       <p className="page-placeholder">Coming soon.</p>
     </section>
   );

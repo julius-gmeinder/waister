@@ -8,7 +8,6 @@
 /* Icons: color for all component icons; sizes are set per component below. */
 .total .lucide,
 .breakdown-row .lucide,
-.tacho .lucide,
 .tab-bar-link .lucide,
 .sidebar-link .lucide {
   color: var(--contrast-bright);
@@ -70,7 +69,20 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ImpactTachos + Tacho */
+/* ImpactTachos + Tacho. The tone modifier maps the impact accents (base.css) onto local
+   variables: base for arc + icon, -strong for the number, -soft for the track. */
+.tacho--power {
+  --tacho-color: var(--power);
+  --tacho-strong: var(--power-strong);
+  --tacho-soft: var(--power-soft);
+}
+
+.tacho--water {
+  --tacho-color: var(--water);
+  --tacho-strong: var(--water-strong);
+  --tacho-soft: var(--water-soft);
+}
+
 .tachos {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -108,11 +120,11 @@
 }
 
 .tacho-track {
-  stroke: var(--border);
+  stroke: var(--tacho-soft);
 }
 
 .tacho-fill {
-  stroke: var(--contrast-bright);
+  stroke: var(--tacho-color);
   transition: stroke-dashoffset 240ms ease;
 }
 
@@ -128,6 +140,7 @@
 .tacho .lucide {
   width: 18px;
   height: 18px;
+  color: var(--tacho-color);
 }
 
 .tacho-reading {
@@ -141,7 +154,7 @@
   font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--contrast);
+  color: var(--tacho-strong);
 }
 
 .tacho-unit {
@@ -222,43 +235,429 @@
   height: 18px;
 }
 
-/* Interaction states, shared by TabBar and Sidebar links (docs/styling.md#interaction-states).
-   Neutral items: --neutral-hover / --neutral-pressed. The current page (aria-current) is
-   --accent with its own hover/pressed steps. The current-page rules come last, so they win over
-   the neutral ones at equal specificity. */
+/* PageTitle (app page) */
+.page-title {
+  margin: 0 0 8px;
+  color: var(--contrast);
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+/* TimeframePicker (dashboard): separate pills. Each chip carries its own --bg, so the neutral
+   hover/pressed tints work on the --surface content area too. */
+.timeframe-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.timeframe-picker-chip {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* PowerCard + WaterCard (dashboard): the shared card frame. A light accent tint at the bottom
+   grounds each scene. */
+.power-card,
+.water-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 24px 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.power-card {
+  background: linear-gradient(var(--surface) 45%, var(--power-tint));
+}
+
+.water-card {
+  background: linear-gradient(var(--surface) 45%, var(--water-tint));
+}
+
+.power-card-label,
+.water-card-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.power-card-label .lucide {
+  color: var(--power);
+}
+
+.water-card-label .lucide {
+  color: var(--water);
+}
+
+.power-card-value,
+.water-card-value {
+  display: inline-block;
+  margin: 8px 0 0;
+  font-family: var(--font-serif);
+  font-size: 40px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.power-card-value {
+  color: var(--power-strong);
+}
+
+.water-card-value {
+  color: var(--water-strong);
+}
+
+.power-card-unit,
+.water-card-unit {
+  margin-left: 6px;
+  font-size: 20px;
+}
+
+/* Whitespace between the number and the scene, so the motion doesn't crowd the value. */
+.power-card-scene,
+.water-card-scene {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 28px;
+  overflow: visible;
+}
+
+/* PowerCard motion. One pulse every --pulse: the number glows (peak at 6%), one of the three
+   bolts strikes (the bolts cycle over 3 pulses, offset by one pulse each) and the gears snap one
+   tooth further. All share the start time and derive from --pulse, so they stay in sync. */
+.power-card-value {
+  animation: power-pulse var(--pulse) linear infinite;
+}
+
+@keyframes power-pulse {
+  0%,
+  40%,
+  100% {
+    transform: scale(1);
+    text-shadow: 0 0 0 transparent;
+  }
+  6% {
+    transform: scale(1.05);
+    text-shadow:
+      0 0 14px var(--power),
+      0 0 2px var(--power);
+  }
+  11% {
+    transform: scale(1.02);
+    text-shadow: 0 0 4px var(--power);
+  }
+  15% {
+    transform: scale(1.035);
+    text-shadow: 0 0 10px var(--power);
+  }
+}
+
+.power-gear {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: power-gear var(--pulse) infinite;
+}
+
+/* The overshooting curve makes the step feel like a ratchet clunk. Meshed gears share it, so
+   their teeth stay in each other's gaps. */
+@keyframes power-gear {
+  0%,
+  6% {
+    transform: rotate(0deg);
+    animation-timing-function: cubic-bezier(0.3, 1.5, 0.5, 1);
+  }
+  34%,
+  100% {
+    transform: rotate(var(--gear-step));
+  }
+}
+
+.power-gear-body {
+  fill: var(--power-soft);
+  fill-rule: evenodd;
+  stroke: var(--power);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.power-gear-axle {
+  fill: var(--power);
+}
+
+.power-strike {
+  opacity: 0;
+  animation: power-strike calc(var(--pulse) * 3) linear infinite;
+  animation-delay: calc(var(--pulse) * var(--strike-index));
+}
+
+/* One strike = the first pulse of the 3-pulse cycle: flash, flicker, fade. */
+@keyframes power-strike {
+  0%,
+  22%,
+  100% {
+    opacity: 0;
+  }
+  2%,
+  8% {
+    opacity: 1;
+  }
+  5% {
+    opacity: 0.35;
+  }
+}
+
+/* pathLength=1 on the polyline: dash 1 = the whole bolt, so it draws from top to bottom. */
+.power-bolt {
+  fill: none;
+  stroke: var(--power);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  filter: drop-shadow(0 0 3px var(--power));
+  animation: power-bolt calc(var(--pulse) * 3) linear infinite;
+  animation-delay: calc(var(--pulse) * var(--strike-index));
+}
+
+@keyframes power-bolt {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  3%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.power-spark {
+  fill: var(--power);
+  filter: drop-shadow(0 0 4px var(--power));
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: power-spark calc(var(--pulse) * 3) ease-out infinite;
+  animation-delay: calc(var(--pulse) * var(--strike-index));
+}
+
+@keyframes power-spark {
+  0%,
+  2%,
+  22%,
+  100% {
+    transform: scale(0);
+  }
+  4% {
+    transform: scale(1.5);
+  }
+}
+
+/* WaterCard motion. One drop every --drip: it swells under the number (0–35%), stretches, falls
+   with gravity onto the pool surface (--drop-fall, set from the fill level) at 78% and sends a
+   ripple out. The pool sways all the time, independent of usage. */
+.water-drop {
+  fill: var(--water);
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: water-drop var(--drip) infinite;
+}
+
+@keyframes water-drop {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(0.2);
+    animation-timing-function: ease-out;
+  }
+  35% {
+    transform: translateY(0) scale(1);
+    animation-timing-function: ease-in-out;
+  }
+  42% {
+    transform: translateY(3px) scale(0.92, 1.12);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  78% {
+    opacity: 1;
+    transform: translateY(var(--drop-fall)) scale(0.85, 1.2);
+  }
+  79%,
+  100% {
+    opacity: 0;
+    transform: translateY(var(--drop-fall)) scale(0.85, 1.2);
+  }
+}
+
+.water-ripple {
+  fill: none;
+  stroke: var(--water-strong);
+  stroke-width: 1.5;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: water-ripple var(--drip) ease-out infinite;
+}
+
+@keyframes water-ripple {
+  0%,
+  78% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  80% {
+    opacity: 0.8;
+    transform: scale(0.35);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+/* The level eases to its new height when the timeframe changes. */
+.water-level {
+  transition: transform 900ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.water-wave {
+  animation: water-sway 3.6s ease-in-out infinite alternate;
+}
+
+.water-wave--back {
+  fill: var(--water-soft);
+  animation-duration: 5.2s;
+  animation-direction: alternate-reverse;
+}
+
+.water-wave--front {
+  fill: var(--water);
+  opacity: 0.55;
+}
+
+@keyframes water-sway {
+  from {
+    transform: translateX(-10px);
+  }
+  to {
+    transform: translateX(10px);
+  }
+}
+
+.water-basin-fill {
+  fill: var(--surface);
+}
+
+.water-basin {
+  fill: none;
+  stroke: var(--water);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* No usage in the timeframe: nothing pulses or drips (strikes start at opacity 0, so the bolts
+   disappear). The pool keeps swaying. */
+.power-card--idle .power-card-value,
+.power-card--idle .power-gear,
+.power-card--idle .power-strike,
+.power-card--idle .power-bolt,
+.power-card--idle .power-spark,
+.water-card--idle .water-drop,
+.water-card--idle .water-ripple {
+  animation: none;
+}
+
+.water-card--idle .water-drop {
+  opacity: 0;
+}
+
+/* Reduced motion: values and the static scene stay, the motion goes. */
+@media (prefers-reduced-motion: reduce) {
+  .power-card-value,
+  .power-gear,
+  .power-strike,
+  .power-bolt,
+  .power-spark,
+  .water-drop,
+  .water-ripple,
+  .water-wave {
+    animation: none;
+  }
+
+  .water-level {
+    transition: none;
+  }
+
+  .water-drop {
+    opacity: 0;
+  }
+}
+
+/* Interaction states, shared by TabBar and Sidebar links and TimeframePicker chips
+   (docs/styling.md#interaction-states). Neutral items: --neutral-hover / --neutral-pressed. The
+   selected item (aria-current page, aria-pressed chip) is --accent with its own hover/pressed
+   steps. The selected rules come last, so they win over the neutral ones at equal specificity. */
 .tab-bar-link,
-.sidebar-link {
+.sidebar-link,
+.timeframe-picker-chip {
   transition:
     background-color 120ms ease,
+    border-color 120ms ease,
     color 120ms ease;
 }
 
 .tab-bar-link:hover,
-.sidebar-link:hover {
+.sidebar-link:hover,
+.timeframe-picker-chip:hover {
   background: var(--neutral-hover);
   color: var(--text);
 }
 
 .tab-bar-link:active,
-.sidebar-link:active {
+.sidebar-link:active,
+.timeframe-picker-chip:active {
   background: var(--neutral-pressed);
 }
 
-.sidebar-link[aria-current='page'] {
+.sidebar-link[aria-current='page'],
+.timeframe-picker-chip[aria-pressed='true'] {
   background: var(--accent);
+  color: var(--text);
 }
 
-.sidebar-link[aria-current='page']:hover {
+.timeframe-picker-chip[aria-pressed='true'] {
+  border-color: var(--accent-pressed);
+}
+
+.sidebar-link[aria-current='page']:hover,
+.timeframe-picker-chip[aria-pressed='true']:hover {
   background: var(--accent-hover);
 }
 
-.sidebar-link[aria-current='page']:active {
+.sidebar-link[aria-current='page']:active,
+.timeframe-picker-chip[aria-pressed='true']:active {
   background: var(--accent-pressed);
 }
 
 /* Keyboard focus only (not on mouse click). */
 .tab-bar-link:focus-visible,
-.sidebar-link:focus-visible {
+.sidebar-link:focus-visible,
+.timeframe-picker-chip:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
