@@ -53,7 +53,7 @@ const GEMINI_SELECTORS = {
   modelSelector:
     '[data-test-id="bard-mode-menu-button"], .input-area-switch-label, button[aria-label*="mode"]',
   thinkingDrawer:
-    'model-thoughts, [data-test-id="model-thoughts"], .thoughts-container, [data-test-id*="thought"]',
+    'model-thoughts, [data-test-id="model-thoughts"], .thoughts-container, [data-test-id*="thought"], details[class*="thought"]',
   /** Canvas chip inside the answer. */
   artifactCard: 'immersive-entry-chip',
   /** Canvas side panel with the document / code. */
@@ -61,6 +61,8 @@ const GEMINI_SELECTORS = {
   /** Inside the answer but not model output: code-block header, action row, source citations. */
   messageChrome:
     '.code-block-decoration, message-actions, sources-carousel-inline, source-footnote, sources-list',
+  /** Non-prompt chrome inside `<user-query>` (e.g. "You said" heading) skipped on fallback. */
+  userChrome: 'h1, h2, h3, .user-query-header, [data-test-id*="user-query-header"]',
   // UNVERIFIED: the selector below was not checked on the live site.
   /** File / image cards in a user turn. */
   attachmentTile: 'user-query-file-preview, [class*="file-preview"], [data-test-id*="file"]',
@@ -72,7 +74,7 @@ const GEMINI_TOOLS: ToolSelectors = {
   code: 'code-execution-result, [data-test-id*="code-execution"]',
   other: '',
   searchEvidence:
-    'sources-carousel-inline, source-footnote, sources-list, .source-inline-chip, [data-test-id*="source"]',
+    'sources-carousel-inline, source-footnote, sources-list, .source-inline-chip, [data-test-id="sources-carousel"], [data-test-id="source-chip"]',
 };
 
 /** Not model output: thinking drawer, UI chrome, canvas chips and tool blocks (counted separately). */
@@ -83,12 +85,17 @@ const GEMINI_MESSAGE_CHROME = joinSelectors(
   toolBlockSelector(GEMINI_TOOLS),
 );
 
+const GEMINI_USER_CHROME = joinSelectors(
+  GEMINI_SELECTORS.attachmentTile,
+  GEMINI_SELECTORS.userChrome,
+);
+
 const GEMINI_ALL_TURNS = joinSelectors(GEMINI_SELECTORS.userTurn, GEMINI_SELECTORS.assistantTurn);
 
 /** Markdown of the typed text. Falls back to the whole `<user-query>` if `.query-text` is missing. */
 function readUserText(userQuery: Element | undefined): string {
   return domToMarkdown(userQuery?.querySelector(GEMINI_SELECTORS.userText) ?? userQuery, {
-    skip: GEMINI_SELECTORS.attachmentTile,
+    skip: GEMINI_USER_CHROME,
     preserveLineBreaks: true,
   });
 }

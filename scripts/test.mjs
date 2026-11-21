@@ -17,10 +17,18 @@ const bundled = await esbuild.build({
       export * from './src/services/estimation/estimation.service';
       export * from './src/services/estimation/model-profiles';
       export * from './src/services/tokenizer/tokenizer.service';
+      export * from './src/readers/dom-content.reader';
       export * from './src/readers/sites/effort-inference.helpers';
-      export { buildModelInfo, unknownModel } from './src/readers/sites/site.helpers';
+      export { buildModelInfo, hasMatch, unknownModel } from './src/readers/sites/site.helpers';
       export { parseChatGptSlug, parseChatGptLabel } from './src/readers/sites/chatgpt.site';
+      export {
+        CURRENT_ESTIMATION_VERSION,
+        resolveStoredModelInfo,
+        validateAndNormalizeRecord,
+        validateAndNormalizeRecords,
+      } from './src/services/prompt-store/record-validator';
       export * from './src/ui/app/pages/facts.helpers';
+      export * from './src/ui/app/pages/analytics.helpers';
     `,
     resolveDir: process.cwd(),
     loader: 'ts',
@@ -50,13 +58,35 @@ const {
   countInputTokens,
   familyDefaultEffort,
   THINKING_DETECTED_EFFORT,
+  readAttachments,
+  readToolCalls,
   buildModelInfo,
+  hasMatch,
   parseChatGptSlug,
   parseChatGptLabel,
   formatFactKpiValue,
   formatFactMultiplier,
   getCandidateFacts,
   shuffleFactsBoard,
+  validateAndNormalizeRecord,
+  validateAndNormalizeRecords,
+  resolveStoredModelInfo,
+  CURRENT_ESTIMATION_VERSION,
+  aggregateAnalytics,
+  buildCategoryBreakdown,
+  buildModelDonut,
+  buildModelEfficiency,
+  buildHistoryTimeSeries,
+  buildEcoInsight,
+  computeUsefulWorkTokens,
+  formatAnalyticsHeaderSubtitle,
+  formatHumanSummaryNumber,
+  formatNaturalScaledEquivalent,
+  formatRecordsAsCsv,
+  formatRecordsAsJson,
+  resolveHumanColumnDecimals,
+  WORK_TO_1K_WORDS_FACTOR,
+  HOUR_MS,
 } = mod;
 
 describe('1. Config & UI Gauge Max Values', () => {
@@ -432,5 +462,823 @@ describe('5. FactSheet Icon Library & Smart-Shuffle Logic', () => {
     for (const kpi of ['power', 'water', 'co2']) {
       assert.notEqual(board2.daily[kpi].item.id, board1.daily[kpi].item.id);
     }
+  });
+});
+
+function makeTestPromptRecord(overrides = {}) {
+  const provider = overrides.provider ?? 'openai';
+  const model = overrides.model ?? {
+    name: 'gpt-sol',
+    version: '6',
+    thinkingEffort: 'medium',
+    rawLabel: 'GPT-6 Sol',
+  };
+  const breakdown = {
+    input: 500,
+    history: 1500,
+    output: 1000,
+    thinking: 500,
+    tools: 0,
+    overhead: 2000,
+    ...(overrides.breakdown ?? {}),
+  };
+  const totalTokens =
+    overrides.totalTokens ??
+    breakdown.input +
+      breakdown.history +
+      breakdown.output +
+      breakdown.thinking +
+      breakdown.tools +
+      breakdown.overhead;
+
+  const impact = overrides.impact ?? calculateEnvironmentalImpact(breakdown, provider, model);
+
+  return {
+    id: overrides.id ?? 'rec-1',
+    conversationUrl: overrides.conversationUrl ?? 'https://chatgpt.com/c/test',
+    capturedAt: overrides.capturedAt ?? 1_700_000_000_000,
+    provider,
+    model,
+    breakdown,
+    totalTokens,
+    impact,
+    timings: overrides.timings ?? { latencyMs: 1800, thinkingTimeMs: 600 },
+    approximate: overrides.approximate ?? false,
+  };
+}
+
+describe('6. Analytics Aggregator (Timeframes, Breakdown, Donut, Efficiency, Series, Eco-Insight)', () => {
+  const NOW = 1_750_000_000_000;
+  const DAY = 24 * HOUR_MS;
+
+  it('handles empty and zero-token edge cases gracefully without NaN or Infinity', () => {
+    const emptyVm = aggregateAnalytics([], 'all', '7d', 'impact', NOW);
+    assert.equal(emptyVm.isEmpty, true);
+    assert.equal(emptyVm.promptCount, 0);
+    assert.equal(emptyVm.kpis.length, 4);
+    assert.equal(emptyVm.breakdown.totalWeightedValue, 0);
+    assert.ok(emptyVm.breakdown.segments.every((s) => s.percentage === 0));
+    assert.equal(emptyVm.modelDonut.slices.length, 0);
+    assert.equal(emptyVm.modelEfficiency.rows.length, 0);
+    assert.equal(emptyVm.historySeries.buckets.length, 7);
+    assert.equal(emptyVm.ecoInsight.id, 'sparse');
+
+    // Single record with zero tokens
+    const zeroRecord = makeTestPromptRecord({
+      capturedAt: NOW - HOUR_MS,
+      breakdown: { input: 0, history: 0, output: 0, thinking: 0, tools: 0, overhead: 0 },
+      totalTokens: 0,
+      impact: { energyWh: 0, waterMl: 0, co2Grams: 0 },
+    });
+    const zeroVm = aggregateAnalytics([zeroRecord], 'tokens', '24h', 'impact', NOW);
+    assert.equal(zeroVm.promptCount, 1);
+    assert.equal(zeroVm.breakdown.totalRawTokens, 0);
+    assert.ok(
+      zeroVm.breakdown.segments.every((s) => Number.isFinite(s.percentage) && s.percentage === 0),
+    );
+    assert.equal(zeroVm.modelEfficiency.rows.length, 0);
+    assert.equal(zeroVm.ecoInsight.id, 'sparse');
+  });
+
+  it('filters timeframes (24h, 7d, 30d, All Time), computes period deltas, and builds exact bucket counts', () => {
+    const records = [
+      makeTestPromptRecord({ id: 'r-2h', capturedAt: NOW - 2 * HOUR_MS }),
+      makeTestPromptRecord({ id: 'r-30h', capturedAt: NOW - 30 * HOUR_MS }), // in prev 24h, active 7d
+      makeTestPromptRecord({ id: 'r-10d', capturedAt: NOW - 10 * DAY }), // in prev 7d, active 30d
+      makeTestPromptRecord({ id: 'r-45d', capturedAt: NOW - 45 * DAY }), // in prev 30d, active All Time
+      makeTestPromptRecord({ id: 'r-120d', capturedAt: NOW - 120 * DAY }), // active All Time only
+    ];
+
+    const vm24h = aggregateAnalytics(records, 'power', '24h', 'impact', NOW);
+    assert.equal(vm24h.promptCount, 1);
+    assert.equal(vm24h.previousPromptCount, 1);
+    assert.equal(vm24h.historySeries.buckets.length, 12);
+    assert.equal(vm24h.kpis[0].deltaText, '0% vs prev 24h');
+
+    const vm7d = aggregateAnalytics(records, 'power', '7d', 'impact', NOW);
+    assert.equal(vm7d.promptCount, 2);
+    assert.equal(vm7d.previousPromptCount, 1);
+    assert.equal(vm7d.historySeries.buckets.length, 7);
+    assert.equal(vm7d.kpis[0].deltaText, '+100% vs prev 7d');
+
+    const vm30d = aggregateAnalytics(records, 'power', '30d', 'impact', NOW);
+    assert.equal(vm30d.promptCount, 3);
+    assert.equal(vm30d.previousPromptCount, 1);
+    assert.equal(vm30d.historySeries.buckets.length, 10);
+    assert.equal(vm30d.kpis[0].deltaText, '+200% vs prev 30d');
+
+    const vmAll = aggregateAnalytics(records, 'power', 'all', 'impact', NOW);
+    assert.equal(vmAll.promptCount, 5);
+    assert.equal(vmAll.previousPromptCount, 0);
+    assert.equal(vmAll.kpis[0].deltaText, null);
+    assert.ok(
+      vmAll.historySeries.buckets.length >= 12 && vmAll.historySeries.buckets.length <= 16,
+      `Expected 12..16 buckets for All Time, got ${vmAll.historySeries.buckets.length}`,
+    );
+
+    const directSeries = buildHistoryTimeSeries(records.slice(0, 1), '24h', NOW);
+    assert.equal(directSeries.buckets.length, 12);
+    assert.equal(directSeries.overallAvgHistoryTokens, 1500);
+    assert.equal(directSeries.overallAvgNewTokens, 1500);
+    assert.ok(directSeries.peakBucketLabel !== null);
+  });
+
+  it('weights category breakdown by effective energy multipliers in impact tabs vs raw tokens in Tokens tab', () => {
+    // 1000 thinking tokens (1.0x weight) vs 1000 history tokens (0.081x weight)
+    const rec = makeTestPromptRecord({
+      capturedAt: NOW - HOUR_MS,
+      breakdown: {
+        output: 0,
+        thinking: 1000,
+        history: 1000,
+        input: 0,
+        tools: 0,
+        overhead: 0,
+      },
+    });
+
+    const tokenBreakdown = buildCategoryBreakdown([rec], 'tokens');
+    const tokThinking = tokenBreakdown.segments.find((s) => s.category === 'thinking');
+    const tokHistory = tokenBreakdown.segments.find((s) => s.category === 'history');
+    assert.equal(tokThinking.percentage, 50);
+    assert.equal(tokHistory.percentage, 50);
+
+    const powerBreakdown = buildCategoryBreakdown([rec], 'power');
+    // Ordered with Visible first (input, output) followed by Hidden & Context (thinking, tools, history, systemPrompt)
+    assert.deepEqual(
+      powerBreakdown.segments.map((s) => s.category),
+      ['input', 'output', 'thinking', 'tools', 'history', 'systemPrompt'],
+    );
+    const powThinking = powerBreakdown.segments.find((s) => s.category === 'thinking');
+    const powHistory = powerBreakdown.segments.find((s) => s.category === 'history');
+    // 1.0 / (1.0 + 0.081) = 92.5%, 0.081 / 1.081 = 7.5%
+    assert.equal(powThinking.percentage, 92.5);
+    assert.equal(powThinking.formattedPercentage, '92.5%');
+    assert.equal(powHistory.percentage, 7.5);
+    assert.equal(powHistory.formattedPercentage, '7.5%');
+  });
+
+  it('groups models beyond the top 5 into an "Other" donut slice in both impact and prompt modes', () => {
+    const models = [
+      { provider: 'anthropic', name: 'claude-fable', version: '5', count: 6 },
+      { provider: 'anthropic', name: 'claude-opus', version: '4.5', count: 5 },
+      { provider: 'openai', name: 'gpt-astra', version: '6', count: 4 },
+      { provider: 'google', name: 'gemini-neon', version: '4', count: 3 },
+      { provider: 'openai', name: 'gpt-sol', version: '6', count: 2 },
+      { provider: 'google', name: 'gemini-flash', version: '3', count: 1 },
+      { provider: 'anthropic', name: 'claude-haiku', version: '4.5', count: 1 },
+    ];
+
+    const records = [];
+    for (const m of models) {
+      for (let i = 0; i < m.count; i++) {
+        records.push(
+          makeTestPromptRecord({
+            id: `${m.name}-${i}`,
+            capturedAt: NOW - HOUR_MS,
+            provider: m.provider,
+            model: {
+              name: m.name,
+              version: m.version,
+              thinkingEffort: 'medium',
+              rawLabel: m.name,
+            },
+          }),
+        );
+      }
+    }
+
+    const impactDonut = buildModelDonut(records, 'power', 'impact');
+    assert.equal(impactDonut.slices.length, 6);
+    assert.equal(impactDonut.slices[5].isOther, true);
+    assert.equal(impactDonut.slices[5].label, 'Other');
+    assert.equal(impactDonut.slices[5].promptCount, 2);
+
+    const promptsDonut = buildModelDonut(records, 'power', 'prompts');
+    assert.equal(promptsDonut.slices.length, 6);
+    assert.equal(promptsDonut.slices[0].promptCount, 6);
+    assert.equal(promptsDonut.slices[5].isOther, true);
+    assert.equal(promptsDonut.slices[5].value, 2);
+  });
+
+  it('prevents Simpson’s Paradox in Model Rate mode while reflecting real session cost in Per Prompt mode', () => {
+    // Heavy model (Claude Opus, 2000 Wh/1M) used in a long cached chat (25,000 history tokens + 200 output)
+    // vs Lightweight model (Gemini Flash, 240 Wh/1M) used in a short uncached chat (0 history + 500 output)
+    const opusLongChat = [1, 2, 3].map((i) =>
+      makeTestPromptRecord({
+        id: `opus-${i}`,
+        capturedAt: NOW - HOUR_MS,
+        provider: 'anthropic',
+        model: {
+          name: 'claude-opus',
+          version: '4.5',
+          thinkingEffort: 'none',
+          rawLabel: 'Claude Opus',
+        },
+        breakdown: {
+          input: 100,
+          output: 200,
+          history: 25000,
+          thinking: 0,
+          tools: 0,
+          overhead: 5200,
+        },
+      }),
+    );
+
+    const flashShortChat = [1, 2, 3].map((i) =>
+      makeTestPromptRecord({
+        id: `flash-${i}`,
+        capturedAt: NOW - HOUR_MS,
+        provider: 'google',
+        model: {
+          name: 'gemini-flash',
+          version: '3',
+          thinkingEffort: 'none',
+          rawLabel: 'Gemini Flash',
+        },
+        breakdown: {
+          input: 200,
+          output: 500,
+          history: 0,
+          thinking: 0,
+          tools: 0,
+          overhead: 1500,
+        },
+      }),
+    );
+
+    const combined = [...opusLongChat, ...flashShortChat];
+
+    // Note: Under the old naive blended Wh/1k totalTokens formula:
+    // Opus energy = (200*1 + 100*0.2 + 25000*0.081 + 5200*0.047)/1M * 2000 = 2489.4/1M * 2000 = 4.9788 Wh
+    // Divided by 30,500 total tokens -> 0.163 Wh/1k raw tokens!
+    // Flash energy = (500*1 + 200*0.2 + 1500*0.047)/1M * 240 = 610.5/1M * 240 = 0.1465 Wh
+    // (If Flash had 0 overhead/history, 500 output -> 0.240 Wh/1k raw tokens > 0.163 Wh/1k!)
+    // In Model Rate mode (per 1k output-equivalent tokens):
+    // Flash is 0.240 Wh / 1k eq. tok, while Opus is 2.000 Wh / 1k eq. tok!
+    const rateEff = buildModelEfficiency(combined, 'power', 'modelRate');
+    assert.equal(rateEff.mode, 'modelRate');
+    assert.equal(rateEff.directionCue, 'Lower is better');
+    assert.equal(rateEff.rows.length, 2);
+    assert.ok(rateEff.rows[0].label.includes('Gemini Flash'));
+    assert.ok(rateEff.rows[1].label.includes('Claude Opus'));
+    assert.equal(rateEff.rows[0].efficiencyValue, 0.24);
+    assert.equal(rateEff.rows[1].efficiencyValue, 2.0);
+    // Consistent fixed 3-decimal formatting across the column
+    assert.equal(rateEff.rows[0].formattedValue, '0.240 Wh / 1k eq. tok');
+    assert.equal(rateEff.rows[1].formattedValue, '2.000 Wh / 1k eq. tok');
+    assert.ok(rateEff.subtitle.includes('less energy per 1k output-eq. tokens'));
+
+    // Per Message mode: reflects real session cost per message (human-friendly rounding by default)
+    const promptEff = buildModelEfficiency(combined, 'power', 'perPrompt', false);
+    assert.equal(promptEff.mode, 'perPrompt');
+    assert.equal(promptEff.directionCue, 'Lower is better');
+    assert.ok(promptEff.rows[0].label.includes('Gemini Flash'));
+    assert.ok(promptEff.rows[1].label.includes('Claude Opus'));
+    assert.ok(promptEff.rows[0].efficiencyValue < promptEff.rows[1].efficiencyValue);
+    assert.equal(promptEff.rows[0].formattedValue, '0.1 Wh / msg');
+    assert.equal(promptEff.rows[1].formattedValue, '5.0 Wh / msg');
+    assert.ok(promptEff.subtitle.includes('more energy per message than'));
+
+    // With technical details ON: higher decimal precision and inline token metadata
+    const promptEffTech = buildModelEfficiency(combined, 'power', 'perPrompt', true);
+    assert.equal(promptEffTech.rows[0].formattedValue, '0.147 Wh / msg');
+    assert.equal(promptEffTech.rows[1].formattedValue, '4.979 Wh / msg');
+
+    // Tokens tab in Model Rate mode: useful token ratio ((input + output) / totalTokens)
+    const tokenRateEff = buildModelEfficiency(combined, 'tokens', 'modelRate');
+    assert.equal(tokenRateEff.mode, 'modelRate');
+    assert.equal(tokenRateEff.directionCue, 'Higher is better');
+    assert.ok(tokenRateEff.rows[0].label.includes('Gemini Flash'));
+    assert.ok(tokenRateEff.rows[0].efficiencyValue > tokenRateEff.rows[1].efficiencyValue);
+
+    // Low-sample guard (<3 messages): marks isLowSample and avoids outlier multiplier claims in Per Message mode
+    const lowSampleEff = buildModelEfficiency(
+      [opusLongChat[0], flashShortChat[0]],
+      'power',
+      'perPrompt',
+    );
+    assert.equal(lowSampleEff.rows[0].isLowSample, true);
+    assert.equal(lowSampleEff.rows[1].isLowSample, true);
+    assert.ok(lowSampleEff.subtitle.startsWith('Lowest average per message:'));
+  });
+
+  it('selects data-driven Eco-Insights and exports clean CSV/JSON', () => {
+    // 1. High history drag
+    const historyHeavy = [
+      makeTestPromptRecord({
+        capturedAt: NOW - HOUR_MS,
+        breakdown: {
+          input: 200,
+          output: 300,
+          history: 12000,
+          thinking: 0,
+          tools: 0,
+          overhead: 1500,
+        },
+      }),
+    ];
+    const historyInsight = buildEcoInsight(
+      historyHeavy,
+      'power',
+      buildCategoryBreakdown(historyHeavy, 'power'),
+    );
+    assert.equal(historyInsight.id, 'history-drag');
+
+    // 2. High thinking share
+    const thinkingHeavy = [
+      makeTestPromptRecord({
+        capturedAt: NOW - HOUR_MS,
+        breakdown: {
+          input: 300,
+          output: 300,
+          history: 200,
+          thinking: 4000,
+          tools: 0,
+          overhead: 1500,
+        },
+      }),
+    ];
+    const thinkingInsight = buildEcoInsight(
+      thinkingHeavy,
+      'power',
+      buildCategoryBreakdown(thinkingHeavy, 'power'),
+    );
+    assert.equal(thinkingInsight.id, 'thinking-effort');
+
+    // 3. Heavy frontier model dominance (when history and thinking are low)
+    const frontierHeavy = [
+      makeTestPromptRecord({
+        capturedAt: NOW - HOUR_MS,
+        provider: 'anthropic',
+        model: {
+          name: 'claude-fable',
+          version: '5',
+          thinkingEffort: 'none',
+          rawLabel: 'Claude Fable',
+        },
+        breakdown: {
+          input: 2000,
+          output: 4000,
+          history: 500,
+          thinking: 0,
+          tools: 0,
+          overhead: 1000,
+        },
+      }),
+    ];
+    const frontierInsight = buildEcoInsight(
+      frontierHeavy,
+      'power',
+      buildCategoryBreakdown(frontierHeavy, 'power'),
+    );
+    assert.equal(frontierInsight.id, 'heavy-model');
+
+    // 4. Export JSON & CSV
+    const jsonOut = formatRecordsAsJson(historyHeavy);
+    assert.equal(JSON.parse(jsonOut).length, 1);
+    const csvOut = formatRecordsAsCsv(historyHeavy);
+    const csvLines = csvOut.split('\n');
+    assert.equal(csvLines.length, 2);
+    assert.ok(csvLines[0].startsWith('id,capturedAt,isoTimestamp,provider,modelName'));
+  });
+});
+
+describe('7. RecordValidator (Corrupt Quarantine, Breakdown Sum Fix, Dynamic Recomputation, Legacy Flagging)', () => {
+  const NOW = 1_750_000_000_000;
+
+  it('rejects corrupt, missing, negative, NaN, Infinity, and zero-token impact spike records', () => {
+    assert.equal(validateAndNormalizeRecord(null), null);
+    assert.equal(validateAndNormalizeRecord({}), null);
+
+    // Negative token count
+    const negTokens = makeTestPromptRecord({
+      breakdown: { input: -10, history: 100, output: 100, thinking: 0, tools: 0, overhead: 100 },
+    });
+    assert.equal(validateAndNormalizeRecord(negTokens), null);
+
+    // NaN / Infinity in impact
+    const nanImpact = makeTestPromptRecord({
+      impact: { energyWh: Number.NaN, waterMl: 10, co2Grams: 1 },
+    });
+    assert.equal(validateAndNormalizeRecord(nanImpact), null);
+
+    const infImpact = makeTestPromptRecord({
+      impact: { energyWh: 1, waterMl: Number.POSITIVE_INFINITY, co2Grams: 1 },
+    });
+    assert.equal(validateAndNormalizeRecord(infImpact), null);
+
+    // Zero-token impact spike (0 tokens everywhere, but energyWh > 0)
+    const zeroSpike = makeTestPromptRecord({
+      breakdown: { input: 0, history: 0, output: 0, thinking: 0, tools: 0, overhead: 0 },
+      totalTokens: 0,
+      impact: { energyWh: 50, waterMl: 177, co2Grams: 15 },
+    });
+    assert.equal(validateAndNormalizeRecord(zeroSpike), null);
+
+    //Batch filtering drops corrupt items and keeps valid ones
+    const validOne = makeTestPromptRecord({ id: 'valid-1', capturedAt: NOW });
+    const list = validateAndNormalizeRecords([negTokens, nanImpact, zeroSpike, validOne]);
+    assert.equal(list.length, 1);
+    assert.equal(list[0].id, 'valid-1');
+  });
+
+  it('fixes token sum mismatches, re-resolves generic model families from rawLabel, and dynamically recomputes legacy flat-rate impact', () => {
+    // Legacy record stored with generic model.name = 'gpt' but rawLabel = 'GPT-6 Astra',
+    // mismatched totalTokens (999999 instead of 12200), and stale flat-rate energyWh = 999
+    const staleRecord = {
+      id: 'legacy-with-breakdown',
+      conversationUrl: 'https://chatgpt.com/c/legacy',
+      capturedAt: NOW - HOUR_MS,
+      provider: 'openai',
+      model: {
+        name: 'gpt',
+        version: 'unknown',
+        thinkingEffort: 'high',
+        rawLabel: 'ChatGPT 6 Astra',
+      },
+      breakdown: {
+        input: 1000,
+        history: 10000,
+        output: 1000,
+        thinking: 2000,
+        tools: 0,
+        overhead: 2200,
+      },
+      totalTokens: 999999, // mismatched
+      impact: {
+        energyWh: 999, // stale pre-update number
+        waterMl: 999,
+        co2Grams: 999,
+      },
+      timings: { latencyMs: 2000, thinkingTimeMs: 800 },
+      approximate: false,
+    };
+
+    const normalized = validateAndNormalizeRecord(staleRecord);
+    assert.ok(normalized !== null);
+    assert.equal(normalized.isLegacy, false);
+    assert.equal(normalized.estimationVersion, CURRENT_ESTIMATION_VERSION);
+    // Re-resolved model family and version from rawLabel
+    assert.equal(normalized.model.name, 'gpt-astra');
+    assert.equal(normalized.model.version, '6');
+    // Reconciled totalTokens = 1000 + 10000 + 1000 + 2000 + 0 + 2200 = 16200
+    assert.equal(normalized.totalTokens, 16200);
+    // Dynamically recomputed impact via current config.json for gpt-astra (energyWhPer1M = 2500)
+    const expectedImpact = calculateEnvironmentalImpact(
+      staleRecord.breakdown,
+      'openai',
+      normalized.model,
+    );
+    assert.deepEqual(normalized.impact, expectedImpact);
+    assert.notEqual(normalized.impact.energyWh, 999);
+
+    // Also verify resolveStoredModelInfo for Claude and Gemini labels
+    const resolvedClaude = resolveStoredModelInfo('anthropic', {
+      name: 'claude',
+      version: 'unknown',
+      thinkingEffort: 'medium',
+      rawLabel: 'Claude 4.5 Opus',
+    });
+    assert.equal(resolvedClaude.name, 'claude-opus');
+    assert.equal(resolvedClaude.version, '4.5');
+
+    const resolvedGemini = resolveStoredModelInfo('google', {
+      name: 'gemini',
+      version: 'unknown',
+      thinkingEffort: 'medium',
+      rawLabel: 'Gemini 4 Argon',
+    });
+    assert.equal(resolvedGemini.name, 'gemini-pro');
+    assert.equal(resolvedGemini.version, '4');
+  });
+
+  it('flags breakdown-less legacy records with isLegacy=true and excludes them from model efficiency comparisons', () => {
+    const breakdownLessLegacy = {
+      id: 'old-scalar-only',
+      conversationUrl: 'https://claude.ai/chat/1',
+      capturedAt: NOW - HOUR_MS,
+      provider: 'anthropic',
+      model: {
+        name: 'claude-opus',
+        version: '4',
+        thinkingEffort: 'none',
+        rawLabel: 'Claude 4 Opus',
+      },
+      breakdown: {
+        input: 0,
+        history: 0,
+        output: 0,
+        thinking: 0,
+        tools: 0,
+        overhead: 0,
+      },
+      totalTokens: 50000,
+      impact: { energyWh: 100, waterMl: 354, co2Grams: 29 },
+      timings: { latencyMs: 1000, thinkingTimeMs: 0 },
+      approximate: true,
+    };
+
+    const modernRecord = makeTestPromptRecord({
+      id: 'modern-sonnet',
+      capturedAt: NOW - HOUR_MS,
+      provider: 'anthropic',
+      model: {
+        name: 'claude-sonnet',
+        version: '4.5',
+        thinkingEffort: 'medium',
+        rawLabel: 'Claude 4.5 Sonnet',
+      },
+    });
+
+    const validatedLegacy = validateAndNormalizeRecord(breakdownLessLegacy);
+    assert.ok(validatedLegacy !== null);
+    assert.equal(validatedLegacy.isLegacy, true);
+    assert.equal(validatedLegacy.totalTokens, 50000);
+
+    const vm = aggregateAnalytics(
+      [breakdownLessLegacy, modernRecord],
+      'power',
+      '7d',
+      'impact',
+      NOW,
+      'perPrompt',
+    );
+    assert.equal(vm.legacyRecordCount, 1);
+    assert.equal(vm.totalLegacyRecordCount, 1);
+    // Excluded from modelEfficiency so incompatible flat-rate numbers don't distort rankings
+    assert.equal(vm.modelEfficiency.rows.length, 1);
+    assert.ok(vm.modelEfficiency.rows[0].label.includes('Claude Sonnet'));
+  });
+
+  it('preserves historically stored systemPromptTokens (breakdown.overhead) untouched during normalization', () => {
+    // Current config for gpt-astra has systemPromptTokens = 2200, but this historical record stored 1111
+    const historicalRecord = makeTestPromptRecord({
+      id: 'historical-sysprompt',
+      capturedAt: NOW - HOUR_MS,
+      provider: 'openai',
+      model: {
+        name: 'gpt-astra',
+        version: '6',
+        thinkingEffort: 'high',
+        rawLabel: 'GPT-6 Astra',
+      },
+      breakdown: {
+        input: 500,
+        history: 1000,
+        output: 500,
+        thinking: 500,
+        tools: 0,
+        overhead: 1111, // Historical value must NOT be overwritten by 2200
+      },
+    });
+
+    const validated = validateAndNormalizeRecord(historicalRecord);
+    assert.ok(validated !== null);
+    assert.equal(validated.breakdown.overhead, 1111);
+    assert.equal(validated.totalTokens, 500 + 1000 + 500 + 500 + 0 + 1111);
+
+    const vm = aggregateAnalytics([historicalRecord], 'tokens', '24h', 'impact', NOW);
+    const sysSeg = vm.breakdown.segments.find((s) => s.category === 'systemPrompt');
+    assert.equal(sysSeg.rawTokens, 1111);
+  });
+});
+
+describe('8. Workload-Normalized Model Comparison, Natural Equivalences & Reader Scoping Fixes', () => {
+  const NOW = 1_750_000_000_000;
+
+  it('computes Workload-Normalized cost (Wh / 1k work): prompt-size invariant at zero overhead and sensitive to real overhead', () => {
+    // 1. Prompt-size invariance when overhead (thinking, tools, history, systemPrompt) is zero:
+    // Model A (gpt-sol, 1000 Wh/1M) used on 3 short prompts (100 input, 200 output -> usefulWork = 220)
+    // vs Model B (gpt-astra, 2500 Wh/1M) used on 3 long prompts (1000 input, 2000 output -> usefulWork = 2200)
+    const solShortZeroOverhead = [1, 2, 3].map((i) =>
+      makeTestPromptRecord({
+        id: `sol-short-${i}`,
+        capturedAt: NOW - HOUR_MS,
+        provider: 'openai',
+        model: { name: 'gpt-sol', version: '6', thinkingEffort: 'none', rawLabel: 'GPT-6 Sol' },
+        breakdown: { input: 100, output: 200, history: 0, thinking: 0, tools: 0, overhead: 0 },
+      }),
+    );
+    const solLongZeroOverhead = [1, 2, 3].map((i) =>
+      makeTestPromptRecord({
+        id: `sol-long-${i}`,
+        capturedAt: NOW - HOUR_MS,
+        provider: 'openai',
+        model: { name: 'gpt-sol', version: '6.1', thinkingEffort: 'none', rawLabel: 'GPT-6.1 Sol' },
+        breakdown: { input: 2000, output: 4000, history: 0, thinking: 0, tools: 0, overhead: 0 },
+      }),
+    );
+
+    assert.equal(
+      computeUsefulWorkTokens({
+        input: 100,
+        output: 200,
+        history: 0,
+        thinking: 0,
+        tools: 0,
+        overhead: 0,
+      }),
+      220,
+    );
+
+    // Default everyday mode: expresses Equal Length rate per 1,000 words (ratePer1kWork * 1.3333)
+    const invariantEff = buildModelEfficiency(
+      [...solShortZeroOverhead, ...solLongZeroOverhead],
+      'power',
+      'normalized',
+      false,
+    );
+    assert.equal(invariantEff.mode, 'normalized');
+    assert.equal(invariantEff.title, 'Fair Model Comparison');
+    assert.equal(invariantEff.rows.length, 2);
+    // Both have 0 overhead and identical model rate: 1.000 Wh/1k work * 1.3333 = 1.3333 Wh/1k words -> "1.3 Wh / 1k words"
+    assert.equal(invariantEff.rows[0].ratePer1kWork, 1.0);
+    assert.equal(invariantEff.rows[0].efficiencyValue, WORK_TO_1K_WORDS_FACTOR);
+    assert.equal(invariantEff.rows[1].efficiencyValue, WORK_TO_1K_WORDS_FACTOR);
+    assert.equal(invariantEff.rows[0].formattedValue, '1.3 Wh / 1k words');
+    assert.equal(invariantEff.rows[0].secondaryLabel, '3 messages');
+
+    // Technical Details ON: reveals raw Wh / 1k work with 3-decimal precision and inline token metadata
+    const invariantTech = buildModelEfficiency(
+      [...solShortZeroOverhead, ...solLongZeroOverhead],
+      'power',
+      'normalized',
+      true,
+    );
+    assert.equal(invariantTech.rows[0].efficiencyValue, 1.0);
+    assert.equal(invariantTech.rows[0].formattedValue, '1.000 Wh / 1k work');
+    assert.ok(invariantTech.rows[0].secondaryLabel.includes('work'));
+    assert.ok(invariantTech.rows[0].secondaryLabel.includes('avg'));
+    assert.ok(!invariantTech.rows[0].secondaryLabel.includes('Ø'));
+
+    // 2. When thinking/tools/history overhead increases on the same model, Normalized cost increases:
+    const solWithOverhead = [1, 2, 3].map((i) =>
+      makeTestPromptRecord({
+        id: `sol-ovh-${i}`,
+        capturedAt: NOW - HOUR_MS,
+        provider: 'openai',
+        model: { name: 'gpt-sol', version: '6.2', thinkingEffort: 'high', rawLabel: 'GPT-6.2 Sol' },
+        breakdown: {
+          input: 100,
+          output: 200,
+          history: 10000,
+          thinking: 1500,
+          tools: 3500,
+          overhead: 2000,
+        },
+      }),
+    );
+
+    const overheadComp = buildModelEfficiency(
+      [...solShortZeroOverhead, ...solWithOverhead],
+      'power',
+      'normalized',
+      false,
+    );
+    assert.equal(overheadComp.rows.length, 2);
+    assert.ok(overheadComp.rows[0].efficiencyValue < overheadComp.rows[1].efficiencyValue);
+    assert.ok(overheadComp.subtitle.startsWith('For the same amount of text,'));
+
+    // 3. Zero-division safety when usefulWorkTokens === 0 (input=0, output=0, overhead>0)
+    const zeroWorkRec = makeTestPromptRecord({
+      id: 'zero-work',
+      capturedAt: NOW - HOUR_MS,
+      breakdown: { input: 0, output: 0, history: 1000, thinking: 0, tools: 0, overhead: 1000 },
+    });
+    const zeroWorkEff = buildModelEfficiency([zeroWorkRec], 'power', 'normalized');
+    assert.equal(zeroWorkEff.rows.length, 0);
+
+    // 4. < 3 messages headline guard in Equal Length mode
+    const lowSampleNorm = buildModelEfficiency(
+      [solShortZeroOverhead[0], solWithOverhead[0]],
+      'power',
+      'normalized',
+      false,
+    );
+    assert.equal(lowSampleNorm.rows[0].isLowSample, true);
+    assert.ok(lowSampleNorm.subtitle.startsWith('Most efficient for equal text:'));
+  });
+
+  it('applies adaptive human rounding and plain-English labels, titles, and header sublines across tabs', () => {
+    // Adaptive human rounding rules
+    assert.equal(resolveHumanColumnDecimals([2.7, 0.6]), 1);
+    assert.equal(resolveHumanColumnDecimals([0.08, 0.02]), 2);
+    assert.equal(resolveHumanColumnDecimals([0.008, 0.002]), 3);
+    assert.equal(formatHumanSummaryNumber(2.74), '2.7');
+    assert.equal(formatHumanSummaryNumber(0.045), '0.05');
+    assert.equal(formatHumanSummaryNumber(0.0042), '0.004');
+
+    // Warm header sublines
+    assert.equal(
+      formatAnalyticsHeaderSubtitle(1, '24h'),
+      'Based on 1 message over the last 24 hours',
+    );
+    assert.equal(
+      formatAnalyticsHeaderSubtitle(12, '7d'),
+      'Based on 12 messages over the last 7 days',
+    );
+    assert.equal(
+      formatAnalyticsHeaderSubtitle(42, 'all', 'tokens'),
+      'Based on 42 messages across all time · 1,000 tokens ≈ 750 words',
+    );
+
+    const rec = makeTestPromptRecord({ capturedAt: NOW - HOUR_MS });
+
+    // Energy tab plain-English copy
+    const vmPower = aggregateAnalytics([rec], 'power', '7d', 'impact', NOW, 'normalized', false);
+    assert.equal(vmPower.breakdown.title, 'Where Your Energy Goes');
+    assert.deepEqual(
+      vmPower.breakdown.segments.map((s) => s.label),
+      [
+        'Your Messages',
+        'AI Replies',
+        'AI Reasoning',
+        'Search & Tools',
+        'Chat Memory',
+        'App Instructions',
+      ],
+    );
+    assert.equal(vmPower.modelDonut.impactToggleLabel, 'Energy (%)');
+    assert.equal(vmPower.modelDonut.messagesToggleLabel, 'Messages (%)');
+    assert.equal(
+      vmPower.kpis.find((k) => k.id === 'hidden-cost-share').label,
+      'Behind-the-Scenes Energy',
+    );
+    assert.equal(vmPower.kpis.find((k) => k.id === 'top-model').label, 'Top Energy User');
+
+    // Water & CO2 tab plain-English copy
+    const vmWater = aggregateAnalytics([rec], 'water', '7d', 'impact', NOW, 'normalized', false);
+    assert.equal(vmWater.breakdown.title, 'Where Your Water Goes');
+    assert.equal(vmWater.modelDonut.impactToggleLabel, 'Water (%)');
+    assert.equal(vmWater.kpis.find((k) => k.id === 'top-model').label, 'Top Water User');
+
+    const vmCo2 = aggregateAnalytics([rec], 'co2', '7d', 'impact', NOW, 'normalized', false);
+    assert.equal(vmCo2.breakdown.title, 'Where Your CO₂ Goes');
+    assert.equal(vmCo2.modelDonut.impactToggleLabel, 'CO₂ (%)');
+    assert.equal(vmCo2.kpis.find((k) => k.id === 'top-model').label, 'Top CO₂ User');
+
+    // Natural equivalences & factSheet email benchmark
+    assert.equal(
+      formatNaturalScaledEquivalent(1.5, '1 minute in a microwave (1,200 W)'),
+      '≈ 1.5 minutes in a microwave (1,200 W)',
+    );
+    assert.equal(
+      formatNaturalScaledEquivalent(1.1, '1 second of a running kitchen faucet'),
+      '≈ 1.1 seconds of a running kitchen faucet',
+    );
+    assert.equal(
+      formatNaturalScaledEquivalent(1.2, 'Driving a gas car 1 meter'),
+      '≈ driving a gas car 1.2 meters',
+    );
+    assert.equal(
+      formatNaturalScaledEquivalent(2.0, 'Sending 1 standard email'),
+      '≈ sending 2 standard emails',
+    );
+
+    const emailItem = factSheet.kpis.co2.items.find((i) => i.id === 'co2-photo-email');
+    assert.equal(emailItem.equivalent, 'Sending 1 standard email');
+  });
+
+  it('prevents cross-turn hasMatch leaks and deduplicates sibling tool chips in readToolCalls', () => {
+    // 1. hasMatch([], selector) must return false without querying global document
+    assert.equal(hasMatch([], '[data-testid*="thought"]'), false);
+
+    // 2. readToolCalls with 1 assistant turn root containing multiple search chips -> 1 search call
+    const fakeSearchTurnRoot = {
+      matches: () => false,
+      querySelector: (sel) => (sel.includes('source-chip') ? {} : null),
+      querySelectorAll: () => [],
+      contains: () => true,
+    };
+    const tools = readToolCalls([fakeSearchTurnRoot], {
+      search: '',
+      code: '',
+      other: '',
+      searchEvidence: '.source-inline-chip, [data-test-id="source-chip"]',
+    });
+    assert.deepEqual(tools, ['search']);
+
+    // 3. readAttachments ignores 0x0 unrendered/avatar images while counting real content images (> maxIconPx)
+    const zeroByZeroIcon = {
+      closest: () => null,
+      getAttribute: () => null,
+      getBoundingClientRect: () => ({ width: 0, height: 0 }),
+      naturalWidth: 0,
+      naturalHeight: 0,
+    };
+    const realUploadImg = {
+      closest: () => null,
+      getAttribute: () => null,
+      getBoundingClientRect: () => ({ width: 320, height: 240 }),
+      naturalWidth: 320,
+      naturalHeight: 240,
+    };
+    const fakeUserTurnRoot = {
+      matches: () => false,
+      querySelectorAll: (sel) => (sel === 'img' ? [zeroByZeroIcon, realUploadImg] : []),
+    };
+    assert.deepEqual(readAttachments([fakeUserTurnRoot], ''), ['image']);
   });
 });

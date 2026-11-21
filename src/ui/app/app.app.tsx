@@ -7,20 +7,26 @@
  * Docs: docs/modules.md#ui
  */
 
-import { useEffect, useMemo, useState, useSyncExternalStore, type ComponentType } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ComponentType,
+} from 'react';
 import { parseRouteHash, type AppRouteId } from '../app-routes';
 import { Sidebar } from '../components/sidebar.component';
 import { DEFAULT_TIMEFRAME, timeframeSinceMs, type TimeframeId } from '../timeframe.helpers';
-import { useFactsSummaries, useUsageSummary } from '../usage-api';
+import { useFactsSummaries, usePromptRecords, useUsageSummary } from '../usage-api';
 import { AnalyticsPage } from './pages/analytics.page';
 import { DashboardPage } from './pages/dashboard.page';
 import { FactsPage } from './pages/facts.page';
 import { HistoryPage } from './pages/history.page';
 import { TipsPage } from './pages/tips.page';
 
-/** Pages without props. Dashboard and Facts receive fetched summaries from the App root. */
-const PAGES: Record<Exclude<AppRouteId, 'dashboard' | 'facts'>, ComponentType> = {
-  analytics: AnalyticsPage,
+/** Pages without props. Dashboard, Analytics and Facts receive fetched data from the App root. */
+const PAGES: Record<Exclude<AppRouteId, 'dashboard' | 'analytics' | 'facts'>, ComponentType> = {
   tips: TipsPage,
   history: HistoryPage,
 };
@@ -37,10 +43,16 @@ function readHash(): string {
 export function App() {
   const route = parseRouteHash(useSyncExternalStore(subscribeToHash, readHash));
   const [timeframe, setTimeframe] = useState<TimeframeId>(DEFAULT_TIMEFRAME);
+  const [dataRevision, setDataRevision] = useState(0);
+  const handleHistoryCleared = useCallback(() => {
+    setDataRevision((rev) => rev + 1);
+  }, []);
+
   // Fixed per selection, so the rolling windows don't refetch on every render.
   const sinceMs = useMemo(() => timeframeSinceMs(timeframe, Date.now()), [timeframe]);
-  const summary = useUsageSummary(sinceMs);
-  const factsSummaries = useFactsSummaries();
+  const summary = useUsageSummary(sinceMs, dataRevision);
+  const factsSummaries = useFactsSummaries(dataRevision);
+  const { records, resetHistory, clearLegacyHistory } = usePromptRecords(handleHistoryCleared);
 
   useEffect(() => {
     document.title = `${route.label} · Waister`;
@@ -50,6 +62,14 @@ export function App() {
   if (route.id === 'dashboard') {
     page = (
       <DashboardPage timeframe={timeframe} onTimeframeChange={setTimeframe} summary={summary} />
+    );
+  } else if (route.id === 'analytics') {
+    page = (
+      <AnalyticsPage
+        records={records}
+        onResetHistory={resetHistory}
+        onClearLegacyHistory={clearLegacyHistory}
+      />
     );
   } else if (route.id === 'facts') {
     page = <FactsPage summaries={factsSummaries} />;
