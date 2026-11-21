@@ -11,6 +11,8 @@
  * Docs: docs/modules.md#reader-strategies, docs/pipeline.md
  */
 
+import { capture } from '../../config/config.json';
+import type { CaptureTimings } from '../../config/config.types';
 import type { ChatCaptureDto } from '../../dto/chat-capture.dto';
 import type { EstimatePromptMessage } from '../../messages/runtime-messages';
 import { chatgptSite } from '../sites/chatgpt.site';
@@ -21,16 +23,15 @@ import type { OnCaptureReady, ReaderStrategy, TurnTimings } from './reader-strat
 
 export const SUPPORTED_SITES: readonly SiteAdapter[] = [chatgptSite, claudeSite, geminiSite];
 
-/** Quiet time after the generating indicator disappeared before a response counts as done. */
-const SETTLE_MS = 400;
-/** Quiet time used instead when the site's generating indicator was never seen. */
-const TEXT_STABLE_MS = 2500;
-/** Bursts of DOM mutations are coalesced into one check after this delay. */
-const CHECK_DELAY_MS = 150;
-/** While a prompt is in flight, the page is re-checked at least this often. */
-const POLL_MS = 500;
-/** A sent prompt that never produced a response is dropped after this long. */
-const STALE_PROMPT_MS = 120_000;
+/** Detection timings from `config.json` (`capture.timings`), documented in `CaptureTimings`. */
+const TIMINGS: CaptureTimings = capture.timings;
+const {
+  settleMs: SETTLE_MS,
+  textStableMs: TEXT_STABLE_MS,
+  checkDelayMs: CHECK_DELAY_MS,
+  pollMs: POLL_MS,
+  stalePromptMs: STALE_PROMPT_MS,
+} = TIMINGS;
 /** Attribute changes that can flip a site's generating/streaming state. */
 const WATCHED_ATTRIBUTES = [
   'class',

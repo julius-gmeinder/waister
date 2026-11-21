@@ -11,8 +11,14 @@
  * Docs: docs/modules.md#site-adapters
  */
 
+import type { ModelFamily } from '../../config/config.types';
 import type { ChatTurn, ModelInfo, ThinkingEffort } from '../../dto/chat-capture.dto';
+import { THINKING_DETECTED_EFFORT } from './effort-inference';
 import type { SiteAdapter } from './site-adapter.types';
+
+/** Typed against the families in `config.json`, so a rename there fails the typecheck. */
+const GPT: ModelFamily<'openai'> = 'gpt';
+const O_SERIES: ModelFamily<'openai'> = 'openai-o';
 
 export const CHATGPT_SELECTORS = {
   promptInput: '#prompt-textarea, #mobile-composer-prompt, [data-mobile-composer-prompt]',
@@ -127,9 +133,9 @@ function parseChatGptSlug(slug: string, uiLabel: string): ModelInfo {
   if (/^o\d/.test(lower)) {
     const version = lower.match(/^(o\d+(?:-mini|-pro)?)/)?.[1] ?? lower;
     return {
-      name: 'openai-o',
+      name: O_SERIES,
       version,
-      thinkingEffort: effortFromWords(words) ?? labelEffort ?? 'medium',
+      thinkingEffort: effortFromWords(words) ?? labelEffort ?? THINKING_DETECTED_EFFORT,
       rawLabel: slug,
     };
   }
@@ -139,13 +145,13 @@ function parseChatGptSlug(slug: string, uiLabel: string): ModelInfo {
 
   let thinkingEffort: ThinkingEffort;
   if (/\b(thinking|t|pro)\b/.test(words)) {
-    thinkingEffort = effortFromWords(words) ?? labelEffort ?? 'medium';
+    thinkingEffort = effortFromWords(words) ?? labelEffort ?? THINKING_DETECTED_EFFORT;
   } else {
     // Instant / chat / 4o-style answers: the router picked a non-reasoning model.
     thinkingEffort = 'none';
   }
 
-  return { name: 'gpt', version, thinkingEffort, rawLabel: slug };
+  return { name: GPT, version, thinkingEffort, rawLabel: slug };
 }
 
 /**
@@ -156,24 +162,24 @@ function parseChatGptModel(rawLabel: string, hasThinkingToggle: boolean): ModelI
   const cleaned = rawLabel.trim();
   const lower = cleaned.toLowerCase();
 
-  let thinkingEffort: ThinkingEffort = hasThinkingToggle ? 'medium' : 'unknown';
+  let thinkingEffort: ThinkingEffort = hasThinkingToggle ? THINKING_DETECTED_EFFORT : 'unknown';
   const effort = effortFromWords(lower);
   if (effort) {
     thinkingEffort = effort;
   } else if (lower.includes('instant') || lower.includes('non-reasoning') || lower.includes('4o')) {
-    thinkingEffort = hasThinkingToggle ? 'medium' : 'none';
+    thinkingEffort = hasThinkingToggle ? THINKING_DETECTED_EFFORT : 'none';
   } else if (
     lower.includes('thinking') ||
     lower.includes('pro') ||
     /\bo[134]\b/.test(lower) ||
     /\b5(?:\.\d+)?\b/.test(lower)
   ) {
-    thinkingEffort = 'medium';
+    thinkingEffort = THINKING_DETECTED_EFFORT;
   }
 
   const versionMatch = cleaned.match(/(\d+(?:\.\d+)?[a-z]*|o\d+(?:-\w+)?)/i);
   const version = versionMatch?.[1] ?? 'unknown';
-  const name = lower.startsWith('o') || /\bo[134]/.test(lower) ? 'openai-o' : 'gpt';
+  const name = lower.startsWith('o') || /\bo[134]/.test(lower) ? O_SERIES : GPT;
 
   return {
     name,
@@ -205,9 +211,9 @@ export const chatgptSite: SiteAdapter = {
     const hasThinkingToggle = document.querySelector(CHATGPT_SELECTORS.thinkingBadge) !== null;
     if (!uiLabel) {
       return {
-        name: 'gpt',
+        name: GPT,
         version: 'unknown',
-        thinkingEffort: hasThinkingToggle ? 'medium' : 'unknown',
+        thinkingEffort: hasThinkingToggle ? THINKING_DETECTED_EFFORT : 'unknown',
         rawLabel: 'unknown',
       };
     }

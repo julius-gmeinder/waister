@@ -40,7 +40,7 @@ popup:       ui/popup/  (React, dashboard)  ← GET_USAGE_SUMMARY (reads only th
                  │ tab bar → chrome.tabs.create
 app page:    ui/app/    (React, full tab, hash routes: analytics · facts · tips · history)
              ui/components/ + ui/base.css + ui/app-routes.ts shared by both
-shared:      dto/, messages/
+shared:      dto/, messages/, config/ (config.json: every tunable rate, heuristic and timing)
 entries/:    one esbuild entry per context, wiring only
 ```
 
@@ -50,8 +50,12 @@ All docs live in `docs/` only. Start at `docs/README.md`. The per-module referen
 ## Rules
 
 - **Respect context boundaries.** `readers/` = content only, `handlers/` + `services/` =
-  background only, `ui/` = popup + app page only. Only `dto/` and `messages/` are shared. Allowed imports
-  per layer are in `docs/architecture.md`. Never import background code into content/popup.
+  background only, `ui/` = popup + app page only. Only `dto/`, `messages/` and `config/` are
+  shared. Allowed imports per layer are in `docs/architecture.md`. Never import background code
+  into content/popup.
+- **No magic numbers for estimation.** Rates, heuristics, effort defaults and capture timings live
+  in `src/config/config.json` ([ADR 0012](docs/decisions/0012-central-config.md)), imported by
+  section (`import { capture } from '…/config/config.json'`).
   Cross context only through `messages/`.
 - **Plain function modules, no classes.** Handlers orchestrate, services compute, DTOs are plain
   structured-clone-safe data. React components are function components too.

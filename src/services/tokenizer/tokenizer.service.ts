@@ -2,18 +2,21 @@
  * TokenizerService: counts the visible tokens (input, history, output) per provider.
  *
  * Every chat turn is wrapped in control tokens (ChatML `<|im_start|>`, Claude turn tags, Gemini
- * `<start_of_turn>`), so each input/history turn adds `turnFramingTokens` from
- * `tokenizer-lookup.json`.
+ * `<start_of_turn>`), so each input/history turn adds `turnFramingTokens` from `config.json`
+ * (`tokenizer.<provider>`).
  *
  * Context: background
  * Docs: docs/modules.md#tokenizer-service, docs/pipeline.md
  */
 
+import { tokenizer } from '../../config/config.json';
+import type { TokenizerConfig } from '../../config/config.types';
 import type { ChatCaptureDto, ChatTurn, Provider } from '../../dto/chat-capture.dto';
 import { countAnthropicTextTokens } from './anthropic.tokenizer';
 import { countGoogleTextTokens } from './google.tokenizer';
 import { countOpenAiTextTokens } from './openai.tokenizer';
-import tokenizerLookup from './tokenizer-lookup.json';
+
+const TOKENIZER_CONFIG: TokenizerConfig = tokenizer;
 
 export interface VisibleTokenizationResult {
   /** Incl. turn framing. */
@@ -26,10 +29,7 @@ export interface VisibleTokenizationResult {
 }
 
 export function resolveTurnFramingTokens(provider: Provider): number {
-  const providers = tokenizerLookup.providers as Partial<
-    Record<Provider, { turnFramingTokens: number }>
-  >;
-  return providers[provider]?.turnFramingTokens ?? tokenizerLookup.defaults.turnFramingTokens;
+  return TOKENIZER_CONFIG[provider].turnFramingTokens;
 }
 
 export function countTextTokensForProvider(text: string, provider: Provider): number {
@@ -46,7 +46,7 @@ export function countTextTokensForProvider(text: string, provider: Provider): nu
 export function countInputTokens(
   userInput: string,
   provider: Provider,
-  turnFramingTokens: number = tokenizerLookup.defaults.turnFramingTokens,
+  turnFramingTokens: number = resolveTurnFramingTokens(provider),
 ): number {
   const textTokens = countTextTokensForProvider(userInput, provider);
   return textTokens > 0 ? textTokens + turnFramingTokens : 0;
@@ -59,7 +59,7 @@ export function countOutputTokens(response: string, provider: Provider): number 
 export function countHistoryTokens(
   chatHistory: readonly ChatTurn[],
   provider: Provider,
-  turnFramingTokens: number = tokenizerLookup.defaults.turnFramingTokens,
+  turnFramingTokens: number = resolveTurnFramingTokens(provider),
 ): number {
   let total = 0;
   for (const turn of chatHistory) {

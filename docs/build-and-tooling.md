@@ -108,6 +108,7 @@ yet), via `no-restricted-imports` per folder:
 | `src/handlers/**`                 | `readers/`, `ui/`                           |
 | `src/services/**`                 | `handlers/`, `readers/`, `ui/`, `messages/` |
 | `src/messages/**`                 | everything except `dto/`                    |
+| `src/config/**`                   | everything except `dto/` (types only)       |
 | `src/dto/**`                      | everything                                  |
 | `src/entries/content.entry.ts`    | `handlers/`, `services/`, `ui/`             |
 | `src/entries/background.entry.ts` | `readers/`, `ui/`                           |

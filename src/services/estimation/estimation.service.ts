@@ -18,13 +18,9 @@ import type {
   TokenBreakdown,
   TokenEstimateDto,
 } from '../../dto/token-estimate.dto';
-import energyLookup from './energy-lookup.json';
-import {
-  resolveEnergyProfile,
-  resolveHiddenTokenProfile,
-  THINKING_BASELINE_MS,
-  THINKING_EFFORT_MULTIPLIERS,
-} from './model-profiles';
+import { ESTIMATION_CONFIG, resolveModelProfile } from './model-profiles';
+
+const { thinking: THINKING, impact: IMPACT } = ESTIMATION_CONFIG;
 
 export type VisibleTokenCounts = Pick<TokenBreakdown, 'input' | 'history' | 'output'> & {
   approximate: boolean;
@@ -37,19 +33,22 @@ export type HiddenTokenEstimate = Pick<TokenBreakdown, 'thinking' | 'overhead'> 
 
 /**
  * Thinking tokens: `max(0, thinkingTimeMs − baseline) × tokensPerMsThinking × effortMultiplier`.
+ * Values from `config.json` (`estimation.thinking`).
  */
 export function estimateThinkingTokens(
   thinkingTimeMs: number,
   tokensPerMsThinking: number,
   thinkingEffort: ThinkingEffort,
 ): number {
-  const effectiveMs = Math.max(0, thinkingTimeMs - THINKING_BASELINE_MS);
-  const effortMultiplier = THINKING_EFFORT_MULTIPLIERS[thinkingEffort] ?? 0.5;
+  const effectiveMs = Math.max(0, thinkingTimeMs - THINKING.baselineMs);
+  // An effort string outside ThinkingEffort (it crosses a message boundary) counts as unknown.
+  const effortMultiplier =
+    THINKING.effortMultipliers[thinkingEffort] ?? THINKING.effortMultipliers.unknown;
   return Math.round(effectiveMs * tokensPerMsThinking * effortMultiplier);
 }
 
 export function estimateHiddenTokens(capture: ChatCaptureDto): HiddenTokenEstimate {
-  const profile = resolveHiddenTokenProfile(capture.provider, capture.model);
+  const profile = resolveModelProfile(capture.provider, capture.model);
   return {
     thinking: estimateThinkingTokens(
       capture.thinkingTimeMs,
@@ -61,9 +60,10 @@ export function estimateHiddenTokens(capture: ChatCaptureDto): HiddenTokenEstima
   };
 }
 
-/** 4 decimals, so tiny single-prompt Wh / mL values don't round to 0. */
+const ROUNDING_FACTOR = 10 ** IMPACT.roundingDecimals;
+
 function roundMetric(value: number): number {
-  return Math.round(value * 10000) / 10000;
+  return Math.round(value * ROUNDING_FACTOR) / ROUNDING_FACTOR;
 }
 
 /** Energy (Wh), water (mL) and CO2 (g) for `totalTokens`. Saved, but not displayed. */
@@ -72,9 +72,8 @@ export function calculateEnvironmentalImpact(
   provider: Provider,
   model: ModelInfo,
 ): EnvironmentalImpact {
-  const profile = resolveEnergyProfile(provider, model);
-  const unit = energyLookup.perTokensUnit || 1_000_000;
-  const scale = Math.max(0, totalTokens) / unit;
+  const profile = resolveModelProfile(provider, model);
+  const scale = Math.max(0, totalTokens) / IMPACT.perTokensUnit;
 
   return {
     energyWh: roundMetric(scale * profile.energyWhPer1M),

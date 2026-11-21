@@ -51,12 +51,17 @@ boundaries visible even without one folder per context.
 | Layer       | Context         | Purpose                                  | May import                       |
 | ----------- | --------------- | ---------------------------------------- | -------------------------------- |
 | `entries/`  | each            | esbuild entry points, wiring only        | the layers of its own context    |
-| `readers/`  | content         | DOM → `ChatCaptureDto`                   | `dto/`, `messages/`              |
+| `readers/`  | content         | DOM → `ChatCaptureDto`                   | `dto/`, `messages/`, `config/`   |
 | `handlers/` | background      | Orchestration                            | `services/`, `dto/`, `messages/` |
-| `services/` | background      | Domain logic (tokenize, estimate, store) | `dto/`                           |
-| `ui/`       | popup, app page | Presentation (React + TSX)               | `dto/`, `messages/`              |
+| `services/` | background      | Domain logic (tokenize, estimate, store) | `dto/`, `config/`                |
+| `ui/`       | popup, app page | Presentation (React + TSX)               | `dto/`, `messages/`, `config/`   |
 | `messages/` | shared          | `chrome.runtime` message contracts       | `dto/`                           |
+| `config/`   | shared          | `config.json`: all tunable values        | `dto/` (types only)              |
 | `dto/`      | shared          | Data contracts                           | nothing                          |
+
+`config/` ([ADR 0012](decisions/0012-central-config.md)) is imported by section
+(`import { capture } from '…/config/config.json'`), so esbuild bundles only that section into
+the importing context.
 
 Entry → layer mapping:
 
@@ -106,7 +111,8 @@ the estimation pipeline: estimation writes rows, the popup asks the database for
 | New chat site                         | `readers/sites/<site>.site.ts` + register in `entries/content.entry.ts` + host in manifest |
 | Different read timing                 | `readers/strategies/<x>.strategy.ts` + swap in `entries/content.entry.ts`                  |
 | New provider tokenizer                | `services/tokenizer/<provider>.tokenizer.ts` + route in `tokenizer.service.ts`             |
-| New model / version                   | entry in `services/estimation/model-profiles.ts`                                           |
+| New model / version                   | entry in `config/config.json` (`estimation.models`) + the site adapter's label parser      |
+| Tune a rate, heuristic or timing      | `config/config.json` only                                                                  |
 | New saved field / popup query         | `services/prompt-store/prompt-store.service.ts` (schema + query) + DTO + message           |
 | New popup element                     | `ui/components/<name>.component.tsx`, rendered from `ui/popup/popup.app.tsx`               |
 | New app page (route)                  | entry in `ui/app-routes.ts` + `ui/app/pages/<name>.page.tsx` + `PAGES` in `app.app.tsx`    |

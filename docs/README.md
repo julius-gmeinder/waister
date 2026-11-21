@@ -36,3 +36,4 @@ _Superseded by NNNN_ instead.
 | 0009 | [Save every prompt to SQLite, popup reads only the database](decisions/0009-sqlite-prompt-store.md) | Accepted                            |
 | 0010 | [Popup built with React + TSX components](decisions/0010-react-popup.md)                            | Accepted, layout superseded by 0011 |
 | 0011 | [Full-page app page with hash routes, ui/ split per surface](decisions/0011-app-page.md)            | Accepted                            |
+| 0012 | [All tunable values in one shared config.json](decisions/0012-central-config.md)                    | Accepted                            |

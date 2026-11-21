@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { ui } from '../../config/config.json';
 import type { UsageSummaryDto } from '../../dto/usage-summary.dto';
 import type { GetUsageSummaryMessage, UsageSummaryResponse } from '../../messages/runtime-messages';
 import { Breakdown } from '../components/breakdown.component';
@@ -14,7 +15,8 @@ import { Header } from '../components/header.component';
 import { TabBar } from '../components/tab-bar.component';
 import { Total } from '../components/total.component';
 
-const USAGE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const USAGE_WINDOW_MS = ui.usageWindowHours * 60 * 60 * 1000;
+const USAGE_WINDOW_LABEL = `last ${ui.usageWindowHours}h`;
 
 /** `undefined` while loading, `null` if the background had no answer. */
 type SummaryState = UsageSummaryDto | null | undefined;
@@ -52,7 +54,9 @@ export function PopupApp() {
     <main className="popup">
       <Header />
       <Total totalTokens={summary?.totalTokens} />
-      <p className="period">{describePromptCount(summary)} · last 24h</p>
+      <p className="period">
+        {describePromptCount(summary)} · {USAGE_WINDOW_LABEL}
+      </p>
       <Breakdown breakdown={summary?.breakdown} />
       <TabBar />
     </main>

@@ -9,7 +9,10 @@
  * Docs: docs/modules.md#site-adapters
  */
 
+import { capture } from '../../config/config.json';
+import type { ModelFamily } from '../../config/config.types';
 import type { ChatTurn, ModelInfo, ThinkingEffort } from '../../dto/chat-capture.dto';
+import { familyDefaultEffort, THINKING_DETECTED_EFFORT } from './effort-inference';
 import type { SiteAdapter } from './site-adapter.types';
 
 export const CLAUDE_SELECTORS = {
@@ -35,16 +38,17 @@ export const CLAUDE_SELECTORS = {
 
 /**
  * Pause threshold (ms) in visible response text while Claude is still generating before we infer
- * that the model has re-entered an interleaved thinking phase.
+ * that the model has re-entered an interleaved thinking phase. From `config.json`.
  */
-const CLAUDE_INTERLEAVED_STALL_MS = 450;
+const CLAUDE_INTERLEAVED_STALL_MS = capture.timings.claudeInterleavedStallMs;
 
-/**Parses dropdown labels like "Claude 3.7 Sonnet", "Claude 4.5 Sonnet". */
+/** Parses dropdown labels like "Claude 3.7 Sonnet", "Claude 4.5 Sonnet". */
 function parseClaudeModel(rawLabel: string, hasExtendedThinking: boolean): ModelInfo {
   const cleaned = rawLabel.trim();
   const lower = cleaned.toLowerCase();
 
-  let name = 'claude';
+  // Generic 'claude' has no config entry and uses the provider default rates.
+  let name: ModelFamily<'anthropic'> | 'claude' = 'claude';
   if (lower.includes('sonnet')) {
     name = 'claude-sonnet';
   } else if (lower.includes('opus')) {
@@ -56,12 +60,10 @@ function parseClaudeModel(rawLabel: string, hasExtendedThinking: boolean): Model
   const versionMatch = cleaned.match(/(\d+(?:\.\d+)?)/);
   const version = versionMatch?.[1] ?? 'unknown';
 
-  let thinkingEffort: ThinkingEffort = 'unknown';
-  if (hasExtendedThinking || lower.includes('thinking') || lower.includes('extended')) {
-    thinkingEffort = 'medium';
-  } else if (lower.includes('haiku')) {
-    thinkingEffort = 'none';
-  }
+  const thinkingEffort: ThinkingEffort =
+    hasExtendedThinking || lower.includes('thinking') || lower.includes('extended')
+      ? THINKING_DETECTED_EFFORT
+      : familyDefaultEffort(name);
 
   return {
     name,
@@ -241,7 +243,7 @@ export const claudeSite: SiteAdapter = {
       return {
         name: 'claude',
         version: 'unknown',
-        thinkingEffort: hasExtendedThinking ? 'medium' : 'unknown',
+        thinkingEffort: hasExtendedThinking ? THINKING_DETECTED_EFFORT : 'unknown',
         rawLabel: 'unknown',
       };
     }
