@@ -40,4 +40,11 @@ export interface SiteAdapter {
 
   /** True if `target` is (inside) the send button. */
   isSendButton(target: Element): boolean;
+
+  /**
+   * Optional per-turn thinking-time aggregator for sites with interleaved thinking (e.g. Claude).
+   * When implemented, `dom-capture.strategy.ts` prefers this aggregated duration (initial +
+   * mid-turn thinking phases) over `tStreamStart - t0`.
+   */
+  consumeThinkingTimeMs?(t0: number, tStreamStart: number, t1: number): number;
 }
