@@ -1,5 +1,17 @@
-/* Styles of the shared components in this folder, one block per component.
-   Docs: docs/styling.md */
+/**
+ * Component styles: the shared components in this folder, one block per component. Classes are
+ * flat kebab-case, prefixed with the component name.
+ *
+ * Docs: docs/styling.md
+ */
+
+/* Icons: color for all component icons; sizes are set per component below. */
+.total .lucide,
+.breakdown-row .lucide,
+.tab-bar-link .lucide,
+.sidebar-link .lucide {
+  color: var(--contrast-bright);
+}
 
 /* Header */
 .header {
@@ -25,7 +37,6 @@
 .total .lucide {
   width: 24px;
   height: 24px;
-  color: var(--contrast-bright);
 }
 
 .total-value {
@@ -47,15 +58,11 @@
   border-radius: 8px;
 }
 
-.breakdown li {
+.breakdown-row {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 8px;
-}
-
-.breakdown li .lucide {
-  color: var(--contrast-bright);
 }
 
 .breakdown-value {
@@ -65,7 +72,8 @@
 /* TabBar (popup): one equal column per app page */
 .tab-bar {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 4px;
   /* No divider: extra space on top (plus the popup's 12px gap) separates it from the breakdown. */
   margin: 8px 0 0;
@@ -89,7 +97,6 @@
 .tab-bar-link .lucide {
   width: 18px;
   height: 18px;
-  color: var(--contrast-bright);
 }
 
 /* Sidebar (app page): full-height --bg column, set apart from the --surface content by color
@@ -128,7 +135,6 @@
 .sidebar-link .lucide {
   width: 18px;
   height: 18px;
-  color: var(--contrast-bright);
 }
 
 /* Interaction states, shared by TabBar and Sidebar links (docs/styling.md#interaction-states).

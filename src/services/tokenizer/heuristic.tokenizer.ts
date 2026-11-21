@@ -1,12 +1,8 @@
 /**
- * Character-based heuristic tokenizer shared by the provider tokenizers. Each provider passes its
- * parameters from `config.json` (`tokenizer.<provider>`).
- *
- * Text is split into letter runs, digit chunks and symbol runs:
- * - a word up to `singleTokenMaxWordLength` letters is 1 token, longer ones count
- *   `ceil(length / charsPerSubword)`
- * - each chunk of up to `digitChunkSize` digits is 1 token
- * - a symbol run counts `max(1, ceil(length / charsPerSymbolToken))`
+ * HeuristicTokenizer: character-based token counter, one instance per provider.
+ * Text is split into letter runs, digit chunks and symbol runs, and each segment is costed from
+ * `tokenizer.<provider>` (see `HeuristicTokenizerConfig`). Whitespace is ignored here, the
+ * TokenizerService adds it back.
  *
  * Context: background
  * Docs: docs/modules.md#tokenizer-service
@@ -14,22 +10,22 @@
 
 import type { HeuristicTokenizerConfig } from '../../config/config.types';
 
-const WORD = /^[A-Za-z]+$/;
-const DIGITS = /^\d+$/;
+// Unicode-aware, so "für" or CJK text count as words instead of falling into the symbol branch.
+// Combining marks (\p{M}) stay with the letters so decomposed accents don't split a word.
+const WORD = /^[\p{L}\p{M}]+$/u;
+const DIGITS = /^\p{N}+$/u;
 
 export function createHeuristicTokenizer(
   params: HeuristicTokenizerConfig,
 ): (text: string) => number {
   const segmentPattern = new RegExp(
-    `[A-Za-z]+|\\d{1,${params.digitChunkSize}}|[^\\sA-Za-z\\d]+`,
-    'g',
+    `[\\p{L}\\p{M}]+|\\p{N}{1,${params.digitChunkSize}}|[^\\s\\p{L}\\p{M}\\p{N}]+`,
+    'gu',
   );
 
   return (text: string): number => {
-    const trimmed = text.trim();
-    if (!trimmed) return 0;
-
-    const segments = trimmed.match(segmentPattern) ?? [];
+    // Blank text has no segments, so no trim is needed.
+    const segments = text.match(segmentPattern) ?? [];
 
     let tokenCount = 0;
     for (const segment of segments) {
@@ -45,6 +41,6 @@ export function createHeuristicTokenizer(
       }
     }
 
-    return Math.max(1, tokenCount);
+    return tokenCount;
   };
 }

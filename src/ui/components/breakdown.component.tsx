@@ -1,5 +1,5 @@
 /**
- * Breakdown: one row per part of totalTokens (input, history, output, thinking, tools, overhead).
+ * Breakdown: one row per breakdown part of totalTokens.
  *
  * Context: popup
  * Docs: docs/modules.md#ui

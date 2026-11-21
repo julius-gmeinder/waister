@@ -34,7 +34,7 @@ project (semester 3).
 content:     readers/  (sites/ = WHERE, strategies/ = WHEN) → ChatCaptureDto
                  │ chrome.runtime ESTIMATE_PROMPT
 background:  handlers/estimation.handler (EstimationHandler)
-                 ├─ services/tokenizer   (TokenizerService, one module per provider)
+                 ├─ services/tokenizer   (TokenizerService, one COUNTERS table)
                  ├─ services/estimation  (EstimationService + model-profiles)
                  └─ services/prompt-store (SQLite WASM, snapshot in IndexedDB) ← PromptRecordDto
              handlers/usage.handler → services/prompt-store → UsageSummaryDto
@@ -63,7 +63,18 @@ All docs live in `docs/` only. Start at `docs/README.md`. The per-module referen
   structured-clone-safe data. React components are function components too.
 - **File names:** kebab-case + role suffix (`*.entry.ts(x)`, `*.reader.ts`, `*.site.ts`,
   `*.strategy.ts`, `*.handler.ts`, `*.service.ts`, `*.tokenizer.ts`, `*.dto.ts`, `*.types.ts`,
-  `*.app.tsx`, `*.page.tsx`, `*.component.tsx`).
+  `*.helpers.ts` (folder-internal pure helpers), `*.app.tsx`, `*.page.tsx`, `*.component.tsx`).
+  Exception, no suffix needed: folder-internal modules (`model-profiles.ts`,
+  `sqlite-database.ts`) and the shared `messages/`, `config/`, `ui/app-routes.ts` and
+  `entries/css-imports.d.ts` files.
+- **Comments:** every src file starts with a header comment: `/** <ModuleName>: <one line>. <optional
+≤3 lines WHY>`, then `Context: content | background | popup | app page | shared` and
+  `Docs: docs/modules.md#<section>` as separate lines of the same block.
+  JSDoc for headers, exports and fields, `//` only for in-body WHY. Comment WHY, not WHAT. A magic
+  list or selector gets a one-line reason. Don't duplicate what the docs say. Site adapters mark
+  unchecked selectors with `// UNVERIFIED:` (see `site-adapter.types.ts`).
+- **Lint enforces the layers:** `eslint.config.js` has `no-restricted-imports` per layer, matching
+  the import table in `docs/architecture.md`.
 - **UI (React):** only the `*.app.tsx` roots fetch data. `components/` only render props (and may
   navigate). Routes only in `ui/app-routes.ts`. Shared styles in `base.css` / `components.css`,
   surface layout in `popup.css` / `app.css`, colors only via the CSS variables
@@ -81,9 +92,8 @@ prompt store). The popup (React + TSX, [ADR 0010](docs/decisions/0010-react-popu
 the database and shows the last 24h of token usage (total, breakdown, prompt count). Its tab bar
 opens the full-page app page ([ADR 0011](docs/decisions/0011-app-page.md)), whose four pages
 (Analytics, Facts, Tips, History) are empty placeholders so far. The UI is deliberately plain for
-now. The energy/water `impact` is
-saved per prompt but not displayed. `npm run build` works. `eslint.config.js` still targets the old
-per-context layout. The required changes are in `docs/build-and-tooling.md`.
+now. The energy/water `impact` is saved per prompt but not displayed. `npm run check` and
+`npm run build` pass.
 
 ## Commands
 

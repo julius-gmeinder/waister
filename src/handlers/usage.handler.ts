@@ -1,5 +1,5 @@
 /**
- * Answers the popup's usage queries from the database (read-only).
+ * UsageHandler: answers the popup's usage queries from the database (read-only).
  *
  * Context: background
  * Docs: docs/modules.md#handlers

@@ -1,7 +1,8 @@
 /**
- * ChatCaptureDto (reader -> EstimationHandler) and its parts. Must stay structured-clone-safe.
+ * ChatCaptureDto: what a reader captured for one finished prompt (reader -> EstimationHandler).
+ * Must stay structured-clone-safe, it crosses contexts as a runtime message.
  *
- * Context: shared (any context)
+ * Context: shared
  * Docs: docs/modules.md#dtos, docs/dto.md
  */
 

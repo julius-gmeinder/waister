@@ -1,5 +1,5 @@
 /**
- * Sidebar (app page): logo plus one link per app page. Links only change the hash, so switching
+ * Sidebar: logo plus one link per app page. Links only change the hash, so switching
  * pages doesn't reload.
  *
  * Context: app page

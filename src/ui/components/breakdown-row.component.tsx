@@ -6,6 +6,7 @@
  */
 
 import type { LucideIcon } from 'lucide-react';
+import { formatCount } from '../format.helpers';
 
 interface BreakdownRowProps {
   icon: LucideIcon;
@@ -16,10 +17,10 @@ interface BreakdownRowProps {
 
 export function BreakdownRow({ icon: Icon, label, value }: BreakdownRowProps) {
   return (
-    <li>
+    <li className="breakdown-row">
       <Icon />
       <span>{label}</span>
-      <span className="breakdown-value">{value?.toLocaleString() ?? '–'}</span>
+      <span className="breakdown-value">{formatCount(value)}</span>
     </li>
   );
 }

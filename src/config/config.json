@@ -1,8 +1,8 @@
 {
-  "description": "All tunable values for token estimation and capture in one place. Field meanings: src/config/config.types.ts and docs/modules.md#config.",
   "estimation": {
     "thinking": {
       "baselineMs": 250,
+      "maxTokens": 32000,
       "effortMultipliers": {
         "none": 0,
         "low": 0.6,
@@ -106,6 +106,11 @@
     }
   },
   "tokenizer": {
+    "whitespace": {
+      "newlineRunTokens": 1,
+      "indentRunTokens": 1,
+      "indentMinSpaces": 2
+    },
     "openai": {
       "turnFramingTokens": 4,
       "attachmentTokens": { "image": 765, "file": 1500 },
@@ -140,12 +145,54 @@
       "stalePromptMs": 120000,
       "claudeInterleavedStallMs": 450
     },
+    "attachments": {
+      "maxIconPx": 48
+    },
     "effortInference": {
       "thinkingDetected": "medium",
       "familyDefaults": {
         "claude-haiku": "none",
         "gemini-pro": "medium",
         "gemini-flash": "low"
+      }
+    },
+    "models": {
+      "claude": {
+        "fallbackName": "claude",
+        "families": {
+          "claude-sonnet": ["sonnet"],
+          "claude-opus": ["opus"],
+          "claude-haiku": ["haiku"]
+        },
+        "thinkingKeywords": ["thinking", "extended"]
+      },
+      "gemini": {
+        "fallbackName": "gemini",
+        "families": {
+          "gemini-pro": ["pro"],
+          "gemini-flash": ["flash"]
+        },
+        "thinkingKeywords": ["thinking"]
+      },
+      "chatgpt": {
+        "effortWords": {
+          "high": ["heavy", "extended", "high"],
+          "medium": ["standard", "medium"],
+          "low": ["light", "low"]
+        },
+        "slug": {
+          "oSeries": "^o\\d",
+          "oSeriesVersion": "^(o\\d+(?:-mini|-pro)?)",
+          "gptVersion": "^gpt-(\\d+)(?:[.-](\\d+))?([a-z])?",
+          "reasoning": "\\b(thinking|t|pro)\\b"
+        },
+        "label": {
+          "nonReasoning": ["instant", "non-reasoning", "4o"],
+          "reasoning": ["thinking", "pro"],
+          "reasoningPatterns": ["\\bo[134]\\b", "\\b5(?:\\.\\d+)?\\b"],
+          "oSeries": "^o|\\bo[134]",
+          "version": "(\\d+(?:\\.\\d+)?[a-z]*|o\\d+(?:-\\w+)?)"
+        }
       }
     }
   },

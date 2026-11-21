@@ -1,11 +1,9 @@
 /**
  * TokenizerService: counts the visible tokens (input, history, output) per provider.
- *
- * Every chat turn is wrapped in control tokens (ChatML `<|im_start|>`, Claude turn tags, Gemini
- * `<start_of_turn>`), so each input/history turn adds `turnFramingTokens` from `config.json`
- * (`tokenizer.<provider>`). Attachments (images, files) add a fixed estimate per attachment from
- * the same config section. The provider tokenizers ignore whitespace, so line breaks and
- * indentation runs are added here (~1 token per run, like real BPE vocabularies).
+ * The heuristic tokenizers ignore whitespace, so newline and indentation runs are added back here.
+ * Each input/history turn also gets the chat-template framing tokens. The new answer gets none.
+ * That is an assumption: its end-of-turn token is not counted, while a history turn is re-sent
+ * wrapped in the full template.
  *
  * Context: background
  * Docs: docs/modules.md#tokenizer-service, docs/pipeline.md
@@ -19,11 +17,19 @@ import type {
   ChatTurn,
   Provider,
 } from '../../dto/chat-capture.dto';
-import { countAnthropicTextTokens } from './anthropic.tokenizer';
-import { countGoogleTextTokens } from './google.tokenizer';
-import { countOpenAiTextTokens } from './openai.tokenizer';
+import { createHeuristicTokenizer } from './heuristic.tokenizer';
 
 const TOKENIZER_CONFIG: TokenizerConfig = tokenizer;
+
+const COUNTERS: Record<Provider, (text: string) => number> = {
+  openai: createHeuristicTokenizer(TOKENIZER_CONFIG.openai),
+  anthropic: createHeuristicTokenizer(TOKENIZER_CONFIG.anthropic),
+  google: createHeuristicTokenizer(TOKENIZER_CONFIG.google),
+};
+
+const { newlineRunTokens, indentRunTokens, indentMinSpaces } = TOKENIZER_CONFIG.whitespace;
+const NEWLINE_RUN = /\n+/g;
+const INDENT_RUN = new RegExp(`^(?: {${indentMinSpaces},}|\\t+)`, 'gm');
 
 export interface VisibleTokenizationResult {
   /** Incl. turn framing and attachments. */
@@ -32,7 +38,7 @@ export interface VisibleTokenizationResult {
   history: number;
   /** Answer text + artifact / canvas document. */
   output: number;
-  /** True while the provider tokenizers are character-based approximations. */
+  /** Constant for now: every provider tokenizer is a heuristic. */
   approximate: boolean;
 }
 
@@ -40,25 +46,17 @@ export function resolveTurnFramingTokens(provider: Provider): number {
   return TOKENIZER_CONFIG[provider].turnFramingTokens;
 }
 
-/** Newline runs + leading indentation runs (≥ 2 spaces or a tab), ~1 token each. */
+/** Newline runs and leading indentation runs, weighted by `tokenizer.whitespace`. */
 export function countWhitespaceTokens(text: string): number {
-  const newlineRuns = text.match(/\n+/g)?.length ?? 0;
-  const indentRuns = text.match(/^(?: {2,}|\t+)/gm)?.length ?? 0;
-  return newlineRuns + indentRuns;
+  const newlineRuns = text.match(NEWLINE_RUN)?.length ?? 0;
+  const indentRuns = text.match(INDENT_RUN)?.length ?? 0;
+  return newlineRuns * newlineRunTokens + indentRuns * indentRunTokens;
 }
 
 export function countTextTokensForProvider(text: string, provider: Provider): number {
   const trimmed = text.trim();
   if (!trimmed) return 0;
-  const whitespace = countWhitespaceTokens(trimmed);
-  switch (provider) {
-    case 'openai':
-      return countOpenAiTextTokens(trimmed) + whitespace;
-    case 'anthropic':
-      return countAnthropicTextTokens(trimmed) + whitespace;
-    case 'google':
-      return countGoogleTextTokens(trimmed) + whitespace;
-  }
+  return COUNTERS[provider](trimmed) + countWhitespaceTokens(trimmed);
 }
 
 export function countAttachmentTokens(
@@ -67,7 +65,9 @@ export function countAttachmentTokens(
 ): number {
   if (!attachments?.length) return 0;
   const rates = TOKENIZER_CONFIG[provider].attachmentTokens;
-  return attachments.reduce((sum, kind) => sum + rates[kind], 0);
+  // `?? 0`: a kind that crossed the message boundary may have no rate, and NaN would make the
+  // SQLite insert fail and lose the prompt.
+  return attachments.reduce((sum, kind) => sum + (rates[kind] ?? 0), 0);
 }
 
 /** One turn: text + attachments + framing (no framing for an empty turn). */

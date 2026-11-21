@@ -1,7 +1,7 @@
 /**
  * UsageSummaryDto (PromptStoreService -> popup): token usage summed since `sinceMs`.
  *
- * Context: shared (any context)
+ * Context: shared
  * Docs: docs/modules.md#dtos, docs/dto.md
  */
 

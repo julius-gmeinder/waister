@@ -1,5 +1,8 @@
-/* Shared by the popup and the app page: fonts, color/font tokens, element defaults.
-   Docs: docs/styling.md */
+/**
+ * Base styles: fonts, color/font tokens and element defaults, shared by the popup and the app page.
+ *
+ * Docs: docs/styling.md
+ */
 @import '@fontsource-variable/inter/opsz.css';
 @import '@fontsource/libre-baskerville/400.css';
 @import '@fontsource/libre-baskerville/700.css';
@@ -11,10 +14,7 @@
   --bg: #fbf8ee;
   --surface: #ffffff;
   --border: #efe8cf;
-  /* The logo's brand yellow. Too loud for UI surfaces, so it's for small brand highlights only. */
-  --brand: #fde100;
-  /* Soft yellow for the selected item, a lighter version of --brand, with darker steps towards it
-     for hover and pressed. */
+  /* Soft yellow for the selected item, with darker steps for hover and pressed. */
   --accent: #fef199;
   --accent-hover: #fdeb7a;
   --accent-pressed: #fce45c;
@@ -25,17 +25,8 @@
   --focus: var(--contrast-bright);
   --contrast: #2e2a8c;
   --contrast-bright: #4f46e5;
-  /* Follows the OS/browser theme, see the media query below. */
-  --frame: #ede5ca;
   --text: #1c1917;
   --text-muted: #57534e;
-}
-
-/* Theme overrides. --frame currently has the same value in both modes. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --frame: #ede5ca;
-  }
 }
 
 body {

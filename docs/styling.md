@@ -2,16 +2,20 @@
 
 ## css files
 
-| File                               | Holds                                                                  | Imported by       |
-| ---------------------------------- | ---------------------------------------------------------------------- | ----------------- |
-| `src/ui/base.css`                  | font imports, color/font variables, light/dark mode, `body`, `.lucide` | both entries      |
-| `src/ui/components/components.css` | styles of the shared components, one commented block per component     | both entries      |
-| `src/ui/popup/popup.css`           | popup layout only (`.popup`, `.period`)                                | `popup.entry.tsx` |
-| `src/ui/app/app.css`               | app page layout only (`.app`, `.app-content`, `.page-title`)           | `app.entry.tsx`   |
+| File                               | Holds                                                              | Imported by       |
+| ---------------------------------- | ------------------------------------------------------------------ | ----------------- |
+| `src/ui/base.css`                  | font imports, color/font variables, `body`, `.lucide` defaults     | both entries      |
+| `src/ui/components/components.css` | styles of the shared components, one commented block per component | both entries      |
+| `src/ui/popup/popup.css`           | popup layout only (`.popup`, `.popup-period`)                      | `popup.entry.tsx` |
+| `src/ui/app/app.css`               | app page layout only (`.app`, `.app-content`, `.page-title`)       | `app.entry.tsx`   |
 
 Each entry imports them in this order, and esbuild bundles them into `popup/index.css` /
 `app/index.css`. A new component's styles go into `components.css`, and a new surface's layout
 into its own CSS file.
+
+**Class names** are flat kebab-case and prefixed with the component name (`.breakdown`,
+`.breakdown-row`, `.tab-bar-link`, `.sidebar-link`). Don't nest selectors by element (no
+`.breakdown li`).
 
 ## logos
 
@@ -27,37 +31,37 @@ into its own CSS file.
 Defined as CSS variables on `:root` in `src/ui/base.css`. Always use the variable, never
 the hex value.
 
-| Variable            | Value                      | Use                                                              |
-| ------------------- | -------------------------- | ---------------------------------------------------------------- |
-| `--bg`              | `#FBF8EE`                  | page background (`body`), whole popup, app sidebar               |
-| `--surface`         | `#FFFFFF`                  | panels on top of `--bg` (`.breakdown`), app content area         |
-| `--border`          | `#EFE8CF`                  | 1px borders (`.breakdown`)                                       |
-| `--brand`           | `#FDE100`                  | logo yellow, small brand highlights only (too loud for surfaces) |
-| `--accent`          | `#FEF199`                  | soft yellow: the selected item (current page in the sidebar)     |
-| `--accent-hover`    | `#FDEB7A`                  | selected item, hovered                                           |
-| `--accent-pressed`  | `#FCE45C`                  | selected item, pressed                                           |
-| `--neutral-hover`   | `#F3EDD9`                  | unselected item on `--bg`, hovered                               |
-| `--neutral-pressed` | `#EAE2C6`                  | unselected item on `--bg`, pressed                               |
-| `--focus`           | = `--contrast-bright`      | keyboard focus ring                                              |
-| `--contrast`        | `#2E2A8C`                  | emphasized text (total token count, page titles)                 |
-| `--contrast-bright` | `#4F46E5`                  | icons                                                            |
-| `--frame`           | `#EDE5CA` (light and dark) | unused right now (kept for theming)                              |
-| `--text`            | `#1C1917`                  | body text                                                        |
-| `--text-muted`      | `#57534E`                  | secondary text (period line, tab labels, placeholders)           |
+| Variable            | Value                 | Use                                                          |
+| ------------------- | --------------------- | ------------------------------------------------------------ |
+| `--bg`              | `#FBF8EE`             | page background (`body`), whole popup, app sidebar           |
+| `--surface`         | `#FFFFFF`             | panels on top of `--bg` (`.breakdown`), app content area     |
+| `--border`          | `#EFE8CF`             | 1px borders (`.breakdown`)                                   |
+| `--accent`          | `#FEF199`             | soft yellow: the selected item (current page in the sidebar) |
+| `--accent-hover`    | `#FDEB7A`             | selected item, hovered                                       |
+| `--accent-pressed`  | `#FCE45C`             | selected item, pressed                                       |
+| `--neutral-hover`   | `#F3EDD9`             | unselected item on `--bg`, hovered                           |
+| `--neutral-pressed` | `#EAE2C6`             | unselected item on `--bg`, pressed                           |
+| `--focus`           | = `--contrast-bright` | keyboard focus ring                                          |
+| `--contrast`        | `#2E2A8C`             | emphasized text (total token count, page titles)             |
+| `--contrast-bright` | `#4F46E5`             | icons                                                        |
+| `--text`            | `#1C1917`             | body text                                                    |
+| `--text-muted`      | `#57534E`             | secondary text (period line, tab labels, placeholders)       |
 
 ### interaction states
 
 Every clickable item uses the same steps. Yellow means "selected", never "hovered", so the
-current page stays recognizable.
+current page stays recognizable. Only the sidebar has a selected state (`aria-current="page"`
+styling on `.sidebar-link`). The popup tab bar always opens a new tab, so it has none.
 
-| State                       | Unselected item (tab bar, sidebar link)     | Selected item (`aria-current="page"`) |
-| --------------------------- | ------------------------------------------- | ------------------------------------- |
-| rest                        | transparent, text `--text-muted` / `--text` | `--accent`                            |
-| `:hover`                    | `--neutral-hover`, text `--text`            | `--accent-hover`                      |
-| `:active` (pressed)         | `--neutral-pressed`                         | `--accent-pressed`                    |
-| `:focus-visible` (keyboard) | 2px `--focus` outline, 2px offset           | same                                  |
+| State                       | Unselected item (tab bar, sidebar link)     | Selected sidebar link (`aria-current="page"`) |
+| --------------------------- | ------------------------------------------- | --------------------------------------------- |
+| rest                        | transparent, text `--text-muted` / `--text` | `--accent`                                    |
+| `:hover`                    | `--neutral-hover`, text `--text`            | `--accent-hover`                              |
+| `:active` (pressed)         | `--neutral-pressed`                         | `--accent-pressed`                            |
+| `:focus-visible` (keyboard) | 2px `--focus` outline, 2px offset           | same                                          |
 
-Backgrounds and text colors fade over 120ms. The neutral tints sit between `--bg` and `--border`,
+Icon color is set once in a grouped rule at the top of `components.css`, and sizes per
+component. Backgrounds and text colors fade over 120ms. The neutral tints sit between `--bg` and `--border`,
 so they only work on a `--bg` background. The state rules live at the end of `components.css`. A new
 clickable component gets added to those selectors instead of defining its own colors.
 
@@ -73,11 +77,11 @@ Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `b
   and the content (`.app-content`, `--surface`, padding 32px 40px) on the right. No border
   between them. Only the background color separates them.
 
-### light / dark mode
+### dark mode
 
-`base.css` has a `@media (prefers-color-scheme: dark)` block that overrides variables on `:root`.
-Components never check the theme themselves. Right now `--frame` has the same value in both
-modes, so the UI looks the same. To theme a color, override its variable in that media query.
+There is no dark theme yet. When theming is needed, add a `@media (prefers-color-scheme: dark)`
+block on `:root` in `base.css` that overrides the color variables. Components never check the
+theme themselves, so they follow automatically.
 
 ## fonts
 

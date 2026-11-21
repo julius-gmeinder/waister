@@ -46,3 +46,16 @@ readers and in the rate tables, so a mismatch silently fell back to the provider
 - Rejected alternatives: background-only config (the capture timings would stay hardcoded),
   `src/config.json` without a folder (no place for its types), merging the provider tokenizers
   into one file (would undo ADR 0006).
+
+## Update 2026-11-21
+
+- **Model knowledge moved into the config.** "Keyword matching for model labels" is no longer
+  code: `capture.models.claude` and `capture.models.gemini` hold `fallbackName`, `families` and
+  `thinkingKeywords`, and `capture.models.chatgpt` holds `effortWords` plus the `slug.*` and
+  `label.*` regex sources. The matching logic stays in the site adapters (`buildModelInfo`,
+  `chatgpt.site.ts`). Family keys are type-checked against `estimation.models`
+  (`CheckedModelKeywordFamilies`).
+- New keys: `estimation.thinking.maxTokens`, `tokenizer.whitespace`, `capture.attachments.maxIconPx`.
+  The top-level `description` was removed.
+- The provider tokenizer files are gone, see the update in [ADR 0006](0006-per-provider-tokenizers.md).
+- The effort validation lives in `readers/sites/effort-inference.helpers.ts`.

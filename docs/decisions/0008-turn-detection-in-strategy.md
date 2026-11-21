@@ -30,3 +30,11 @@ turn, a longer text-stability window (2.5 s) decides on its own.
 - A broken stop-button selector no longer blocks capture. It only delays `t1` detection by ~2 s.
 - Observing the whole body means more observer callbacks. They are coalesced into one check per
   150 ms, and attribute changes are filtered to the few attributes that signal streaming.
+
+## Update 2026-11-21
+
+The strategy no longer has a facade or an interface: `chat.reader.ts` and the `ReaderStrategy`
+type (with its `domCaptureStrategy` export) were deleted. `observeTurns`, `buildChatCaptureDto`,
+`resolveSiteAdapter` and `SUPPORTED_SITES` are private to `dom-capture.strategy.ts`. The detection
+windows named above (including the 2.5 s one) are now `capture.timings` in `config.json`
+([ADR 0012](0012-central-config.md)).

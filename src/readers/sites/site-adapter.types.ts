@@ -1,8 +1,13 @@
 /**
- * SiteAdapter contract (layer 1, WHERE): DOM selectors, reads and state checks for one chat app.
- * No timing logic, that lives in `dom-capture.strategy.ts`.
+ * SiteAdapter: contract of layer 1 (WHERE), the DOM selectors, reads and state checks for one chat
+ * app. Timing and capture decisions live in `dom-capture.strategy.ts`, with one exception: an
+ * adapter may keep state of its own where a site needs it (Claude's thinking-time aggregator, see
+ * `isPromptInput`, `isSendButton`, `isGenerating`).
  *
- * Context: content script
+ * Convention: a `// UNVERIFIED:` comment marks selectors that were derived from knowledge of the
+ * site but never checked against the live page. Grep for it first when a site stops matching.
+ *
+ * Context: content
  * Docs: docs/modules.md#site-adapters
  */
 
@@ -28,7 +33,10 @@ export interface SiteAdapter {
   /** Images / files attached to the latest user message. */
   readUserAttachments(): AttachmentKind[];
 
-  /** Markdown of the latest answer, without UI chrome, thinking drawers and tool blocks. */
+  /**
+   * Markdown of the latest answer, without UI chrome, thinking drawers, tool blocks and
+   * artifact / canvas cards (those are counted separately).
+   */
   readResponse(): string;
 
   /** Markdown of the artifact / canvas side panel written by the latest answer, '' if none. */
@@ -46,16 +54,19 @@ export interface SiteAdapter {
   /** A new response raises the count. */
   countResponses(): number;
 
-  /** True while a response is being generated (e.g. stop button visible). */
+  /**
+   * True while a response is being generated (e.g. stop button visible). Claude also feeds its
+   * thinking aggregator on each call, so the strategy must keep polling it while a prompt is in flight.
+   */
   isGenerating(): boolean;
 
   /** True once the latest response shows visible text (thinking placeholders don't count). */
   isStreamingVisibleText(): boolean;
 
-  /** True if `target` is (inside) the prompt composer. */
+  /** True if `target` is (inside) the prompt composer. Claude also starts a thinking-time turn on a hit. */
   isPromptInput(target: Element): boolean;
 
-  /** True if `target` is (inside) the send button. */
+  /** True if `target` is (inside) the send button. Claude also starts a thinking-time turn on a hit. */
   isSendButton(target: Element): boolean;
 
   /**

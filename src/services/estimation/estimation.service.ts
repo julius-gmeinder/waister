@@ -1,7 +1,7 @@
 /**
  * EstimationService: estimates the hidden tokens (thinking, tools, overhead) and assembles the
- * `TokenEstimateDto`. Visible counts are passed in by the handler, so services don't call each
- * other.
+ * `TokenEstimateDto`.
+ * Visible counts are passed in by the handler, so services don't call each other.
  *
  * Context: background
  * Docs: docs/modules.md#estimation-service, docs/pipeline.md
@@ -33,25 +33,30 @@ export type HiddenTokenEstimate = Pick<TokenBreakdown, 'thinking' | 'tools' | 'o
 };
 
 /**
- * Thinking tokens: `max(0, thinkingTimeMs − baseline) × tokensPerMsThinking × effortMultiplier`.
- * Values from `config.json` (`estimation.thinking`).
+ * Thinking tokens: `max(0, thinkingTimeMs − baseline) × tokensPerMsThinking × effortMultiplier`,
+ * capped at `estimation.thinking.maxTokens`. Thinking can't take longer than the whole response.
  */
 export function estimateThinkingTokens(
   thinkingTimeMs: number,
+  latencyMs: number,
   tokensPerMsThinking: number,
   thinkingEffort: ThinkingEffort,
 ): number {
-  const effectiveMs = Math.max(0, thinkingTimeMs - THINKING.baselineMs);
+  const effectiveMs = Math.max(0, Math.min(thinkingTimeMs, latencyMs) - THINKING.baselineMs);
   // An effort string outside ThinkingEffort (it crosses a message boundary) counts as unknown.
   const effortMultiplier =
     THINKING.effortMultipliers[thinkingEffort] ?? THINKING.effortMultipliers.unknown;
-  return Math.round(effectiveMs * tokensPerMsThinking * effortMultiplier);
+  return Math.min(
+    THINKING.maxTokens,
+    Math.round(effectiveMs * tokensPerMsThinking * effortMultiplier),
+  );
 }
 
 /** Tool tokens: sum of `estimation.tools[provider][kind]` over all detected calls. */
 export function estimateToolTokens(toolCalls: readonly ToolCallKind[], provider: Provider): number {
   const rates = TOOLS[provider];
-  return toolCalls.reduce((sum, kind) => sum + rates[kind], 0);
+  // `?? 0`: a kind that crossed the message boundary may have no rate (NaN would lose the prompt).
+  return toolCalls.reduce((sum, kind) => sum + (rates[kind] ?? 0), 0);
 }
 
 export function estimateHiddenTokens(capture: ChatCaptureDto): HiddenTokenEstimate {
@@ -59,6 +64,7 @@ export function estimateHiddenTokens(capture: ChatCaptureDto): HiddenTokenEstima
   return {
     thinking: estimateThinkingTokens(
       capture.thinkingTimeMs,
+      capture.latencyMs,
       profile.tokensPerMsThinking,
       capture.model.thinkingEffort,
     ),

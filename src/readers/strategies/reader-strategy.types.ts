@@ -1,13 +1,11 @@
 /**
- * ReaderStrategy contract (layer 2, WHEN): detects prompt send and response end, then builds a
- * `ChatCaptureDto` from the site adapter's reads.
+ * ReaderStrategyTypes: timing and callback types of the DOM capture strategy (layer 2, WHEN).
  *
- * Context: content script
+ * Context: content
  * Docs: docs/modules.md#reader-strategies
  */
 
 import type { ChatCaptureDto } from '../../dto/chat-capture.dto';
-import type { SiteAdapter } from '../sites/site-adapter.types';
 
 /** Epoch ms timestamps of one prompt/response cycle. */
 export interface TurnTimings {
@@ -15,17 +13,8 @@ export interface TurnTimings {
   t0: number;
   /** First visible response text appeared. */
   tStreamStart: number;
-  /** Last change to the response before it settled. */
+  /** Last activity before the response settled: last text change or generating indicator seen. */
   t1: number;
 }
 
 export type OnCaptureReady = (capture: ChatCaptureDto) => void;
-
-export interface ReaderStrategy {
-  /** Starts watching the page and returns a cleanup function. */
-  start(
-    onCapture?: OnCaptureReady,
-    host?: string,
-    customAdapters?: readonly SiteAdapter[],
-  ): () => void;
-}

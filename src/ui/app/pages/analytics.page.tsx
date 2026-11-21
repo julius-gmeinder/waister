@@ -1,5 +1,5 @@
 /**
- * AnalyticsPage: token usage over time. Empty for now.
+ * AnalyticsPage: token usage over time (placeholder).
  *
  * Context: app page
  * Docs: docs/modules.md#ui

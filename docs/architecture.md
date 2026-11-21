@@ -79,7 +79,9 @@ shared ([ADR 0011](decisions/0011-app-page.md)).
 **Why the boundaries matter:** each context is a separate JS world. esbuild bundles every entry
 on its own, so a wrong import doesn't fail the build. It just silently copies background code
 (e.g. a tokenizer vocabulary) into every tab's content script. The import rules prevent that
-and will be enforced by ESLint (see [build-and-tooling.md](build-and-tooling.md#eslint)).
+and ESLint enforces them (`no-restricted-imports` per layer, see
+[build-and-tooling.md](build-and-tooling.md#eslint)). Imports inside one layer folder are not
+restricted.
 
 ## Conventions
 
@@ -87,9 +89,18 @@ and will be enforced by ESLint (see [build-and-tooling.md](build-and-tooling.md#
   "EstimationHandler", "TokenizerService" etc. are module names, not classes.
 - **File names:** kebab-case plus a role suffix: `*.entry.ts(x)`, `*.reader.ts`, `*.site.ts`,
   `*.strategy.ts`, `*.handler.ts`, `*.service.ts`, `*.tokenizer.ts`, `*.dto.ts`, `*.types.ts`,
-  and in `ui/` `*.app.tsx` (root component of a surface), `*.page.tsx` (one app page route) and
+  `*.helpers.ts` (pure helpers internal to one folder, e.g. `readers/sites/site.helpers.ts`,
+  `ui/format.helpers.ts`), and in `ui/` `*.app.tsx` (root component of a surface), `*.page.tsx` (one app page route) and
   `*.component.tsx` ([ADR 0010](decisions/0010-react-popup.md),
   [ADR 0011](decisions/0011-app-page.md)).
+  **Exception, no renames:** folder-internal modules (`services/estimation/model-profiles.ts`,
+  `services/prompt-store/sqlite-database.ts`) and the shared `messages/runtime-messages.ts`,
+  `config/` files, `ui/app-routes.ts` and `entries/css-imports.d.ts` may omit the suffix.
+- **Header comment:** every file starts with `<ModuleName>: <one line>`, then `Context:`
+  (content, background, popup, app page or shared) and `Docs:` (an anchor in
+  [modules.md](modules.md)). JSDoc for headers, exports and fields, `//` only for an in-body WHY.
+  Comments say why, not what, and don't repeat these docs. Site adapters tag selectors that were
+  never checked against the live page with `// UNVERIFIED:`.
 - **React components** are function components with a PascalCase export
   (`breakdown-row.component.tsx` → `BreakdownRow`). Only the `*.app.tsx` root components fetch
   data, and the other components only render props.
@@ -110,8 +121,8 @@ the estimation pipeline: estimation writes rows, the popup asks the database for
 | ------------------------------------- | ------------------------------------------------------------------------------------------ |
 | New chat site                         | `readers/sites/<site>.site.ts` + register in `entries/content.entry.ts` + host in manifest |
 | Different read timing                 | `readers/strategies/<x>.strategy.ts` + swap in `entries/content.entry.ts`                  |
-| New provider tokenizer                | `services/tokenizer/<provider>.tokenizer.ts` + route in `tokenizer.service.ts`             |
-| New model / version                   | entry in `config/config.json` (`estimation.models`) + the site adapter's label parser      |
+| Real tokenizer for one provider       | replace that provider's entry in `COUNTERS` (`tokenizer.service.ts`)                       |
+| New model / version                   | `estimation.models` and `capture.models` in `config/config.json` (rates, label keywords)   |
 | Tune a rate, heuristic or timing      | `config/config.json` only                                                                  |
 | New saved field / popup query         | `services/prompt-store/prompt-store.service.ts` (schema + query) + DTO + message           |
 | New popup element                     | `ui/components/<name>.component.tsx`, rendered from `ui/popup/popup.app.tsx`               |

@@ -5,7 +5,7 @@
  * strings as `string` and skip excess-property checks, so string enums stay `string` here (the
  * readers validate effort values at runtime) and model-family keys are checked separately.
  *
- * Context: shared (any context)
+ * Context: shared
  * Docs: docs/modules.md#config
  */
 
@@ -19,7 +19,15 @@ import type rawConfig from './config.json';
 
 type RawConfig = typeof rawConfig;
 
-/** Per-model rates. Hidden-token rates plus the environmental impact per `perTokensUnit` tokens. */
+/**
+ * Per-model rates. Hidden-token rates plus the environmental impact per `perTokensUnit` tokens.
+ *
+ * Assumptions: none of these numbers come from a provider. The providers publish neither system
+ * prompt sizes nor per-prompt energy, water or CO2 figures. The `*Per1M` rates are order-of-
+ * magnitude guesses, loosely scaled by model size (opus / pro / o-series > sonnet / gpt > haiku /
+ * flash). `systemPromptTokens` and `tokensPerMsThinking` (observed streaming speed) are rough
+ * estimates too. Treat the impact as a relative indicator, not a measurement.
+ */
 export interface ModelRates {
   /** Hidden input: system prompt + tool definitions sent with every prompt. */
   systemPromptTokens: number;
@@ -39,10 +47,24 @@ export interface ProviderModels {
   families: Record<string, ModelRates>;
 }
 
+/**
+ * Assumptions: every value here is a guess, not a measurement (ADR 0012).
+ * - `thinking.baselineMs`: typical network + time-to-first-token of a non-reasoning reply.
+ * - `thinking.effortMultipliers`: relative reasoning budget per UI effort level, `medium` = 1.
+ *   `none` is 0 because a model with thinking switched off emits no reasoning tokens, whatever
+ *   the latency. `unknown` is 0.5 to hedge between thinking and not thinking.
+ * - `tools`: snippet sizes per call, i.e. a search returns a few result snippets (~3000 tokens,
+ *   2500 for Gemini), a code run its input plus output (~600), any other tool ~800.
+ */
 export interface EstimationConfig {
   thinking: {
     /** Subtracted from `thinkingTimeMs` so plain round-trip latency isn't counted as reasoning. */
     baselineMs: number;
+    /**
+     * Upper bound for the thinking estimate of one prompt. Guards against a network stall or an
+     * idle tab being counted as reasoning, since the estimate is derived from latency alone.
+     */
+    maxTokens: number;
     /** `medium` = 1. `unknown` hedges between thinking and not thinking. */
     effortMultipliers: Record<ThinkingEffort, number>;
   };
@@ -57,7 +79,20 @@ export interface EstimationConfig {
   models: Record<Provider, ProviderModels>;
 }
 
-/** Parameters of the character-based heuristic tokenizer, per provider. */
+/**
+ * Parameters of the character-based heuristic tokenizer, per provider. All of them are
+ * calibrations against typical English prose, not the real vocabularies:
+ * - openai: `o200k_base`, about 4.0 chars/token, numbers split into 1-3 digit chunks.
+ * - anthropic: no public vocabulary, about 3.7 chars/token. Slightly denser than `o200k_base`
+ *   because words over 5 characters split more often.
+ * - google: SentencePiece unigram, 256k vocab, about 4.1 chars/token. The large vocabulary keeps
+ *   words up to about 7 characters as one piece.
+ * `turnFramingTokens` is the chat-template control tokens around a turn (ChatML
+ * `<|im_start|>`, Claude turn tags, Gemini `<start_of_turn>`). `attachmentTokens` image values
+ * follow the providers' published per-image costs for a typical image (OpenAI 765 = 1024x1024 at
+ * high detail, Gemini 258 for an image up to 384px, Claude ~1600 for a large one). The file value
+ * is a flat guess.
+ */
 export interface HeuristicTokenizerConfig {
   /** Chat-template control tokens around every input/history turn. */
   turnFramingTokens: number;
@@ -73,7 +108,19 @@ export interface HeuristicTokenizerConfig {
   charsPerSymbolToken: number;
 }
 
-export type TokenizerConfig = Record<Provider, HeuristicTokenizerConfig>;
+/** Whitespace the provider tokenizers skip, added back as one token per run. */
+export interface WhitespaceTokenConfig {
+  /** Tokens per run of consecutive line breaks. */
+  newlineRunTokens: number;
+  /** Tokens per run of leading indentation. */
+  indentRunTokens: number;
+  /** Leading spaces needed to count as indentation (a leading tab always counts). */
+  indentMinSpaces: number;
+}
+
+export interface TokenizerConfig extends Record<Provider, HeuristicTokenizerConfig> {
+  whitespace: WhitespaceTokenConfig;
+}
 
 export interface CaptureTimings {
   /** Quiet time after the generating indicator disappeared before a response counts as done. */
@@ -90,14 +137,88 @@ export interface CaptureTimings {
   claudeInterleavedStallMs: number;
 }
 
+export interface CaptureAttachments {
+  /**
+   * Images at most this many px wide and high are icons / avatars (UI chrome), not attachments.
+   * Real upload thumbnails are larger.
+   */
+  maxIconPx: number;
+}
+
+/**
+ * Providers whose model family is named by a word in the picker label (Claude, Gemini).
+ * Read by `buildModelInfo` in `readers/sites/site.helpers.ts`.
+ */
+export interface ModelKeywordConfig {
+  /** Family name when no keyword matches. Has no rates in `estimation.models` (provider default). */
+  fallbackName: string;
+  /**
+   * Family name -> lowercase keywords contained in the label. Checked in key order, the first
+   * family with a matching keyword wins. Keys must exist in `estimation.models` (type-checked below).
+   */
+  families: Record<string, string[]>;
+  /** Lowercase label words that mean the picked model thinks (e.g. "Sonnet 4 Extended"). */
+  thinkingKeywords: string[];
+}
+
+/**
+ * ChatGPT model knowledge, read by `readers/sites/chatgpt.site.ts`. Every pattern string is a
+ * case-insensitive regex source. The slug (`data-message-model-slug`, e.g. "gpt-5-1-thinking")
+ * is preferred over the picker label because in Auto mode it names the model that really answered.
+ */
+export interface ChatGptModelConfig {
+  /**
+   * Plain words per effort level, matched as whole words in slugs and picker labels. Checked
+   * high, medium, low (first hit wins). "Extended" and "Heavy" are the effort labels of the
+   * Thinking picker, "Standard" and "Light" the lower ones.
+   */
+  effortWords: Record<'high' | 'medium' | 'low', string[]>;
+  slug: {
+    /** o-series slugs ("o3", "o4-mini-high") start with `o` + digit. */
+    oSeries: string;
+    /** Capture group 1 = version of an o-series slug ("o4-mini"). */
+    oSeriesVersion: string;
+    /** Capture groups = major, minor, letter suffix of a GPT slug ("gpt-4o", "gpt-5-1"). */
+    gptVersion: string;
+    /**
+     * Matched against the slug with `-`/`_` replaced by spaces, so a bare `t` is the "thinking"
+     * marker of slugs like "gpt-5-t-mini". Slugs without a match are non-reasoning answers
+     * (instant, chat, 4o).
+     */
+    reasoning: string;
+  };
+  /** Picker-label fallback, used when no message carries a model slug. */
+  label: {
+    /** Substrings (lowercase) that mark a non-reasoning model, so no thinking is assumed. */
+    nonReasoning: string[];
+    /** Substrings (lowercase) that mark a reasoning model. */
+    reasoning: string[];
+    /**
+     * Regexes for reasoning models named by number only: o1 / o3 / o4 as a whole word and
+     * GPT-5 / 5.x, which is a thinking model by default.
+     */
+    reasoningPatterns: string[];
+    /** Label belongs to the o-series (starts with `o`, or contains o1 / o3 / o4). */
+    oSeries: string;
+    /** Capture group 1 = version ("4o", "5.1", "o3-mini"). */
+    version: string;
+  };
+}
+
 export interface CaptureConfig {
   timings: CaptureTimings;
+  attachments: CaptureAttachments;
   /** Values are `ThinkingEffort` strings, validated at runtime by the readers. */
   effortInference: {
     /** Effort when the UI shows that thinking is on, but not at which level. */
     thinkingDetected: string;
     /** Effort per model family when the UI shows no thinking signal. Missing = `unknown`. */
     familyDefaults: Partial<Record<ModelFamily, string>>;
+  };
+  models: {
+    claude: ModelKeywordConfig;
+    gemini: ModelKeywordConfig;
+    chatgpt: ChatGptModelConfig;
   };
 }
 
@@ -107,7 +228,6 @@ export interface UiConfig {
 }
 
 export interface WaisterConfig {
-  description: string;
   estimation: EstimationConfig;
   tokenizer: TokenizerConfig;
   capture: CaptureConfig;
@@ -135,3 +255,14 @@ export type CheckedConfig = ShapeCheck<RawConfig>;
 export type CheckedFamilyDefaults = Expect<
   HasOnlyKeys<RawConfig['capture']['effortInference']['familyDefaults'], ModelFamily>
 >;
+
+/**
+ * Compile-time only: `false` here means a family key under `capture.models.claude|gemini.families`
+ * has no rates in `estimation.models`.
+ */
+export type CheckedModelKeywordFamilies = [
+  Expect<
+    HasOnlyKeys<RawConfig['capture']['models']['claude']['families'], ModelFamily<'anthropic'>>
+  >,
+  Expect<HasOnlyKeys<RawConfig['capture']['models']['gemini']['families'], ModelFamily<'google'>>>,
+];

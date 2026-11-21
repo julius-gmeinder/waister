@@ -1,6 +1,5 @@
 /**
- * SiteAdapter for ChatGPT (chatgpt.com).
- *
+ * ChatGPT SiteAdapter (chatgpt.com): selectors and reads for one chat app.
  * One answer can span several assistant role nodes (reasoning, tool calls, final answer), so all
  * reads work on turns: consecutive role nodes of the same author merged together.
  *
@@ -15,10 +14,11 @@
  * - Classic app fallback: `[data-message-author-role]`, `.markdown`, `#prompt-textarea`, and
  *   `data-testid` send/stop buttons.
  *
- * Context: content script
+ * Context: content
  * Docs: docs/modules.md#site-adapters
  */
 
+import { capture } from '../../config/config.json';
 import type { ModelFamily } from '../../config/config.types';
 import type {
   AttachmentKind,
@@ -28,38 +28,53 @@ import type {
   ToolCallKind,
 } from '../../dto/chat-capture.dto';
 import {
-  domToMarkdown,
+  outermost,
   readArtifactText,
   readAttachments,
   readToolCalls,
   type ToolSelectors,
 } from '../dom-content.reader';
-import { THINKING_DETECTED_EFFORT } from './effort-inference';
+import { THINKING_DETECTED_EFFORT } from './effort-inference.helpers';
 import type { SiteAdapter } from './site-adapter.types';
+import {
+  buildHistory,
+  hasMatch,
+  joinMarkdown,
+  joinSelectors,
+  makeTurn,
+  matchesOrContains,
+  queryOutermost,
+  readText,
+  toolBlockSelector,
+  unknownModel,
+  type Role,
+} from './site.helpers';
 
 /** Typed against the families in `config.json`, so a rename there fails the typecheck. */
 const GPT: ModelFamily<'openai'> = 'gpt';
 const O_SERIES: ModelFamily<'openai'> = 'openai-o';
 
-export const CHATGPT_SELECTORS = {
+const CHATGPT_SELECTORS = {
   promptInput:
     '#prompt-textarea, #mobile-composer-prompt, [data-mobile-composer-prompt], [data-composer-markdown], form[data-chatgpt-composer] .ProseMirror[contenteditable="true"], #pending-conversation-input',
   sendButton:
     'button[data-testid="send-button"], #composer-submit-button, button[data-composer-submit]:not([data-stop-generating]), form[data-chatgpt-composer] button[type="submit"]:not([disabled]):not([aria-disabled="true"])',
-  /**
-   * Scoped to the composer so localized or unrelated page buttons (dictation, read aloud) never match.
-   */
+  /** Scoped to the composer so localized or unrelated page buttons (dictation, read aloud) never match. */
   stopButton:
     'button[data-testid="stop-button"], button[data-composer-submit][data-stop-generating], form[data-chatgpt-composer] button[aria-label="Stop"], form[data-chatgpt-composer] button[aria-label="Stop generating"]',
   roleNode:
     '[data-message-author-role], [data-message-role], [data-user-message-bubble], [data-response-body]',
-  /** Classic app, web-mobile shell. */
-  roleAttrs: ['data-message-author-role', 'data-message-role'],
+  /** Role attribute of the classic app (`user` / `assistant`). */
+  classicRoleAttr: 'data-message-author-role',
+  /** Role attribute of the web-mobile shell (`user` / `assistant`). */
+  mobileRoleAttr: 'data-message-role',
+  /** User message bubble (logged-in and web-mobile shells). */
+  userBubble: '[data-user-message-bubble]',
+  /** Assistant answer wrapper of the logged-in app. */
+  assistantBody: '[data-response-body]',
   /** Excludes the "Thinking…" placeholder (`[data-response-starting]`). */
   assistantMarkdown:
     '.markdown, [data-assistant-markdown-root], [data-markdown-text-style="assistant-message"], [data-dil-response]',
-  /** User message bubble (present in both logged-in and web-mobile shells). */
-  userBubble: '[data-user-message-bubble]',
   /** Web-mobile shell: set on an assistant message once its answer is finished. */
   messageCompleteAttr: 'data-message-complete',
   /** Web-mobile shell: set on an assistant message while it is actively streaming. */
@@ -73,24 +88,27 @@ export const CHATGPT_SELECTORS = {
   modelSlugAttr: 'data-message-model-slug',
   modelSelector:
     '[data-testid="model-switcher-dropdown-button"], button[aria-label*="Model selector"], [data-model-selection-label], button[aria-label="Select ChatGPT model"]',
-  thinkingBadge:
-    '[data-testid*="thought"], [aria-label*="Thinking"], [aria-label*="Reason"], form[data-chatgpt-composer] button[aria-pressed="true"]',
-  /** Inside a message but not model output: role headings, action rows, placeholders, cards. */
+  /** Thinking markers inside an answer. Checked in the latest turn only. */
+  thinkingBadge: '[data-testid*="thought"], [aria-label*="Thinking"], [aria-label*="Reason"]',
+  /** Pressed composer toggle (e.g. "Think"). Page state, not part of any turn. */
+  thinkingToggle: 'form[data-chatgpt-composer] button[aria-pressed="true"]',
+  /** Inside a message but not model output: role headings, action rows, placeholders. */
   messageChrome:
-    '[data-response-starting], [data-assistant-placeholder-slot], [data-message-attribution], h4[data-conversation-role], [data-message-actions], .turn-action-controls, [role="status"], [data-testid*="canvas"], [data-testid*="textdoc"]',
+    '[data-response-starting], [data-assistant-placeholder-slot], [data-message-attribution], h4[data-conversation-role], [data-message-actions], .turn-action-controls, [role="status"]',
   /** Ancestor of a user role node that also holds its attachments. */
   userTurnContainer:
     '[data-chatgpt-search-unit-key], li[data-message-role], [data-message-author-role]',
-  /** File / pasted-content cards in a user turn (UNVERIFIED on the live site). */
+  // UNVERIFIED: the selectors below were not checked on the live site.
+  /** File / pasted-content cards in a user turn. */
   attachmentTile: '[data-testid*="file"], [data-testid*="attachment"], [class*="file-tile"]',
-  /** Canvas card inside the answer (UNVERIFIED on the live site). */
+  /** Canvas card inside the answer. */
   artifactCard: '[data-testid*="canvas"], [data-testid*="textdoc"], [id^="textdoc-message"]',
-  /** Canvas side panel with the document (UNVERIFIED on the live site). */
+  /** Canvas side panel with the document. */
   artifactPanel:
     '[data-testid="canvas-panel"], [data-testid*="textdoc-editor"], section[data-testid*="canvas"] .ProseMirror',
 } as const;
 
-/** UNVERIFIED on the live site except `utm_source=chatgpt.com` on cited links. */
+// UNVERIFIED: everything except `utm_source=chatgpt.com` on cited links.
 const CHATGPT_TOOLS: ToolSelectors = {
   search: '[data-testid*="web-search"], [data-testid="search-results"]',
   code: '[data-testid*="code-interpreter"], [data-testid*="execution-output"]',
@@ -99,36 +117,59 @@ const CHATGPT_TOOLS: ToolSelectors = {
     'a[href*="utm_source=chatgpt.com"], [data-testid*="citation"], [data-testid*="webpage-citation"]',
 };
 
-type Role = 'user' | 'assistant';
+/** Not model output: UI chrome, canvas cards and tool blocks (counted separately). */
+const CHATGPT_MESSAGE_CHROME = joinSelectors(
+  CHATGPT_SELECTORS.messageChrome,
+  CHATGPT_SELECTORS.artifactCard,
+  toolBlockSelector(CHATGPT_TOOLS),
+);
+
+const MODELS = capture.models.chatgpt;
+
+/** Case-insensitive, so patterns work on slugs, lowercased labels and raw labels alike. */
+function pattern(source: string): RegExp {
+  return new RegExp(source, 'i');
+}
+
+const SLUG = {
+  oSeries: pattern(MODELS.slug.oSeries),
+  oSeriesVersion: pattern(MODELS.slug.oSeriesVersion),
+  gptVersion: pattern(MODELS.slug.gptVersion),
+  reasoning: pattern(MODELS.slug.reasoning),
+};
+
+const LABEL = {
+  reasoningPatterns: MODELS.label.reasoningPatterns.map(pattern),
+  oSeries: pattern(MODELS.label.oSeries),
+  version: pattern(MODELS.label.version),
+};
+
+/** Whole-word regexes per effort, in the order they are checked (high wins over medium / low). */
+const EFFORT_PATTERNS: [ThinkingEffort, RegExp][] = (['high', 'medium', 'low'] as const).map(
+  (effort) => [effort, pattern(`\\b(${MODELS.effortWords[effort].join('|')})\\b`)],
+);
 
 interface GptTurn {
   role: Role;
   nodes: Element[];
 }
 
-function extractCleanText(element: Element | null | undefined): string {
-  if (!element) return '';
-  return (element.textContent ?? '').trim();
-}
-
 function resolveNodeRole(node: Element): Role | null {
-  for (const attr of CHATGPT_SELECTORS.roleAttrs) {
+  for (const attr of [CHATGPT_SELECTORS.classicRoleAttr, CHATGPT_SELECTORS.mobileRoleAttr]) {
     const value = node.getAttribute(attr);
     if (value === 'user' || value === 'assistant') return value;
     if (value !== null) return null;
   }
-  if (node.hasAttribute('data-user-message-bubble')) return 'user';
-  if (node.hasAttribute('data-response-body')) return 'assistant';
+  if (node.matches(CHATGPT_SELECTORS.userBubble)) return 'user';
+  if (node.matches(CHATGPT_SELECTORS.assistantBody)) return 'assistant';
   return null;
 }
 
 function readTurns(): GptTurn[] {
   const turns: GptTurn[] = [];
-  for (const node of Array.from(document.querySelectorAll(CHATGPT_SELECTORS.roleNode))) {
-    // A role node nested in another one belongs to the outer message: don't count it twice.
-    if (node.parentElement?.closest(CHATGPT_SELECTORS.roleNode)) continue;
+  for (const node of queryOutermost(CHATGPT_SELECTORS.roleNode)) {
     const role = resolveNodeRole(node);
-    if (role !== 'user' && role !== 'assistant') continue;
+    if (!role) continue;
     const last = turns[turns.length - 1];
     if (last?.role === role) {
       last.nodes.push(node);
@@ -139,90 +180,71 @@ function readTurns(): GptTurn[] {
   return turns;
 }
 
-/** Null while the answer to the latest user turn isn't rendered yet. */
-function latestAssistantTurn(): GptTurn | null {
-  const turns = readTurns();
-  const last = turns[turns.length - 1];
-  return last?.role === 'assistant' ? last : null;
+function latestTurnOf(role: Role): GptTurn | undefined {
+  return readTurns()
+    .filter((turn) => turn.role === role)
+    .at(-1);
 }
 
-/** Skips matches nested in another match so text isn't counted twice. */
+/** Undefined while the answer to the latest user turn isn't rendered yet. */
+function latestAssistantTurn(): GptTurn | undefined {
+  const last = readTurns().at(-1);
+  return last?.role === 'assistant' ? last : undefined;
+}
+
 function outermostMatches(turn: GptTurn, selector: string): Element[] {
-  return turn.nodes.flatMap((node) => {
-    if (node.matches(selector)) return [node];
-    return Array.from(node.querySelectorAll(selector)).filter((el) => {
-      const outer = el.parentElement?.closest(selector);
-      return !outer || !node.contains(outer);
-    });
-  });
-}
-
-function joinMarkdown(elements: Element[], preserveLineBreaks = false): string {
-  return elements
-    .map((el) => domToMarkdown(el, { skip: CHATGPT_SELECTORS.messageChrome, preserveLineBreaks }))
-    .filter(Boolean)
-    .join('\n\n');
+  return turn.nodes.flatMap((node) => outermost(node, selector));
 }
 
 /** '' while the model is still thinking. */
-function markdownText(turn: GptTurn): string {
-  return joinMarkdown(outermostMatches(turn, CHATGPT_SELECTORS.assistantMarkdown));
+function readAnswerMarkdown(turn: GptTurn): string {
+  return joinMarkdown(outermostMatches(turn, CHATGPT_SELECTORS.assistantMarkdown), {
+    skip: CHATGPT_MESSAGE_CHROME,
+  });
 }
 
-function turnText(turn: GptTurn): string {
+function readTurnText(turn: GptTurn): string {
   if (turn.role === 'assistant') {
-    return markdownText(turn) || joinMarkdown(turn.nodes);
+    return readAnswerMarkdown(turn) || joinMarkdown(turn.nodes, { skip: CHATGPT_MESSAGE_CHROME });
   }
+  const options = { skip: CHATGPT_MESSAGE_CHROME, preserveLineBreaks: true };
   return (
-    joinMarkdown(outermostMatches(turn, CHATGPT_SELECTORS.userBubble), true) ||
-    joinMarkdown(turn.nodes, true)
+    joinMarkdown(outermostMatches(turn, CHATGPT_SELECTORS.userBubble), options) ||
+    joinMarkdown(turn.nodes, options)
   );
 }
 
-function turnAttachments(turn: GptTurn): AttachmentKind[] {
+function readTurnAttachments(turn: GptTurn | undefined): AttachmentKind[] {
+  if (!turn || turn.role !== 'user') return [];
   const containers = new Set(
     turn.nodes.map((node) => node.closest(CHATGPT_SELECTORS.userTurnContainer) ?? node),
   );
   return readAttachments([...containers], CHATGPT_SELECTORS.attachmentTile);
 }
 
-function effortFromWords(lower: string): ThinkingEffort | null {
-  if (/\b(heavy|extended|high)\b/.test(lower)) return 'high';
-  if (/\b(standard|medium)\b/.test(lower)) return 'medium';
-  if (/\b(light|low)\b/.test(lower)) return 'low';
-  return null;
+function parseEffort(lower: string): ThinkingEffort | null {
+  return EFFORT_PATTERNS.find(([, regex]) => regex.test(lower))?.[0] ?? null;
 }
 
 /**
  * Parses slugs like "gpt-4o", "gpt-5-1-thinking", "o4-mini-high". `uiLabel` supplies the effort
  * when the slug doesn't carry it (e.g. "Thinking · Extended" in the model picker).
  */
-function parseChatGptSlug(slug: string, uiLabel: string): ModelInfo {
+function parseSlug(slug: string, uiLabel: string): ModelInfo {
   const lower = slug.toLowerCase();
   const words = lower.replace(/[-_]/g, ' ');
-  const labelEffort = effortFromWords(uiLabel.toLowerCase());
+  const labelEffort = parseEffort(uiLabel.toLowerCase());
+  const reasoningEffort = parseEffort(words) ?? labelEffort ?? THINKING_DETECTED_EFFORT;
 
-  if (/^o\d/.test(lower)) {
-    const version = lower.match(/^(o\d+(?:-mini|-pro)?)/)?.[1] ?? lower;
-    return {
-      name: O_SERIES,
-      version,
-      thinkingEffort: effortFromWords(words) ?? labelEffort ?? THINKING_DETECTED_EFFORT,
-      rawLabel: slug,
-    };
+  if (SLUG.oSeries.test(lower)) {
+    const version = lower.match(SLUG.oSeriesVersion)?.[1] ?? lower;
+    return { name: O_SERIES, version, thinkingEffort: reasoningEffort, rawLabel: slug };
   }
 
-  const v = lower.match(/^gpt-(\d+)(?:[.-](\d+))?([a-z])?/);
+  const v = lower.match(SLUG.gptVersion);
   const version = v ? `${v[1]}${v[2] ? `.${v[2]}` : ''}${v[3] ?? ''}` : 'unknown';
-
-  let thinkingEffort: ThinkingEffort;
-  if (/\b(thinking|t|pro)\b/.test(words)) {
-    thinkingEffort = effortFromWords(words) ?? labelEffort ?? THINKING_DETECTED_EFFORT;
-  } else {
-    // Instant / chat / 4o-style answers: the router picked a non-reasoning model.
-    thinkingEffort = 'none';
-  }
-
+  // No reasoning marker: the router picked a non-reasoning model (instant / chat / 4o).
+  const thinkingEffort = SLUG.reasoning.test(words) ? reasoningEffort : 'none';
   return { name: GPT, version, thinkingEffort, rawLabel: slug };
 }
 
@@ -230,34 +252,29 @@ function parseChatGptSlug(slug: string, uiLabel: string): ModelInfo {
  * Parses picker labels like "ChatGPT 4o", "o3-mini-high", "ChatGPT 5 Thinking". Fallback for when
  * no message carries a model slug.
  */
-function parseChatGptModel(rawLabel: string, hasThinkingToggle: boolean): ModelInfo {
-  const cleaned = rawLabel.trim();
-  const lower = cleaned.toLowerCase();
+function parseModel(rawLabel: string, hasThinkingSignal: boolean): ModelInfo {
+  const label = rawLabel.trim();
+  const lower = label.toLowerCase();
+  const { nonReasoning, reasoning } = MODELS.label;
 
-  let thinkingEffort: ThinkingEffort = hasThinkingToggle ? THINKING_DETECTED_EFFORT : 'unknown';
-  const effort = effortFromWords(lower);
+  let thinkingEffort: ThinkingEffort = hasThinkingSignal ? THINKING_DETECTED_EFFORT : 'unknown';
+  const effort = parseEffort(lower);
   if (effort) {
     thinkingEffort = effort;
-  } else if (lower.includes('instant') || lower.includes('non-reasoning') || lower.includes('4o')) {
-    thinkingEffort = hasThinkingToggle ? THINKING_DETECTED_EFFORT : 'none';
+  } else if (nonReasoning.some((word) => lower.includes(word))) {
+    thinkingEffort = hasThinkingSignal ? THINKING_DETECTED_EFFORT : 'none';
   } else if (
-    lower.includes('thinking') ||
-    lower.includes('pro') ||
-    /\bo[134]\b/.test(lower) ||
-    /\b5(?:\.\d+)?\b/.test(lower)
+    reasoning.some((word) => lower.includes(word)) ||
+    LABEL.reasoningPatterns.some((regex) => regex.test(lower))
   ) {
     thinkingEffort = THINKING_DETECTED_EFFORT;
   }
 
-  const versionMatch = cleaned.match(/(\d+(?:\.\d+)?[a-z]*|o\d+(?:-\w+)?)/i);
-  const version = versionMatch?.[1] ?? 'unknown';
-  const name = lower.startsWith('o') || /\bo[134]/.test(lower) ? O_SERIES : GPT;
-
   return {
-    name,
-    version,
+    name: LABEL.oSeries.test(lower) ? O_SERIES : GPT,
+    version: label.match(LABEL.version)?.[1] ?? 'unknown',
     thinkingEffort,
-    rawLabel: cleaned || 'unknown',
+    rawLabel: label,
   };
 }
 
@@ -269,75 +286,59 @@ export const chatgptSite: SiteAdapter = {
   },
 
   readModel(): ModelInfo {
-    const uiLabel = extractCleanText(document.querySelector(CHATGPT_SELECTORS.modelSelector));
-
+    const uiLabel = readText(document.querySelector(CHATGPT_SELECTORS.modelSelector));
     const turn = latestAssistantTurn();
+
     const slug = turn?.nodes
       .map((node) => node.getAttribute(CHATGPT_SELECTORS.modelSlugAttr))
       .filter((s): s is string => Boolean(s))
       .pop();
-    if (slug) {
-      return parseChatGptSlug(slug, uiLabel);
-    }
+    if (slug) return parseSlug(slug, uiLabel);
 
-    const hasThinkingToggle = document.querySelector(CHATGPT_SELECTORS.thinkingBadge) !== null;
-    if (!uiLabel) {
-      return {
-        name: GPT,
-        version: 'unknown',
-        thinkingEffort: hasThinkingToggle ? THINKING_DETECTED_EFFORT : 'unknown',
-        rawLabel: 'unknown',
-      };
-    }
-    return parseChatGptModel(uiLabel, hasThinkingToggle);
+    const hasThinkingSignal =
+      hasMatch(turn?.nodes ?? [], CHATGPT_SELECTORS.thinkingBadge) ||
+      document.querySelector(CHATGPT_SELECTORS.thinkingToggle) !== null;
+    return uiLabel ? parseModel(uiLabel, hasThinkingSignal) : unknownModel(GPT, hasThinkingSignal);
   },
 
   readUserInput(): string {
-    const userTurns = readTurns().filter((turn) => turn.role === 'user');
-    const latest = userTurns[userTurns.length - 1];
-    return latest ? turnText(latest) : '';
+    const latest = latestTurnOf('user');
+    return latest ? readTurnText(latest) : '';
   },
 
   readUserAttachments(): AttachmentKind[] {
-    const userTurns = readTurns().filter((turn) => turn.role === 'user');
-    const latest = userTurns[userTurns.length - 1];
-    return latest ? turnAttachments(latest) : [];
+    return readTurnAttachments(latestTurnOf('user'));
   },
 
   readResponse(): string {
     const turn = latestAssistantTurn();
-    return turn ? turnText(turn) : '';
+    return turn ? readTurnText(turn) : '';
   },
 
   readArtifactText(): string {
-    const turn = latestAssistantTurn();
-    return turn
-      ? readArtifactText(
-          turn.nodes,
-          CHATGPT_SELECTORS.artifactCard,
-          CHATGPT_SELECTORS.artifactPanel,
-        )
-      : '';
+    return readArtifactText(
+      latestAssistantTurn()?.nodes ?? [],
+      CHATGPT_SELECTORS.artifactCard,
+      CHATGPT_SELECTORS.artifactPanel,
+    );
   },
 
   readToolCalls(): ToolCallKind[] {
-    const turn = latestAssistantTurn();
-    return turn ? readToolCalls(turn.nodes, CHATGPT_TOOLS) : [];
+    return readToolCalls(latestAssistantTurn()?.nodes ?? [], CHATGPT_TOOLS);
   },
 
   readHistory(): ChatTurn[] {
-    const turns = readTurns();
-    // The latest user turn and its answer are the prompt being captured, not history.
-    let lastUser = -1;
-    turns.forEach((turn, i) => {
-      if (turn.role === 'user') lastUser = i;
-    });
-    return turns.slice(0, Math.max(0, lastUser)).flatMap((turn): ChatTurn[] => {
-      const text = turnText(turn);
-      const attachments = turn.role === 'user' ? turnAttachments(turn) : [];
-      if (!text && attachments.length === 0) return [];
-      return [{ role: turn.role, text, ...(attachments.length ? { attachments } : {}) }];
-    });
+    return buildHistory(readTurns(), (turn) =>
+      makeTurn(turn.role, readTurnText(turn), readTurnAttachments(turn)),
+    );
+  },
+
+  countUserMessages(): number {
+    return readTurns().filter((turn) => turn.role === 'user').length;
+  },
+
+  countResponses(): number {
+    return readTurns().filter((turn) => turn.role === 'assistant').length;
   },
 
   isGenerating(): boolean {
@@ -347,11 +348,10 @@ export const chatgptSite: SiteAdapter = {
     return (
       turn?.nodes.some(
         (node) =>
-          node.matches(CHATGPT_SELECTORS.streamingIndicator) ||
-          node.querySelector(CHATGPT_SELECTORS.streamingIndicator) !== null ||
+          matchesOrContains(node, CHATGPT_SELECTORS.streamingIndicator) ||
           node.hasAttribute(CHATGPT_SELECTORS.messageStreamingAttr) ||
           // Web-mobile shell: an assistant message without the "complete" flag is still running.
-          (node.getAttribute('data-message-role') === 'assistant' &&
+          (node.getAttribute(CHATGPT_SELECTORS.mobileRoleAttr) === 'assistant' &&
             !node.hasAttribute(CHATGPT_SELECTORS.messageCompleteAttr)),
       ) ?? false
     );
@@ -360,15 +360,7 @@ export const chatgptSite: SiteAdapter = {
   isStreamingVisibleText(): boolean {
     // Only rendered markdown counts, not the "Thinking…" placeholder.
     const turn = latestAssistantTurn();
-    return turn ? markdownText(turn).length > 0 : false;
-  },
-
-  countUserMessages(): number {
-    return readTurns().filter((turn) => turn.role === 'user').length;
-  },
-
-  countResponses(): number {
-    return readTurns().filter((turn) => turn.role === 'assistant').length;
+    return turn ? readAnswerMarkdown(turn).length > 0 : false;
   },
 
   isPromptInput(target: Element): boolean {

@@ -1,5 +1,5 @@
 /**
- * HistoryPage: list of saved prompts. Empty for now.
+ * HistoryPage: list of saved prompts (placeholder).
  *
  * Context: app page
  * Docs: docs/modules.md#ui

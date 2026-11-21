@@ -1,11 +1,12 @@
 /**
- * Total: the summed token count, the popup's headline number.
+ * Total: the summed token count, the headline number.
  *
  * Context: popup
  * Docs: docs/modules.md#ui
  */
 
 import { Coins } from 'lucide-react';
+import { formatCount } from '../format.helpers';
 
 interface TotalProps {
   /** `undefined` while loading. */
@@ -14,10 +15,10 @@ interface TotalProps {
 
 export function Total({ totalTokens }: TotalProps) {
   return (
-    <section className="total">
+    <div className="total">
       <Coins />
-      <span className="total-value">{totalTokens?.toLocaleString() ?? '–'}</span>
-      <span className="total-label">tokens</span>
-    </section>
+      <span className="total-value">{formatCount(totalTokens)}</span>
+      <span>tokens</span>
+    </div>
   );
 }

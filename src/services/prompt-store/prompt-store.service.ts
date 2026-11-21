@@ -1,6 +1,7 @@
 /**
  * PromptStoreService: one row per estimated prompt in the SQLite `prompts` table, plus usage
- * queries for the popup. Metrics only, never chat text (ADR 0009).
+ * queries for the popup.
+ * Metrics only, never chat text (ADR 0009).
  *
  * Context: background
  * Docs: docs/modules.md#prompt-store-service
@@ -41,7 +42,10 @@ const CREATE_SCHEMA = `
   CREATE INDEX IF NOT EXISTS prompts_captured_at ON prompts (captured_at);
 `;
 
-/** Columns added after the first release: `ALTER TABLE` for databases created before them. */
+/**
+ * Columns added after the first release: `ALTER TABLE` migrates databases created before them.
+ * They are also in `CREATE_SCHEMA`, which only applies to new databases.
+ */
 const ADDED_COLUMNS: { name: string; definition: string }[] = [
   { name: 'tool_tokens', definition: 'INTEGER NOT NULL DEFAULT 0' },
 ];

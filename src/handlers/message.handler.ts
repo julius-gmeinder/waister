@@ -1,5 +1,7 @@
 /**
- * Routes runtime messages to their handler.
+ * MessageHandler: routes a runtime message to its handler.
+ * Returns `undefined` for an unrecognized type, so the listener can decline the message instead of
+ * keeping its channel open.
  *
  * Context: background
  * Docs: docs/modules.md#handlers
@@ -9,7 +11,7 @@ import type { RuntimeMessage } from '../messages/runtime-messages';
 import { handleEstimation } from './estimation.handler';
 import { handleGetUsageSummary } from './usage.handler';
 
-export async function handleRuntimeMessage(message: RuntimeMessage): Promise<unknown> {
+export function handleRuntimeMessage(message: RuntimeMessage): Promise<unknown> | undefined {
   switch (message.type) {
     case 'ESTIMATE_PROMPT':
       return handleEstimation(message.payload);

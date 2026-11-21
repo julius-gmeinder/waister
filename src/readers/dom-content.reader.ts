@@ -1,20 +1,18 @@
 /**
- * Shared DOM readers for message content, used by all site adapters:
+ * DomContentReader: shared DOM readers for message content (markdown, attachments, tool calls,
+ * artifact panels), used by all site adapters.
+ * The model writes (and later re-reads as history) markdown source, but the page shows rendered
+ * HTML. `textContent` would drop the syntax, merge blocks, include UI chrome and repeat KaTeX
+ * formulas, so `domToMarkdown` walks the DOM and reverses the rendering instead.
  *
- * - `domToMarkdown`: serializes a rendered message back to the markdown the model generated.
- *   The model writes (and later re-reads as history) markdown source, while the page shows
- *   rendered HTML. `textContent` drops the syntax (`**`, `#`, `|`, code fences, link URLs),
- *   merges block elements, includes UI chrome (copy buttons, screen-reader labels) and repeats
- *   KaTeX formulas 2–3 times. This walks the DOM and reverses the rendering instead.
- * - `readAttachments`: images and file cards attached to a user turn.
- * - `readToolCalls`: tool calls (web search, code execution, …) visible in an answer.
- * - `readArtifactText`: artifact / canvas side panels belonging to the latest answer.
- *
- * Context: content script
- * Docs: docs/modules.md#dom-content-reader, docs/decisions/0013-rich-message-content.md
+ * Context: content
+ * Docs: docs/modules.md#dom-content-reader
  */
 
+import { capture } from '../config/config.json';
 import type { AttachmentKind, ToolCallKind } from '../dto/chat-capture.dto';
+
+const { maxIconPx } = capture.attachments;
 
 /**
  * Never part of the message text: controls, icons, media, hidden and screen-reader-only nodes.
@@ -42,42 +40,42 @@ const CHROME_SELECTOR = [
   '[role="tooltip"]',
   '.sr-only',
   '.visually-hidden',
-  '.cdk-visually-hidden',
+  '.cdk-visually-hidden', // Angular CDK (Gemini)
 ].join(', ');
 
 /** Containers that start a new line. Everything else not handled explicitly is inline. */
 const BLOCK_TAGS = new Set([
-  'DIV',
-  'SECTION',
-  'ARTICLE',
-  'MAIN',
-  'HEADER',
-  'FOOTER',
-  'ASIDE',
-  'NAV',
-  'FIGURE',
-  'FIGCAPTION',
-  'DETAILS',
-  'SUMMARY',
-  'DL',
-  'DT',
-  'DD',
-  'FORM',
-  'FIELDSET',
-  'LI',
+  'div',
+  'section',
+  'article',
+  'main',
+  'header',
+  'footer',
+  'aside',
+  'nav',
+  'figure',
+  'figcaption',
+  'details',
+  'summary',
+  'dl',
+  'dt',
+  'dd',
+  'form',
+  'fieldset',
+  'li',
 ]);
 
 /**
  * Private-use placeholders for whitespace that must survive normalization (code blocks, list
  * indentation, line breaks typed by the user). Restored at the very end.
  */
-const KEEP_SPACE = '\uE000';
-const KEEP_TAB = '\uE001';
-const KEEP_NEWLINE = '\uE002';
+const KEEP_SPACE = '';
+const KEEP_TAB = '';
+const KEEP_NEWLINE = '';
 const LIST_INDENT = KEEP_SPACE.repeat(2);
 
-/** Images at most this many px wide and high are icons/avatars, not attachments. */
-const MAX_ICON_PX = 48;
+/** Whitespace-only text between user paragraphs keeps at most one blank line. */
+const MAX_GAP_NEWLINES = 2;
 
 export interface MarkdownOptions {
   /** Extra selector for site chrome to drop (thinking drawers, tool blocks, artifact cards). */
@@ -86,12 +84,24 @@ export interface MarkdownOptions {
   preserveLineBreaks?: boolean;
 }
 
+export interface ToolSelectors {
+  /** Each outermost match is one web search / browse call. */
+  search: string;
+  /** Each outermost match is one code execution call. */
+  code: string;
+  /** Each outermost match is one other tool call. */
+  other: string;
+  /** Shown when an answer used web search (citations, source chips): at least one search. */
+  searchEvidence: string;
+}
+
 interface RenderContext {
   skip: string;
   listDepth: number;
   preserveLineBreaks: boolean;
 }
 
+/** Markdown reconstructed from the rendered `root`, with UI chrome removed. */
 export function domToMarkdown(
   root: Element | null | undefined,
   options: MarkdownOptions = {},
@@ -105,12 +115,96 @@ export function domToMarkdown(
   return normalize(renderChildren(root, ctx));
 }
 
-function normalize(raw: string): string {
+/**
+ * Matches of `selector` at or inside `root`, without ones nested in another match. If `root`
+ * itself matches it is the only result. An empty selector matches nothing.
+ */
+export function outermost(root: Element, selector: string): Element[] {
+  if (!selector) return [];
+  if (root.matches(selector)) return [root];
+  return Array.from(root.querySelectorAll(selector)).filter((el) => {
+    const outer = el.parentElement?.closest(selector);
+    return !outer || !root.contains(outer);
+  });
+}
+
+/**
+ * Attachments of one user turn. Every outermost `fileSelector` match is one attachment: an
+ * image if it shows a content image (image upload thumbnail), otherwise a file (document,
+ * pasted-content card). Content images outside such cards count as images.
+ */
+export function readAttachments(roots: readonly Element[], fileSelector: string): AttachmentKind[] {
+  const kinds: AttachmentKind[] = [];
+  for (const root of roots) {
+    const images = Array.from(root.querySelectorAll('img')).filter(isContentImage);
+    const tiles = outermost(root, fileSelector);
+    for (const tile of tiles) {
+      kinds.push(images.some((img) => tile.contains(img)) ? 'image' : 'file');
+    }
+    for (const img of images) {
+      if (!tiles.some((tile) => tile.contains(img))) kinds.push('image');
+    }
+  }
+  return kinds;
+}
+
+/** Tool calls visible in the latest answer (`roots` = its role nodes). */
+export function readToolCalls(roots: readonly Element[], selectors: ToolSelectors): ToolCallKind[] {
+  const count = (selector: string) =>
+    roots.reduce((sum, root) => sum + outermost(root, selector).length, 0);
+  const repeat = (kind: ToolCallKind, times: number): ToolCallKind[] =>
+    Array.from({ length: times }, () => kind);
+
+  const searches = count(selectors.search);
+  const hasSearchEvidence = roots.some((root) => hasMatch(root, selectors.searchEvidence));
+  // Citations without a recognizable search block still mean at least one search happened.
+  const searchCount = searches > 0 ? searches : hasSearchEvidence ? 1 : 0;
+
+  return [
+    ...repeat('search', searchCount),
+    ...repeat('code', count(selectors.code)),
+    ...repeat('other', count(selectors.other)),
+  ];
+}
+
+/**
+ * Content of artifact / canvas side panels, but only if the latest answer (`roots`) contains an
+ * artifact card, so a panel left open from an earlier turn isn't counted for an unrelated answer.
+ * The panel lives outside the message, so without this the document counts as a few tokens.
+ */
+export function readArtifactText(
+  roots: readonly Element[],
+  cardSelector: string,
+  panelSelector: string,
+): string {
+  if (!roots.some((root) => hasMatch(root, cardSelector))) return '';
+  return outermost(document.body, panelSelector)
+    .filter((panel) => !roots.some((root) => root.contains(panel)))
+    .map((panel) => domToMarkdown(panel))
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+/** True if `root` or anything inside it matches `selector`. An empty selector matches nothing. */
+function hasMatch(root: Element, selector: string): boolean {
+  return selector !== '' && (root.matches(selector) || root.querySelector(selector) !== null);
+}
+
+/**
+ * Collapses runs of spaces/tabs, trims spaces around newlines and caps consecutive blank lines.
+ * Callers pick the cap: paragraphs allow 1, list items 0.
+ */
+function collapseWhitespace(raw: string, maxBlankLines: number): string {
   return raw
     .replace(/[ \t\r\f\v]+/g, ' ')
     .replace(/ *\n */g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+    .replace(new RegExp(`\\n{${maxBlankLines + 2},}`, 'g'), '\n'.repeat(maxBlankLines + 1))
+    .trim();
+}
+
+/** Final pass over the rendered markdown: collapse whitespace, then restore the KEEP_* nodes. */
+function normalize(raw: string): string {
+  return collapseWhitespace(raw, 1)
     .split(KEEP_SPACE)
     .join(' ')
     .split(KEEP_TAB)
@@ -143,14 +237,22 @@ function surround(text: string, open: string, close: string = open): string {
 
 function renderChildren(element: Element, ctx: RenderContext): string {
   let out = '';
-  for (const child of Array.from(element.childNodes)) {
+  for (const child of element.childNodes) {
     out += renderNode(child, ctx);
   }
   return out;
 }
 
 function renderText(text: string, ctx: RenderContext): string {
-  if (!ctx.preserveLineBreaks || !text.trim()) return text.replace(/\s+/g, ' ');
+  const collapsed = text.replace(/\s+/g, ' ');
+  if (!ctx.preserveLineBreaks) return collapsed;
+
+  if (!text.trim()) {
+    // Whitespace-only node: a plain gap between inline nodes, unless it carries the line breaks
+    // between two user paragraphs.
+    const lineBreaks = text.match(/\r\n?|\n/g)?.length ?? 0;
+    return lineBreaks > 0 ? KEEP_NEWLINE.repeat(Math.min(lineBreaks, MAX_GAP_NEWLINES)) : collapsed;
+  }
   return text
     .replace(/\r\n?/g, '\n')
     .replace(/[^\S\n]+/g, ' ')
@@ -161,50 +263,53 @@ function renderNode(node: Node, ctx: RenderContext): string {
   if (node.nodeType === Node.TEXT_NODE) return renderText(node.textContent ?? '', ctx);
   if (!(node instanceof Element)) return '';
 
+  // Before the skip check: KaTeX / MathJax wrap their rendering in aria-hidden nodes, but we want
+  // the TeX source from the annotation.
   const math = renderMath(node);
   if (math !== null) return math;
   if (node.matches(ctx.skip)) return '';
 
-  const tag = node.tagName.toUpperCase();
+  const tag = node.localName;
   switch (tag) {
-    case 'BR':
+    case 'br':
       return ctx.preserveLineBreaks ? KEEP_NEWLINE : '\n';
-    case 'HR':
+    case 'hr':
       return block('---');
-    case 'H1':
-    case 'H2':
-    case 'H3':
-    case 'H4':
-    case 'H5':
-    case 'H6': {
+    case 'h1':
+    case 'h2':
+    case 'h3':
+    case 'h4':
+    case 'h5':
+    case 'h6': {
       const text = renderChildren(node, ctx).replace(/\s+/g, ' ').trim();
       return text ? block(`${'#'.repeat(Number(tag[1]))} ${text}`) : '';
     }
-    case 'P':
+    case 'p':
       return block(renderChildren(node, ctx));
-    case 'PRE':
+    case 'pre':
       return block(renderCodeBlock(node));
-    case 'UL':
-    case 'OL':
+    case 'ul':
+    case 'ol':
       return block(renderList(node, ctx));
-    case 'BLOCKQUOTE': {
-      const inner = normalizeForPrefix(renderChildren(node, ctx));
+    case 'blockquote': {
+      const inner = collapseWhitespace(renderChildren(node, ctx), 1);
       return inner ? block(inner.replace(/^/gm, '> ')) : '';
     }
-    case 'TABLE':
+    case 'table':
       return block(renderTable(node, ctx));
-    case 'STRONG':
-    case 'B':
+    case 'strong':
+    case 'b':
       return surround(renderChildren(node, ctx), '**');
-    case 'EM':
-    case 'I':
+    case 'em':
+    case 'i':
       return surround(renderChildren(node, ctx), '*');
-    case 'DEL':
-    case 'S':
+    case 'del':
+    case 's':
       return surround(renderChildren(node, ctx), '~~');
-    case 'CODE':
+    case 'code':
+      // Backticks inside inline code aren't escaped: negligible for token counts.
       return surround(node.textContent ?? '', '`');
-    case 'A':
+    case 'a':
       return renderLink(node, ctx);
     default: {
       const content = renderChildren(node, ctx);
@@ -213,20 +318,11 @@ function renderNode(node: Node, ctx: RenderContext): string {
   }
 }
 
-/** Collapses a rendered fragment so every line can be prefixed (blockquotes). */
-function normalizeForPrefix(raw: string): string {
-  return raw
-    .replace(/[ \t]+/g, ' ')
-    .replace(/ *\n */g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
 /** TeX source of a KaTeX / MathJax / Gemini formula, or null if `el` is not a formula. */
 function renderMath(el: Element): string | null {
   const dataMath = el.getAttribute('data-math');
   if (dataMath !== null) {
-    const display = el.classList.contains('math-block') || el.tagName.toUpperCase() === 'DIV';
+    const display = el.classList.contains('math-block') || el.localName === 'div';
     return display ? block(`$$${dataMath}$$`) : `$${dataMath}$`;
   }
 
@@ -264,31 +360,31 @@ function renderCodeBlock(pre: Element): string {
 }
 
 function renderList(list: Element, ctx: RenderContext): string {
-  const ordered = list.tagName.toUpperCase() === 'OL';
+  const ordered = list.localName === 'ol';
   let index = Number(list.getAttribute('start') ?? '1') || 1;
   const indent = LIST_INDENT.repeat(ctx.listDepth);
   const items: string[] = [];
 
-  for (const item of Array.from(list.children)) {
-    if (item.tagName.toUpperCase() !== 'LI' || item.matches(ctx.skip)) continue;
-    const body = renderChildren(item, { ...ctx, listDepth: ctx.listDepth + 1 })
-      .replace(/[ \t]+/g, ' ')
-      .replace(/ *\n */g, '\n')
-      .replace(/\n{2,}/g, '\n')
-      .trim();
+  for (const item of list.children) {
+    if (item.localName !== 'li' || item.matches(ctx.skip)) continue;
+    const body = collapseWhitespace(
+      renderChildren(item, { ...ctx, listDepth: ctx.listDepth + 1 }),
+      0,
+    );
     const marker = ordered ? `${index++}. ` : '- ';
     items.push(`${indent}${marker}${body}`);
   }
   return items.join('\n');
 }
 
+/** Pipes in cells and colspan/rowspan aren't handled: negligible for token counts. */
 function renderTable(table: Element, ctx: RenderContext): string {
   const rows = Array.from(table.querySelectorAll('tr')).filter(
     (row) => row.closest('table') === table,
   );
   const lines = rows.map((row) => {
     const cells = Array.from(row.children)
-      .filter((cell) => ['TD', 'TH'].includes(cell.tagName.toUpperCase()))
+      .filter((cell) => cell.localName === 'td' || cell.localName === 'th')
       .map((cell) => renderChildren(cell, ctx).replace(/\s+/g, ' ').trim());
     return `| ${cells.join(' | ')} |`;
   });
@@ -307,87 +403,9 @@ function renderLink(anchor: Element, ctx: RenderContext): string {
   return surround(text, '[', `](${href})`);
 }
 
-/** Matches of `selector` inside `root`, without ones nested in another match. */
-function outermost(root: Element, selector: string): Element[] {
-  if (!selector) return [];
-  return Array.from(root.querySelectorAll(selector)).filter((el) => {
-    const outer = el.parentElement?.closest(selector);
-    return !outer || !root.contains(outer);
-  });
-}
-
 function isContentImage(img: HTMLImageElement): boolean {
   const rect = img.getBoundingClientRect();
   const isIcon =
-    rect.width > 0 && rect.height > 0 && rect.width <= MAX_ICON_PX && rect.height <= MAX_ICON_PX;
+    rect.width > 0 && rect.height > 0 && rect.width <= maxIconPx && rect.height <= maxIconPx;
   return !isIcon && img.closest('[aria-hidden="true"], button') === null;
-}
-
-/**
- * Attachments of one user turn. Every outermost `fileSelector` match is one attachment: an
- * image if it shows a content image (image upload thumbnail), otherwise a file (document,
- * pasted-content card). Content images outside such cards count as images.
- */
-export function readAttachments(roots: readonly Element[], fileSelector: string): AttachmentKind[] {
-  const kinds: AttachmentKind[] = [];
-  for (const root of roots) {
-    const tiles = outermost(root, fileSelector);
-    for (const tile of tiles) {
-      kinds.push(Array.from(tile.querySelectorAll('img')).some(isContentImage) ? 'image' : 'file');
-    }
-    for (const img of Array.from(root.querySelectorAll('img'))) {
-      if (tiles.some((tile) => tile.contains(img))) continue;
-      if (isContentImage(img)) kinds.push('image');
-    }
-  }
-  return kinds;
-}
-
-export interface ToolSelectors {
-  /** Each outermost match is one web search / browse call. */
-  search: string;
-  /** Each outermost match is one code execution call. */
-  code: string;
-  /** Each outermost match is one other tool call. */
-  other: string;
-  /** Shown when an answer used web search (citations, source chips): at least one search. */
-  searchEvidence: string;
-}
-
-/** Tool calls visible in the latest answer (`roots` = its role nodes). */
-export function readToolCalls(roots: readonly Element[], selectors: ToolSelectors): ToolCallKind[] {
-  const count = (selector: string) =>
-    roots.reduce((sum, root) => sum + outermost(root, selector).length, 0);
-
-  const searches = count(selectors.search);
-  const hasSearchEvidence =
-    selectors.searchEvidence !== '' &&
-    roots.some((root) => root.querySelector(selectors.searchEvidence) !== null);
-
-  return [
-    ...Array<ToolCallKind>(searches > 0 ? searches : hasSearchEvidence ? 1 : 0).fill('search'),
-    ...Array<ToolCallKind>(count(selectors.code)).fill('code'),
-    ...Array<ToolCallKind>(count(selectors.other)).fill('other'),
-  ];
-}
-
-/**
- * Content of artifact / canvas side panels, but only if the latest answer (`roots`) contains an
- * artifact card, so a panel left open from an earlier turn isn't counted for an unrelated answer.
- * The panel lives outside the message, so without this the document counts as a few tokens.
- */
-export function readArtifactText(
-  roots: readonly Element[],
-  cardSelector: string,
-  panelSelector: string,
-): string {
-  const hasCard = roots.some(
-    (root) => root.matches(cardSelector) || root.querySelector(cardSelector) !== null,
-  );
-  if (!hasCard || !document.body) return '';
-  return outermost(document.body, panelSelector)
-    .filter((panel) => !roots.some((root) => root.contains(panel)))
-    .map((panel) => domToMarkdown(panel))
-    .filter(Boolean)
-    .join('\n\n');
 }

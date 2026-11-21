@@ -5,7 +5,6 @@
  * Docs: docs/modules.md#entries
  */
 
-// Styles: esbuild bundles these (plus the fonts imported by base.css) into popup/index.css.
 import '../ui/base.css';
 import '../ui/components/components.css';
 import '../ui/popup/popup.css';
@@ -14,7 +13,6 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PopupApp } from '../ui/popup/popup.app';
 
-// Loaded with `defer`, so #root is already parsed when this runs.
 const root = document.getElementById('root');
 if (root) {
   createRoot(root).render(

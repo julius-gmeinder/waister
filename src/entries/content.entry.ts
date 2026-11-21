@@ -1,7 +1,7 @@
 /**
- * Content script entry: starts the DOM capture strategy.
+ * ContentEntry: content script entry, starts the DOM capture strategy.
  *
- * Context: content script
+ * Context: content
  * Docs: docs/modules.md#entries
  */
 

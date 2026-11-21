@@ -4,8 +4,12 @@ Reference for every folder and file in `src/`. The code is organized **by layer*
 runs in exactly one runtime context or is shared. Import rules are in
 [architecture.md](architecture.md#layers--contexts).
 
-Status: the pipeline is implemented end to end. The tokenizers are character-based
-approximations, and the readers depend on each site's current DOM.
+Status: the pipeline is implemented end to end. The tokenizer is a character-based
+approximation per provider, and the readers depend on each site's current DOM.
+
+Every file starts with the same header: `<ModuleName>: <one line>`, `Context:` and a `Docs:`
+anchor that points at a heading in this file. Don't rename a heading without updating the
+anchors (`grep -rn "Docs: docs/modules.md#" src`).
 
 | Folder                   | Layer                                  | Runs in              |
 | ------------------------ | -------------------------------------- | -------------------- |
@@ -27,7 +31,7 @@ approximations, and the readers depend on each site's current DOM.
 
 | File                  | Bundle                  | Context    | Wires up                                        |
 | --------------------- | ----------------------- | ---------- | ----------------------------------------------- |
-| `content.entry.ts`    | `content.js` (IIFE)     | content    | site adapter + reader strategy → chat reader    |
+| `content.entry.ts`    | `content.js` (IIFE)     | content    | `startDomCaptureStrategy()`                     |
 | `background.entry.ts` | `background.js` (ESM)   | background | `chrome.runtime.onMessage` → message handler    |
 | `popup.entry.tsx`     | `popup/index.js` (IIFE) | popup      | imports popup CSS + fonts, mounts `<PopupApp/>` |
 | `app.entry.tsx`       | `app/index.js` (IIFE)   | app page   | imports app CSS + fonts, mounts `<App/>`        |
@@ -36,8 +40,7 @@ approximations, and the readers depend on each site's current DOM.
 imports in the `.entry.tsx` files (TypeScript 6 checks side-effect imports).
 
 Why ESM for the background and IIFE for the others: see
-[build-and-tooling.md](build-and-tooling.md#scriptsbuildmjs). `scripts/build.mjs` still points at
-the old `src/<context>/index.ts` paths, so it has to be updated before the first build.
+[build-and-tooling.md](build-and-tooling.md#scriptsbuildmjs).
 
 ---
 
@@ -50,15 +53,16 @@ The content script stays thin and only sends plain text plus timing.
 ```
 dom-content.reader.ts                Shared DOM -> markdown serializer, attachment, tool-call and artifact readers
 sites/<site>.site.ts                 WHERE: DOM selectors, reads and state checks for one site
+sites/site.helpers.ts                Helpers shared by the adapters (reads, turns, history, model labels)
+sites/effort-inference.helpers.ts    Thinking-effort defaults from config
 strategies/dom-capture.strategy.ts   WHEN: one turn-detection loop for all sites, calculates latencyMs & thinkingTimeMs, builds ChatCaptureDto
-chat.reader.ts                       Re-exports the consolidated strategy facade
 ```
 
 - **A site redesign** only touches that site's adapter (`CHATGPT_SELECTORS`, `CLAUDE_SELECTORS`, `GEMINI_SELECTORS`).
-- **A new chat site** is a new `*.site.ts` that implements `SiteAdapter`, added to `SUPPORTED_SITES` in `dom-capture.strategy.ts`.
+- **A new chat site** is a new `*.site.ts` that implements `SiteAdapter`, added to `SUPPORTED_SITES` (private) in `dom-capture.strategy.ts`.
 
 May import: `dto/`, `messages/`, `config/` (section `capture`). Must not import: `handlers/`,
-`services/`, `ui/`.
+`services/`, `ui/`. Enforced by ESLint.
 
 ### Site adapters
 
@@ -73,12 +77,27 @@ was sent and when its response finished is decided by the strategy
 | `claude.site.ts`  | Claude  | `claude.ai`         | `anthropic` |
 | `gemini.site.ts`  | Gemini  | `gemini.google.com` | `google`    |
 
-`effort-inference.ts` is internal to `sites/`: it reads `capture.effortInference` from
+`effort-inference.helpers.ts` is internal to `sites/`: it reads `capture.effortInference` from
 [`config.json`](#config) and validates the strings. `THINKING_DETECTED_EFFORT` is used when the UI
 shows that thinking is on without a level. `familyDefaultEffort(family)` is used when there is no
 thinking signal (e.g. `claude-haiku` → `none`, `gemini-flash` → `low`, otherwise `unknown`). The
 model names a parser produces are typed `ModelFamily<provider>` (plus a generic fallback like
 `'claude'`), so they can't drift from the rate table.
+
+`site.helpers.ts` holds what the adapters share: `readText`, `latestOf`, `queryOutermost`,
+`joinMarkdown`, `makeTurn`, `buildHistory`, `readTurnNodes`, `unknownModel` and `buildModelInfo` (the
+label parser for Claude and Gemini, driven by `capture.models`).
+
+**Adapter layout** (all three follow it): imports → selector table (not exported) → tool table →
+derived `*_MESSAGE_CHROME` selector → private helpers (`read*`, `parse*`, `latest*`) → the exported
+adapter. Thinking checks look at the latest assistant turn only. Selectors that were derived from
+knowledge of the site but never checked on the live page carry a `// UNVERIFIED:` comment
+(convention in `site-adapter.types.ts`). The Claude adapter is the one with side effects:
+`isPromptInput` and `isSendButton` call `startTurn()` and `isGenerating` calls `tick()` to feed
+its thinking-time aggregator.
+
+Imports of the adapters: `config/` (`capture.models`, `capture.effortInference`),
+`dom-content.reader.ts` (`outermost`, `domToMarkdown`, …) and `dto/`.
 
 Contract (`site-adapter.types.ts`):
 
@@ -126,9 +145,12 @@ Contract (`site-adapter.types.ts`):
 `src/readers/dom-content.reader.ts`: shared helpers used by all three site adapters ([ADR 0013](decisions/0013-rich-message-content.md)):
 
 - `domToMarkdown(root, options)`: walks a message DOM node, skips UI chrome (`button`, `svg`, `.sr-only`, `[aria-hidden="true"]`, plus site-specific chrome selectors), reconstructs markdown syntax (headings, bold/italic/strikethrough, ordered/unordered lists with nesting, blockquotes, pipe tables, `[label](url)` links, inline code, and fenced code blocks with language tags and preserved newlines/indentation), and extracts single TeX strings (`$...$` / `$$...$$`) from KaTeX/MathJax formulas.
-- `readAttachments(roots, fileSelector)`: detects `'image'` and `'file'` attachments on a user turn.
+- `outermost(root, selector)`: the matches at or inside `root` without ones nested in another match (`root` itself counts if it matches, `[]` for an empty selector).
+- `readAttachments(roots, fileSelector)`: detects `'image'` and `'file'` attachments on a user turn. Images up to `capture.attachments.maxIconPx` count as icons, not attachments.
 - `readToolCalls(roots, selectors)`: detects `'search'`, `'code'` and `'other'` tool calls on the latest assistant turn.
 - `readArtifactText(roots, cardSelector, panelSelector)`: serializes the open artifact / canvas side panel when the latest answer contains an artifact card.
+
+`hasMatch` and `collapseWhitespace` are private to this file.
 
 ### Reader strategies
 
@@ -136,12 +158,15 @@ Contract (`site-adapter.types.ts`):
 adapters. It builds the DTO only once the response has completely finished (`t1`). Timing details:
 [pipeline.md](pipeline.md#1-reader--consolidated-strategy-content-script).
 
-| File                      | Strategy                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dom-capture.strategy.ts` | Default consolidated strategy. Resolves the active `SiteAdapter`, detects `{ t0, tStreamStart, t1 }` with `observeTurns`, computes `latencyMs` and `thinkingTimeMs`, reads `conversationUrl` (`location.origin + location.pathname` at `t1`), builds `ChatCaptureDto`, and sends it via `ESTIMATE_PROMPT` to `handleEstimation` in `estimation.handler.ts`. Logs `[waister]` lines to the page console: the send, each change of the detected state while a prompt is in flight (`generating`, user/response counts vs. baseline, response length), the capture, and why a prompt was dropped. |
+| File                      | Strategy                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dom-capture.strategy.ts` | The one strategy. Exports only `startDomCaptureStrategy(onCapture?)`. Resolves the active `SiteAdapter` (`SUPPORTED_SITES`), detects `{ t0, tStreamStart, t1 }` with `observeTurns` (built on `createDebouncedTimer` and `createStateLogger`; `markPromptSent` calls `reset()`, which also clears `lastActivity`), computes `latencyMs` and `thinkingTimeMs`, reads `conversationUrl` (`location.origin + location.pathname` at `t1`), builds `ChatCaptureDto`, and sends it via `ESTIMATE_PROMPT` to `handleEstimation` in `estimation.handler.ts`. Logs `[waister]` lines to the page console: the send, each change of the detected state while a prompt is in flight (`generating`, user/response counts vs. baseline, response length), the capture, and why a prompt was dropped. |
 
-Contract (`reader-strategy.types.ts`): `start(onCapture?, host?, customAdapters?)`, plus the
-`TurnTimings` type `{ t0, tStreamStart, t1 }`.
+`reader-strategy.types.ts` holds the types `TurnTimings` (`{ t0, tStreamStart, t1 }`) and
+`OnCaptureReady`. There is no strategy interface: `observeTurns`, `buildChatCaptureDto`,
+`resolveSiteAdapter` and `SUPPORTED_SITES` are private, and `content.entry.ts` calls
+`startDomCaptureStrategy()` directly (see the update in
+[ADR 0008](decisions/0008-turn-detection-in-strategy.md)).
 
 The detection timings (settle, text-stable, check delay, poll, stale prompt) come from
 `config.json` → `capture.timings`.
@@ -154,16 +179,16 @@ The detection timings (settle, text-stable, check delay, poll, stale prompt) com
 right order and return a result. They hold no domain logic of their own (no tokenizing, no
 estimation formulas).
 
-| File                    | Role                                                                                                                                                                                                                                                                                                                 |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `message.handler.ts`    | Routes each `chrome.runtime` message by `type` to the matching handler: `ESTIMATE_PROMPT` → EstimationHandler, `GET_USAGE_SUMMARY` → UsageHandler.                                                                                                                                                                   |
-| `estimation.handler.ts` | **EstimationHandler**: `ChatCaptureDto` → `PromptRecordDto`. Gets visible counts from the TokenizerService and hidden counts from the EstimationService, has the EstimationService build the `TokenEstimateDto` (`totalTokens`), then has the PromptStoreService add a UUID + the conversation URL and save the row. |
-| `usage.handler.ts`      | **UsageHandler**: `handleGetUsageSummary(sinceMs)` → `UsageSummaryDto`, read straight from the PromptStoreService. No link to the estimation pipeline.                                                                                                                                                               |
+| File                    | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `message.handler.ts`    | Routes each `chrome.runtime` message by `type` to the matching handler: `ESTIMATE_PROMPT` → EstimationHandler, `GET_USAGE_SUMMARY` → UsageHandler. Returns `undefined` for an unknown type, so `background.entry.ts` answers `false` and doesn't keep the channel open.                                                                                                                                                                                                                   |
+| `estimation.handler.ts` | **EstimationHandler**: `ChatCaptureDto` → `PromptRecordDto`. Gets visible counts from the TokenizerService and hidden counts from the EstimationService, has the EstimationService build the `TokenEstimateDto` (`totalTokens`), then has the PromptStoreService add a UUID + the conversation URL and save the row. `normalizeCaptureDto` first trims the text, clamps negative times, drops attachment and tool kinds it doesn't know (they count 0) and throws on an unknown provider. |
+| `usage.handler.ts`      | **UsageHandler**: `handleGetUsageSummary(sinceMs)` → `UsageSummaryDto`, read straight from the PromptStoreService. No link to the estimation pipeline.                                                                                                                                                                                                                                                                                                                                    |
 
 Style: plain exported functions (no classes). Services are imported directly. Pipeline details:
 [pipeline.md](pipeline.md).
 
-May import: `services/`, `dto/`, `messages/`. Must not import: `readers/`, `ui/`.
+May import: `services/`, `dto/`, `messages/`. Must not import: `readers/`, `ui/`. Enforced by ESLint.
 
 ---
 
@@ -188,22 +213,26 @@ Rules:
 - Other layers import a service only through its `*.service.ts` facade.
 
 May import: `dto/`, `config/` (sections `estimation`, `tokenizer`). Must not import: `handlers/`,
-`readers/`, `ui/`, `messages/`.
+`readers/`, `ui/`, `messages/`. Enforced by ESLint.
 
 ### Tokenizer service
 
-`src/services/tokenizer/`: counts the **visible** tokens for `userInput` (plus `userAttachments`), `response` (plus `artifactText`) and each `chatHistory[]` turn (plus turn `attachments`). All parameters, including per-turn framing tokens and per-attachment token estimates, come from [`config.json`](#config) → `tokenizer.<provider>`, and `countWhitespaceTokens` adds ~1 token per newline run and leading indentation run. Hidden tokens are not counted here (see [EstimationService](#estimation-service)).
+`src/services/tokenizer/`: counts the **visible** tokens for `userInput` (plus `userAttachments`), `response` (plus `artifactText`) and each `chatHistory[]` turn (plus turn `attachments`). All parameters, including per-turn framing tokens and per-attachment token estimates, come from [`config.json`](#config) → `tokenizer.<provider>`. The calibration notes for each provider are JSDoc in `config.types.ts`. Hidden tokens are not counted here (see [EstimationService](#estimation-service)).
 
-| File                     | Provider    | Role / Difference across sites                                                                                                                      |
-| ------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tokenizer.service.ts`   | (router)    | `countVisibleTokens(capture)` → `{ input, history, output, approximate }`, built from `countInputTokens`, `countHistoryTokens`, `countOutputTokens` |
-| `heuristic.tokenizer.ts` | (shared)    | `createHeuristicTokenizer(params)`: the one character-based algorithm (letter runs, digit chunks, symbol runs), parameterized per provider          |
-| `openai.tokenizer.ts`    | `openai`    | Calibrated for OpenAI's `o200k_base` BPE (~4.0 chars/token, 1–3 digit number chunks) + 4 ChatML turn-framing tokens                                 |
-| `anthropic.tokenizer.ts` | `anthropic` | Calibrated for Claude's BPE (~3.7 chars/token, denser subword splits) + 5 turn-framing tokens                                                       |
-| `google.tokenizer.ts`    | `google`    | Calibrated for Gemini's 256k SentencePiece unigram vocabulary (~4.1 chars/token) + 4 turn-delimiter tokens                                          |
+| File                     | Role                                                                                                                                                                                                  |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tokenizer.service.ts`   | `countVisibleTokens(capture)` → `{ input, history, output, approximate }`, built from `countInputTokens`, `countHistoryTokens`, `countOutputTokens`. Holds the `COUNTERS: Record<Provider, …>` table. |
+| `heuristic.tokenizer.ts` | `createHeuristicTokenizer(params)`: the one character-based algorithm (letter runs, digit chunks, symbol runs), Unicode-aware (`\p{L}`, `\p{N}`)                                                      |
 
-The provider files only pass their config section to `createHeuristicTokenizer`. A real tokenizer
-can replace one of them without touching the others ([ADR 0006](decisions/0006-per-provider-tokenizers.md)).
+- **One table, not one file per provider:** `COUNTERS` maps each provider to a counter built from
+  its config section. A real tokenizer can replace a single entry without touching the others
+  ([ADR 0006](decisions/0006-per-provider-tokenizers.md)).
+- **Whitespace:** the heuristic ignores it, so `countWhitespaceTokens` adds tokens per newline run
+  and per leading indentation run (`tokenizer.whitespace`: `newlineRunTokens`, `indentRunTokens`,
+  `indentMinSpaces`).
+- **Framing:** each non-empty input and history turn gets `turnFramingTokens`. The new answer gets
+  none. That is an assumption.
+- **Unknown attachment kinds** count 0 (and are dropped earlier by `normalizeCaptureDto`).
 
 ### Estimation service
 
@@ -211,9 +240,9 @@ can replace one of them without touching the others ([ADR 0006](decisions/0006-p
 
 All rates and constants come from [`config.json`](#config) → `estimation`.
 
-- `thinking` = `max(0, thinkingTimeMs − baselineMs) × tokensPerMsThinking × effortMultiplier[thinkingEffort]`
-  (`baselineMs` = 250)
-  (**hidden output**: internal reasoning / chain-of-thought tokens generated by the model before the visible answer starts streaming; scales dynamically with `thinkingTimeMs`).
+- `thinking` = `max(0, min(thinkingTimeMs, latencyMs) − baselineMs) × tokensPerMsThinking × effortMultiplier[thinkingEffort]`,
+  capped at `estimation.thinking.maxTokens`
+  (**hidden output**: internal reasoning / chain-of-thought tokens generated by the model before the visible answer starts streaming; scales dynamically with `thinkingTimeMs`, which can't exceed the whole response time).
 - `tools` = sum of `estimation.tools[provider][kind]` over `capture.toolCalls`
   (**hidden tool context**: web search result snippets, code execution inputs/outputs, and other tool calls).
 - `overhead` = `systemPromptTokens` of the model
@@ -245,6 +274,10 @@ per-model entry. That value stays in the background and is **not shown** in the 
   After every insert the whole database is exported and written to IndexedDB (`waister` →
   store `sqlite`, key `main`). The next start of the worker restores it. Writes are queued, so
   snapshots land in the same order as the inserts.
+- **Corrupt snapshot:** if restoring fails, the bad snapshot is backed up under the IndexedDB key
+  `main.corrupt` (only the latest one is kept) and the worker starts with a fresh database.
+- `SchemaSetup` (`sqlite-database.ts`) is a plain function `(db) => void`. `prompt-store.service.ts`
+  provides it as `applySchema`.
 - **Table `prompts`:** `id` (UUID, PK), `conversation_url`, `captured_at` (indexed), `provider`,
   `model_name`, `model_version`, `thinking_effort`, `model_raw_label`, `input_tokens`,
   `history_tokens`, `output_tokens`, `thinking_tokens`, `tool_tokens`, `overhead_tokens`, `total_tokens`,
@@ -261,7 +294,7 @@ esbuild entry ([ADR 0011](decisions/0011-app-page.md)):
 
 - **Popup** (`ui/popup/`, toolbar button): the dashboard. When opened, it asks the database for
   the last 24 hours (`GET_USAGE_SUMMARY { sinceMs: now − 24 h }`) and shows the summed
-  `totalTokens`, the breakdown (input, history, output, thinking, overhead) and the prompt
+  `totalTokens`, the breakdown (input, history, output, thinking, tools, overhead) and the prompt
   count. A tab bar at the bottom opens the app page.
 - **App page** (`ui/app/`, a full browser tab at `app/index.html`): a sidebar plus one page per
   route (Analytics, Facts, Tips, History). The pages are empty placeholders for now.
@@ -269,19 +302,20 @@ esbuild entry ([ADR 0011](decisions/0011-app-page.md)):
 Neither surface talks to the estimation pipeline. The layout is deliberately plain for now.
 
 ```
-base.css                              shared: fonts, color/font tokens, light/dark, element defaults
+base.css                              shared: fonts, color/font tokens, element defaults
 app-routes.ts                         shared: APP_ROUTES (id, label, icon), hash ↔ route, extension URLs
+format.helpers.ts                     shared: formatCount (locale number, en dash while loading)
 components/                           shared components (used by either surface)
   components.css                      styles of all components, one block each
-  header.component.tsx                Header: full logo, centered (/logo/waister-full.svg)
-  total.component.tsx                 Total: icon + summed token count
-  breakdown.component.tsx             Breakdown: the five rows (order, labels, icons)
+  header.component.tsx                Header: full logo, centered (/logo/waister-full.svg), popup and app page
+  total.component.tsx                 Total: icon + summed token count (a <div>)
+  breakdown.component.tsx             Breakdown: the six rows (order, labels, icons)
   breakdown-row.component.tsx         BreakdownRow: icon, label, count of one part
   tab-bar.component.tsx               TabBar (popup): one tab per route, opens it in a new browser tab
   sidebar.component.tsx               Sidebar (app page): logo + one hash link per route
 popup/
   popup.html                          <div id="root">, loads index.js + index.css
-  popup.css                           popup layout only (full-window card, period line)
+  popup.css                           popup layout only (full-window card, `.popup-period` line)
   popup.app.tsx                       PopupApp: fetches the summary, holds the state
 app/
   app.html                            <div id="root">, loads index.js + index.css
@@ -316,8 +350,9 @@ app/
   (no permission needed). Every click opens a new tab. Reusing an already open app tab would
   need the `tabs` permission.
 - **State:** `PopupApp` holds one `UsageSummaryDto | null | undefined` (`undefined` = loading,
-  `null` = no answer from the background). Components get plain values and show `–` while a
-  value is `undefined`.
+  `null` = no usable answer from the background). It treats a missing response and an `{ error }`
+  response as `null`, and ignores a result that arrives after it unmounted. Components get plain
+  values and show `–` (`formatCount`) while a value is `undefined`.
 - **Data flow:** only the `*.app.tsx` root components send `chrome.runtime` messages.
   Components never fetch data. They may only navigate (`chrome.tabs.create`, hash links).
 - The popup only lives while it is open, so nothing persists between openings.
@@ -326,11 +361,11 @@ app/
 
 **Icons** come from [lucide-react](https://lucide.dev/icons/): import the component
 (`import { Coins } from 'lucide-react'`) and render `<Coins />`. Only imported icons get bundled.
-Size and color are set in CSS (`.lucide` in `base.css`, overrides in `components.css`), and icons
-inherit `currentColor`. The icon list is in [styling.md](styling.md#icons).
+Sizes are set per component in `components.css` (`.lucide` in `base.css` holds the defaults), and
+the icon color once in a grouped rule there. The icon list is in [styling.md](styling.md#icons).
 
 May import: `dto/`, `messages/`, `config/` (section `ui`), `react`, `react-dom`, `lucide-react`.
-Must not import: `handlers/`, `services/`, `readers/`.
+Must not import: `handlers/`, `services/`, `readers/`. Enforced by ESLint.
 
 ---
 
@@ -342,7 +377,7 @@ here must survive structured cloning (no classes, functions or DOM nodes).
 
 | File                    | DTO                | From → To                                 |
 | ----------------------- | ------------------ | ----------------------------------------- |
-| `chat-capture.dto.ts`   | `ChatCaptureDto`   | chat reader → EstimationHandler           |
+| `chat-capture.dto.ts`   | `ChatCaptureDto`   | reader strategy → EstimationHandler       |
 | `token-estimate.dto.ts` | `TokenEstimateDto` | EstimationService → EstimationHandler     |
 | `prompt-record.dto.ts`  | `PromptRecordDto`  | EstimationHandler → PromptStoreService    |
 | `usage-summary.dto.ts`  | `UsageSummaryDto`  | PromptStoreService → UsageHandler → popup |
@@ -358,10 +393,13 @@ May import: nothing.
 `src/messages/` (shared): the contract for every `chrome.runtime` message, a discriminated union
 on `type`, plus the response type of each message.
 
-| `type`              | Sender  | Receiver   | Payload          | Response          |
-| ------------------- | ------- | ---------- | ---------------- | ----------------- |
-| `ESTIMATE_PROMPT`   | content | background | `ChatCaptureDto` | `PromptRecordDto` |
-| `GET_USAGE_SUMMARY` | popup   | background | `{ sinceMs }`    | `UsageSummaryDto` |
+| `type`              | Sender  | Receiver   | Payload          | Response                                          |
+| ------------------- | ------- | ---------- | ---------------- | ------------------------------------------------- |
+| `ESTIMATE_PROMPT`   | content | background | `ChatCaptureDto` | `PromptRecordDto` (the content script ignores it) |
+| `GET_USAGE_SUMMARY` | popup   | background | `{ sinceMs }`    | `UsageSummaryDto` (`UsageSummaryResponse`)        |
+
+On a handler failure the listener answers `{ error: string }`. An unknown `type` gets no answer
+(the listener returns `false`).
 
 May import: `dto/`.
 
@@ -373,29 +411,38 @@ May import: `dto/`.
 ([ADR 0012](decisions/0012-central-config.md)). To tune the estimate, edit `config.json`. No
 TypeScript changes are needed.
 
-| File              | Role                                                                                                                                |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `config.json`     | The values, one section per consumer (below)                                                                                        |
-| `config.types.ts` | `WaisterConfig` and its parts (field docs), `ModelFamily<P>`, and the compile-time checks `CheckedConfig` / `CheckedFamilyDefaults` |
+| File              | Role                                                                                                                                                      |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config.json`     | The values, one section per consumer (below)                                                                                                              |
+| `config.types.ts` | `WaisterConfig` and its parts (**field docs and the assumptions behind the numbers**), `ModelFamily<P>`, and the compile-time checks (`CheckedConfig`, …) |
 
-| Section                        | Used by                              | Values                                                                                                                                            |
-| ------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `estimation.thinking`          | EstimationService                    | `baselineMs`, `effortMultipliers` per `ThinkingEffort`                                                                                            |
-| `estimation.impact`            | EstimationService                    | `perTokensUnit` (what the `*Per1M` rates refer to), `roundingDecimals`                                                                            |
-| `estimation.tools`             | EstimationService                    | per-provider hidden token estimates per tool call (`search`, `code`, `other`)                                                                     |
-| `estimation.models.<provider>` | EstimationService                    | `default` + `families.<family>`: `systemPromptTokens`, `tokensPerMsThinking`, `energyWhPer1M`, `waterMlPer1M`, `co2GramsPer1M`                    |
-| `tokenizer.<provider>`         | TokenizerService                     | `turnFramingTokens`, `attachmentTokens` (`image`, `file`), `singleTokenMaxWordLength`, `charsPerSubword`, `digitChunkSize`, `charsPerSymbolToken` |
-| `capture.timings`              | dom-capture strategy, Claude adapter | `settleMs`, `textStableMs`, `checkDelayMs`, `pollMs`, `stalePromptMs`, `claudeInterleavedStallMs`                                                 |
-| `capture.effortInference`      | site adapters                        | `thinkingDetected`, `familyDefaults.<family>`                                                                                                     |
-| `ui`                           | PopupApp                             | `usageWindowHours`                                                                                                                                |
+The field list, units and calibration notes live in `config.types.ts`, not here. Sections:
+
+| Section                            | Used by                              | What it holds                                                                                         |
+| ---------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `estimation.thinking`              | EstimationService                    | thinking baseline, token cap (`maxTokens`), effort multipliers                                        |
+| `estimation.impact`                | EstimationService                    | unit and rounding of the energy / water / CO2 rates                                                   |
+| `estimation.tools`                 | EstimationService                    | per-provider hidden tokens per tool call (`search`, `code`, `other`)                                  |
+| `estimation.models.<provider>`     | EstimationService                    | `default` + `families.<family>`: system prompt size, thinking speed, impact rates                     |
+| `tokenizer.<provider>`             | TokenizerService                     | heuristic parameters, turn framing, attachment estimates                                              |
+| `tokenizer.whitespace`             | TokenizerService                     | tokens per newline run and indentation run (`newlineRunTokens`, `indentRunTokens`, `indentMinSpaces`) |
+| `capture.timings`                  | dom-capture strategy, Claude adapter | turn-detection timings                                                                                |
+| `capture.attachments`              | DOM content reader                   | `maxIconPx`: images up to this size are icons, not attachments                                        |
+| `capture.effortInference`          | site adapters                        | effort when thinking is detected / per family default                                                 |
+| `capture.models.claude`, `.gemini` | site adapters                        | `fallbackName`, `families` (name → label keywords), `thinkingKeywords`                                |
+| `capture.models.chatgpt`           | ChatGPT adapter                      | `effortWords`, `slug.*` and `label.*` (regex sources for the model slug and picker label)             |
+| `ui`                               | PopupApp                             | `usageWindowHours`                                                                                    |
 
 - **Import by section:** `import { capture } from '../../config/config.json'`. esbuild
   tree-shakes JSON per top-level key, so each bundle only contains the sections it reads.
 - **Checked by `tsc`:** a missing or mistyped field fails `npm run check` (`CheckedConfig`). The
   model families are the keys of `estimation.models.<provider>.families`. Renaming one breaks the
-  reader that produces it, and a `familyDefaults` key without rates breaks `CheckedFamilyDefaults`.
+  reader that produces it, and a `familyDefaults` or `capture.models.*.families` key without rates breaks
+  `CheckedFamilyDefaults` / `CheckedModelKeywordFamilies`.
 - **Effort strings** (`thinkingDetected`, `familyDefaults`) are plain strings in JSON. The readers
   validate them and fall back to `unknown`, logging a warning.
+- **Regex sources** under `capture.models.chatgpt` are plain strings, compiled case-insensitively by
+  the ChatGPT adapter.
 - **Build-time only:** values are bundled. A change needs a rebuild.
 
 May import: `dto/` (types only).

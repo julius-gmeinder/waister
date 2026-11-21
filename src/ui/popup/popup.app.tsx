@@ -14,6 +14,7 @@ import { Breakdown } from '../components/breakdown.component';
 import { Header } from '../components/header.component';
 import { TabBar } from '../components/tab-bar.component';
 import { Total } from '../components/total.component';
+import { formatCount } from '../format.helpers';
 
 const USAGE_WINDOW_MS = ui.usageWindowHours * 60 * 60 * 1000;
 const USAGE_WINDOW_LABEL = `last ${ui.usageWindowHours}h`;
@@ -28,9 +29,10 @@ async function fetchUsageSummary(): Promise<UsageSummaryDto | null> {
   };
 
   try {
-    const response = (await chrome.runtime.sendMessage(message)) as
-      UsageSummaryResponse | { error: string };
-    return 'error' in response ? null : response;
+    const response: unknown = await chrome.runtime.sendMessage(message);
+    // The background answers `{ error }` on failure and nothing if no listener replied.
+    if (!response || typeof response !== 'object' || 'error' in response) return null;
+    return response as UsageSummaryResponse;
   } catch {
     return null;
   }
@@ -40,21 +42,27 @@ function describePromptCount(summary: SummaryState): string {
   if (summary === undefined) return '–';
   if (summary === null) return 'No data';
   const count = summary.promptCount;
-  return `${count.toLocaleString()} ${count === 1 ? 'prompt' : 'prompts'}`;
+  return `${formatCount(count)} ${count === 1 ? 'prompt' : 'prompts'}`;
 }
 
 export function PopupApp() {
   const [summary, setSummary] = useState<SummaryState>(undefined);
 
   useEffect(() => {
-    void fetchUsageSummary().then(setSummary);
+    let ignore = false;
+    void fetchUsageSummary().then((result) => {
+      if (!ignore) setSummary(result);
+    });
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   return (
     <main className="popup">
       <Header />
       <Total totalTokens={summary?.totalTokens} />
-      <p className="period">
+      <p className="popup-period">
         {describePromptCount(summary)} · {USAGE_WINDOW_LABEL}
       </p>
       <Breakdown breakdown={summary?.breakdown} />

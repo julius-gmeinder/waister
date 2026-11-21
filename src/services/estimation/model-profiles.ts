@@ -1,5 +1,6 @@
 /**
- * Per-model rates from `config.json` (`estimation.models`), internal to EstimationService.
+ * ModelProfiles: resolves a model family to its rates from `estimation.models`, internal to
+ * EstimationService.
  *
  * Context: background
  * Docs: docs/modules.md#estimation-service

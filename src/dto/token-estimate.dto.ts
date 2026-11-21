@@ -1,18 +1,17 @@
 /**
  * TokenEstimateDto (EstimationService -> EstimationHandler): token breakdown, total and impact.
  *
- * Context: shared (any context)
+ * Context: shared
  * Docs: docs/modules.md#dtos, docs/dto.md
  */
 
 import type { ModelInfo, Provider } from './chat-capture.dto';
 
 export interface TokenBreakdown {
-  /** Visible tokens of `userInput`. */
   input: number;
-  /** Visible tokens of all earlier turns (re-sent as context). */
+  /** Earlier turns, which the chat app re-sends as context. */
   history: number;
-  /** Visible tokens of `response`. */
+  /** Answer plus any artifact / canvas document. */
   output: number;
   /** Hidden reasoning tokens, estimated. */
   thinking: number;
@@ -22,7 +21,7 @@ export interface TokenBreakdown {
   overhead: number;
 }
 
-/** Derived from the token counts via the per-1M-token table in `services/estimation/`. */
+/** Derived from `totalTokens` via the per-1M-token rates in `config.json` (`estimation.models`). */
 export interface EnvironmentalImpact {
   energyWh: number;
   /** Datacenter cooling water. */

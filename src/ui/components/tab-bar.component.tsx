@@ -1,5 +1,5 @@
 /**
- * TabBar (popup): one tab per app page. A click opens that page in a new browser tab.
+ * TabBar: one tab per app page. A click opens that page in a new browser tab.
  *
  * Context: popup
  * Docs: docs/modules.md#ui

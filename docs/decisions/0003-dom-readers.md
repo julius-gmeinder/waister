@@ -22,3 +22,10 @@ Read the DOM. Split reading into two layers:
   pipeline, because it produces the same `ChatCaptureDto`.
 - Model version and thinking effort are only as accurate as the site's UI shows them, so
   `ModelInfo` has `unknown` values and a `rawLabel`.
+
+## Update 2026-11-21
+
+The swappable-strategy part was simplified. The `ReaderStrategy` interface and the
+`chat.reader.ts` facade are gone, because there is only one strategy. `dom-capture.strategy.ts`
+exports just `startDomCaptureStrategy(onCapture?)`, and `content.entry.ts` calls it directly. A
+second strategy (e.g. a network hook) would bring an interface back when it is needed.

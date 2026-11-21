@@ -1,9 +1,9 @@
 /**
- * Thinking-effort defaults from `config.json` (`capture.effortInference`), shared by the site
- * adapters. Internal to `sites/`. JSON values are plain strings, so they are validated here and
- * an invalid one falls back to `unknown`.
+ * EffortInference: thinking-effort defaults from `config.json` (`capture.effortInference`).
+ * Internal to `sites/`. JSON values are plain strings, so they are validated here and an invalid
+ * one falls back to `unknown`.
  *
- * Context: content script
+ * Context: content
  * Docs: docs/modules.md#site-adapters
  */
 

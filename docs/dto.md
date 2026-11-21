@@ -4,7 +4,7 @@ Plain, structured-clone-safe data. Defined in `src/dto/`. The shapes below match
 
 ## ChatCaptureDto
 
-`src/dto/chat-capture.dto.ts`. Built by the reader in the content script, consumed by the
+`src/dto/chat-capture.dto.ts`. Built by the capture strategy in the content script, consumed by the
 EstimationHandler. One DTO per sent prompt.
 
 | Field             | Type               | Description                                                                                  |

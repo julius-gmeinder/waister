@@ -1,5 +1,9 @@
-/* App page layout only (full browser tab). Tokens: ../base.css, component styles:
-   ../components/components.css. Docs: docs/styling.md */
+/**
+ * App page layout only (full browser tab). Tokens live in ../base.css, component styles in
+ * ../components/components.css.
+ *
+ * Docs: docs/styling.md
+ */
 
 /* Flat layout, no floating cards or borders: the sidebar is --bg (components.css), and the
    content area is --surface. */

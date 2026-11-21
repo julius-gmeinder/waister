@@ -1,5 +1,5 @@
 /**
- * TipsPage: tips for using fewer tokens. Empty for now.
+ * TipsPage: tips for using fewer tokens (placeholder).
  *
  * Context: app page
  * Docs: docs/modules.md#ui

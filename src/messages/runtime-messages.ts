@@ -1,12 +1,11 @@
 /**
- * All chrome.runtime messages and their responses.
+ * RuntimeMessages: all chrome.runtime messages and their responses.
  *
- * Context: shared (any context)
+ * Context: shared
  * Docs: docs/modules.md#messages
  */
 
 import type { ChatCaptureDto } from '../dto/chat-capture.dto';
-import type { PromptRecordDto } from '../dto/prompt-record.dto';
 import type { UsageSummaryDto } from '../dto/usage-summary.dto';
 
 /** Content -> background, once the response has finished streaming. */
@@ -24,7 +23,5 @@ export interface GetUsageSummaryMessage {
 }
 
 export type RuntimeMessage = EstimatePromptMessage | GetUsageSummaryMessage;
-
-export type EstimatePromptResponse = PromptRecordDto;
 
 export type UsageSummaryResponse = UsageSummaryDto;

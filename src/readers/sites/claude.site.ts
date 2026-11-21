@@ -1,23 +1,21 @@
 /**
- * SiteAdapter for Claude (claude.ai).
+ * Claude SiteAdapter (claude.ai): selectors and reads for one chat app, plus an internal
+ * thinking-time aggregator for interleaved thinking (Claude thinks, writes, pauses to think or use
+ * tools again, then resumes).
+ * Claude has no stable turn tags: messages are found by `data-testid` and font utility classes
+ * (`.font-user-message`, `.font-claude-message`), and a message can match several of them at once,
+ * so turn lookups always take the outermost match.
  *
- * Includes an internal thinking-time aggregator (`claudeThinkingAggregator`) that handles
- * interleaved thinking (e.g. when Claude thinks, outputs text, pauses to think/use tools again,
- * and then resumes streaming visible text).
+ * Unlike the other adapters this one has side effects, intentionally (see `SiteAdapter`):
+ * `isPromptInput` / `isSendButton` call `startTurn()` and `isGenerating` calls `tick()` to feed the
+ * aggregator, which `consumeThinkingTimeMs` reads out once per prompt.
  *
- * Context: content script
+ * Context: content
  * Docs: docs/modules.md#site-adapters
  */
 
 import { capture } from '../../config/config.json';
-import type { ModelFamily } from '../../config/config.types';
-import type {
-  AttachmentKind,
-  ChatTurn,
-  ModelInfo,
-  ThinkingEffort,
-  ToolCallKind,
-} from '../../dto/chat-capture.dto';
+import type { AttachmentKind, ChatTurn, ModelInfo, ToolCallKind } from '../../dto/chat-capture.dto';
 import {
   domToMarkdown,
   readArtifactText,
@@ -25,42 +23,62 @@ import {
   readToolCalls,
   type ToolSelectors,
 } from '../dom-content.reader';
-import { familyDefaultEffort, THINKING_DETECTED_EFFORT } from './effort-inference';
 import type { SiteAdapter } from './site-adapter.types';
+import {
+  buildHistory,
+  buildModelInfo,
+  hasMatch,
+  joinSelectors,
+  latestOf,
+  makeTurn,
+  matchesOrContains,
+  queryOutermost,
+  readText,
+  readTurnNodes,
+  rootsOf,
+  toolBlockSelector,
+  unknownModel,
+} from './site.helpers';
 
-export const CLAUDE_SELECTORS = {
+const CLAUDE_SELECTORS = {
   promptInput: 'div.ProseMirror[contenteditable="true"], [data-testid="chat-input"]',
-  sendButton:
-    'button[aria-label="Send Message"], button[aria-label="Send message"], button[aria-label*="Send"], fieldset button[type="button"]:last-of-type',
-  stopButton:
-    'button[aria-label="Stop Response"], button[aria-label="Stop response"], button[aria-label="Stop generating"], button[aria-label*="Stop"]',
+  /**
+   * `*="Send"` also covers "Send Message" / "Send message". The `fieldset` fallback is broad
+   * (last button of the composer fieldset) and can hit other composer buttons, which would start
+   * a turn without a prompt being sent.
+   */
+  sendButton: 'button[aria-label*="Send"], fieldset button[type="button"]:last-of-type',
+  /** `*="Stop"` also covers "Stop Response" / "Stop generating". */
+  stopButton: 'button[aria-label*="Stop"]',
   streamingContainer: '[data-is-streaming="true"]',
   userMessage: '[data-testid="user-message"], .font-user-message',
   assistantMessage:
     '.font-claude-message, .font-claude-response, [data-testid="assistant-message"]',
-  /** User and assistant turns in document order. */
-  allTurns:
-    '[data-testid="user-message"], .font-user-message, .font-claude-message, .font-claude-response, [data-testid="assistant-message"]',
   modelSelector: '[data-testid="model-selector-dropdown"], button[aria-label*="Model"]',
-  extendedThinkingIndicator:
-    '[data-testid*="thinking"], button[aria-label*="Extended thinking"], [aria-expanded][class*="thinking"]',
+  /** Composer toggle. Page state, not part of any turn. */
+  thinkingToggle: 'button[aria-label*="Extended thinking"]',
+  /** Thinking markers inside an answer. Checked in the latest turn only. */
+  thinkingIndicator: '[data-testid*="thinking"], [aria-expanded][class*="thinking"]',
   /** Collapsible thinking/thought blocks inside an assistant turn that must not count as visible answer text. */
   thinkingBlock:
     '[data-testid*="thinking"], [aria-expanded][class*="thinking"], details[class*="thinking"], [class*="thinking-block"]',
-  /** Wrapper of one message, holding a user turn's attachment cards next to its text. */
+  /**
+   * Wrapper of one message, holding a user turn's attachment cards next to its text. This is a
+   * React dev attribute (render counter), not a semantic one, so it may disappear. Attachments
+   * then fall back to the parent of the message node.
+   */
   turnContainer: '[data-test-render-count]',
-  /** File / image / pasted-content cards in a user turn (UNVERIFIED on the live site). */
+  // UNVERIFIED: the selectors below were not checked on the live site.
+  /** File / image / pasted-content cards in a user turn. */
   attachmentTile: '[data-testid="file-thumbnail"], [data-testid*="attachment"]',
-  /** Artifact card inside the answer (UNVERIFIED on the live site). */
+  /** Artifact card inside the answer. */
   artifactCard: '[data-testid*="artifact"], .artifact-block-cell',
-  /** Artifact side panel with the document / code (UNVERIFIED on the live site). */
+  /** Artifact side panel with the document / code. */
   artifactPanel:
     '#markdown-artifact, [data-testid="artifact-content"], [data-testid*="artifact-view"]',
-  /** Tool-use blocks (search, analysis) inside the answer (UNVERIFIED on the live site). */
-  toolBlock: '[data-testid*="tool-use"], [data-testid*="search"], [data-testid*="analysis"]',
 } as const;
 
-/** UNVERIFIED on the live site. */
+// UNVERIFIED: all tool selectors.
 const CLAUDE_TOOLS: ToolSelectors = {
   search: '[data-testid*="search"]',
   code: '[data-testid*="analysis"], [data-testid*="repl"]',
@@ -69,116 +87,75 @@ const CLAUDE_TOOLS: ToolSelectors = {
 };
 
 /** Not model output: thinking drawers, tool blocks and artifact cards (counted separately). */
-const CLAUDE_MESSAGE_CHROME = [
+const CLAUDE_MESSAGE_CHROME = joinSelectors(
   CLAUDE_SELECTORS.thinkingBlock,
-  CLAUDE_SELECTORS.toolBlock,
+  toolBlockSelector(CLAUDE_TOOLS),
   CLAUDE_SELECTORS.artifactCard,
-].join(', ');
+);
+
+/** User and assistant turns in document order. */
+const CLAUDE_ALL_TURNS = joinSelectors(
+  CLAUDE_SELECTORS.userMessage,
+  CLAUDE_SELECTORS.assistantMessage,
+);
 
 /**
- * Pause threshold (ms) in visible response text while Claude is still generating before we infer
- * that the model has re-entered an interleaved thinking phase. From `config.json`.
+ * Pause (ms) in visible response text while Claude is still generating after which we infer an
+ * interleaved thinking phase.
  */
-const CLAUDE_INTERLEAVED_STALL_MS = capture.timings.claudeInterleavedStallMs;
+const INTERLEAVED_STALL_MS = capture.timings.claudeInterleavedStallMs;
 
-/** Parses dropdown labels like "Claude 3.7 Sonnet", "Claude 4.5 Sonnet". */
-function parseClaudeModel(rawLabel: string, hasExtendedThinking: boolean): ModelInfo {
-  const cleaned = rawLabel.trim();
-  const lower = cleaned.toLowerCase();
-
-  // Generic 'claude' has no config entry and uses the provider default rates.
-  let name: ModelFamily<'anthropic'> | 'claude' = 'claude';
-  if (lower.includes('sonnet')) {
-    name = 'claude-sonnet';
-  } else if (lower.includes('opus')) {
-    name = 'claude-opus';
-  } else if (lower.includes('haiku')) {
-    name = 'claude-haiku';
-  }
-
-  const versionMatch = cleaned.match(/(\d+(?:\.\d+)?)/);
-  const version = versionMatch?.[1] ?? 'unknown';
-
-  const thinkingEffort: ThinkingEffort =
-    hasExtendedThinking || lower.includes('thinking') || lower.includes('extended')
-      ? THINKING_DETECTED_EFFORT
-      : familyDefaultEffort(name);
-
-  return {
-    name,
-    version,
-    thinkingEffort,
-    rawLabel: cleaned || 'unknown',
-  };
-}
-
-function extractCleanText(element: Element | null | undefined): string {
-  if (!element) return '';
-  return (element.textContent ?? '').trim();
+function readUserText(userEl: Element | undefined): string {
+  return domToMarkdown(userEl, { preserveLineBreaks: true });
 }
 
 /**
  * Markdown of a Claude response without thinking blocks, tool blocks and artifact cards, so
  * thinking summaries don't trigger `isStreamingVisibleText()` early or mask interleaved pauses.
  */
-function extractVisibleAssistantText(assistantEl: Element | null | undefined): string {
+function readResponseText(assistantEl: Element | undefined): string {
   return domToMarkdown(assistantEl, { skip: CLAUDE_MESSAGE_CHROME });
 }
 
-function extractUserText(userEl: Element | null | undefined): string {
-  return domToMarkdown(userEl, { preserveLineBreaks: true });
-}
-
-function userAttachments(userEl: Element | null | undefined): AttachmentKind[] {
+function readTurnAttachments(userEl: Element | undefined): AttachmentKind[] {
   if (!userEl) return [];
   const container =
     userEl.closest(CLAUDE_SELECTORS.turnContainer) ?? userEl.parentElement ?? userEl;
   return readAttachments([container], CLAUDE_SELECTORS.attachmentTile);
 }
 
-function latestAssistantNode(): Element | undefined {
-  const assistantNodes = document.querySelectorAll(CLAUDE_SELECTORS.assistantMessage);
-  return assistantNodes[assistantNodes.length - 1];
-}
-
-function latestUserNode(): Element | undefined {
-  const userNodes = document.querySelectorAll(CLAUDE_SELECTORS.userMessage);
-  return userNodes[userNodes.length - 1];
-}
-
 /**
- * Concatenated text of all thinking blocks currently in the DOM (or inside the latest turn).
- * A growth in this text while visible answer text is unchanged signals active thinking.
+ * Concatenated text of all thinking blocks in the whole document. Only changes between two ticks
+ * matter (growth while visible answer text is unchanged signals active thinking), so blocks of
+ * earlier turns, being static, cancel out.
  */
 function readThinkingBlocksText(): string {
-  const nodes = Array.from(document.querySelectorAll(CLAUDE_SELECTORS.thinkingBlock));
-  return nodes.map((n) => extractCleanText(n)).join('\n');
+  return Array.from(document.querySelectorAll(CLAUDE_SELECTORS.thinkingBlock))
+    .map(readText)
+    .join('\n');
 }
 
 /**
- * Checks whether Claude's DOM currently shows an active thinking block (e.g. a thinking container
- * inside `[data-is-streaming="true"]` or an added/growing thinking section).
+ * Whether Claude's DOM currently shows an active thinking block (a thinking container inside
+ * `[data-is-streaming="true"]`, or a growing thinking section).
  */
 function hasActiveThinkingDomSignal(thinkingTextChanged: boolean): boolean {
   if (thinkingTextChanged) return true;
-  const streamingNodes = Array.from(document.querySelectorAll(CLAUDE_SELECTORS.streamingContainer));
-  return streamingNodes.some(
-    (node) =>
-      node.matches(CLAUDE_SELECTORS.thinkingBlock) ||
-      node.querySelector(CLAUDE_SELECTORS.thinkingBlock) !== null,
+  return Array.from(document.querySelectorAll(CLAUDE_SELECTORS.streamingContainer)).some((node) =>
+    matchesOrContains(node, CLAUDE_SELECTORS.thinkingBlock),
   );
 }
 
 /**
- * Internal aggregator that accumulates Claude's thinking time across:
+ * Accumulates Claude's thinking time across:
  *   1. The initial pre-stream thinking phase (`t0 -> tStreamStart`), and
  *   2. Any interleaved thinking phases mid-turn, identified when visible response text stops
  *      growing while Claude is still generating and either:
  *      - a thinking block in the DOM is actively streaming/mutating, or
- *      - visible text stalls for `>= CLAUDE_INTERLEAVED_STALL_MS` (backdated to when visible text
+ *      - visible text stalls for `>= INTERLEAVED_STALL_MS` (backdated to when visible text
  *        last changed).
  */
-function createClaudeThinkingAggregator() {
+function createThinkingAggregator() {
   let active = false;
   let accumulatedInterleavedMs = 0;
   let interleavedStart: number | null = null;
@@ -186,6 +163,14 @@ function createClaudeThinkingAggregator() {
   let lastVisibleText = '';
   let lastVisibleChangeAt: number | null = null;
   let lastThinkingText = '';
+
+  const reset = () => {
+    accumulatedInterleavedMs = 0;
+    interleavedStart = null;
+    seenVisibleStream = false;
+    lastVisibleText = '';
+    lastVisibleChangeAt = null;
+  };
 
   const closeInterleaved = (endMs: number) => {
     if (interleavedStart === null) return;
@@ -195,22 +180,20 @@ function createClaudeThinkingAggregator() {
     interleavedStart = null;
   };
 
+  const startTurn = (): void => {
+    reset();
+    active = true;
+    lastThinkingText = readThinkingBlocksText();
+  };
+
   return {
-    startTurn(): void {
-      active = true;
-      accumulatedInterleavedMs = 0;
-      interleavedStart = null;
-      seenVisibleStream = false;
-      lastVisibleText = '';
-      lastVisibleChangeAt = null;
-      lastThinkingText = readThinkingBlocksText();
-    },
+    startTurn,
 
     tick(generating: boolean, visibleText: string): void {
       const now = Date.now();
       if (!active) {
         if (!generating) return;
-        this.startTurn();
+        startTurn();
       }
 
       const thinkingText = readThinkingBlocksText();
@@ -238,7 +221,7 @@ function createClaudeThinkingAggregator() {
       if (generating) {
         const domThinking = hasActiveThinkingDomSignal(thinkingTextChanged);
         const stalled =
-          lastVisibleChangeAt !== null && now - lastVisibleChangeAt >= CLAUDE_INTERLEAVED_STALL_MS;
+          lastVisibleChangeAt !== null && now - lastVisibleChangeAt >= INTERLEAVED_STALL_MS;
 
         if (domThinking || stalled) {
           if (interleavedStart === null) {
@@ -264,18 +247,14 @@ function createClaudeThinkingAggregator() {
         Math.max(0, t1 - t0),
         Math.round(initialThinkingMs + accumulatedInterleavedMs),
       );
+      reset();
       active = false;
-      accumulatedInterleavedMs = 0;
-      interleavedStart = null;
-      seenVisibleStream = false;
-      lastVisibleText = '';
-      lastVisibleChangeAt = null;
       return totalMs;
     },
   };
 }
 
-const claudeThinkingAggregator = createClaudeThinkingAggregator();
+const thinkingAggregator = createThinkingAggregator();
 
 export const claudeSite: SiteAdapter = {
   provider: 'anthropic',
@@ -285,107 +264,89 @@ export const claudeSite: SiteAdapter = {
   },
 
   readModel(): ModelInfo {
-    const selectorNode = document.querySelector(CLAUDE_SELECTORS.modelSelector);
-    const rawLabel = extractCleanText(selectorNode);
+    const rawLabel = readText(document.querySelector(CLAUDE_SELECTORS.modelSelector));
+    const latest = latestOf(CLAUDE_SELECTORS.assistantMessage);
     const hasExtendedThinking =
-      document.querySelector(CLAUDE_SELECTORS.extendedThinkingIndicator) !== null;
-
-    if (!rawLabel) {
-      return {
-        name: 'claude',
-        version: 'unknown',
-        thinkingEffort: hasExtendedThinking ? THINKING_DETECTED_EFFORT : 'unknown',
-        rawLabel: 'unknown',
-      };
-    }
-    return parseClaudeModel(rawLabel, hasExtendedThinking);
+      document.querySelector(CLAUDE_SELECTORS.thinkingToggle) !== null ||
+      hasMatch(rootsOf(latest), CLAUDE_SELECTORS.thinkingIndicator);
+    return rawLabel
+      ? buildModelInfo(rawLabel, hasExtendedThinking, capture.models.claude)
+      : unknownModel(capture.models.claude.fallbackName, hasExtendedThinking);
   },
 
   readUserInput(): string {
-    return extractUserText(latestUserNode());
+    return readUserText(latestOf(CLAUDE_SELECTORS.userMessage));
   },
 
   readUserAttachments(): AttachmentKind[] {
-    return userAttachments(latestUserNode());
+    return readTurnAttachments(latestOf(CLAUDE_SELECTORS.userMessage));
   },
 
   readResponse(): string {
-    return extractVisibleAssistantText(latestAssistantNode());
+    return readResponseText(latestOf(CLAUDE_SELECTORS.assistantMessage));
   },
 
   readArtifactText(): string {
-    const latest = latestAssistantNode();
-    return latest
-      ? readArtifactText([latest], CLAUDE_SELECTORS.artifactCard, CLAUDE_SELECTORS.artifactPanel)
-      : '';
+    return readArtifactText(
+      rootsOf(latestOf(CLAUDE_SELECTORS.assistantMessage)),
+      CLAUDE_SELECTORS.artifactCard,
+      CLAUDE_SELECTORS.artifactPanel,
+    );
   },
 
   readToolCalls(): ToolCallKind[] {
-    const latest = latestAssistantNode();
-    return latest ? readToolCalls([latest], CLAUDE_TOOLS) : [];
+    return readToolCalls(rootsOf(latestOf(CLAUDE_SELECTORS.assistantMessage)), CLAUDE_TOOLS);
   },
 
   readHistory(): ChatTurn[] {
-    const nodes = Array.from(document.querySelectorAll(CLAUDE_SELECTORS.allTurns));
-    const turns: ChatTurn[] = [];
-
-    for (const node of nodes) {
-      const isUser = node.matches(CLAUDE_SELECTORS.userMessage);
-      const role: 'user' | 'assistant' = isUser ? 'user' : 'assistant';
-      const text = isUser ? extractUserText(node) : extractVisibleAssistantText(node);
-      const attachments = isUser ? userAttachments(node) : [];
-      if (text || attachments.length > 0) {
-        turns.push({ role, text, ...(attachments.length ? { attachments } : {}) });
-      }
-    }
-
-    // The latest prompt and its answer (if rendered yet) are the capture, not history.
-    if (turns.length >= 2 && turns[turns.length - 1]?.role === 'assistant') {
-      return turns.slice(0, -2);
-    }
-    if (turns.length >= 1 && turns[turns.length - 1]?.role === 'user') {
-      return turns.slice(0, -1);
-    }
-    return [];
+    return buildHistory(
+      readTurnNodes(CLAUDE_ALL_TURNS, CLAUDE_SELECTORS.userMessage),
+      ({ role, node }) =>
+        role === 'user'
+          ? makeTurn(role, readUserText(node), readTurnAttachments(node))
+          : makeTurn(role, readResponseText(node), []),
+    );
   },
 
+  countUserMessages(): number {
+    return queryOutermost(CLAUDE_SELECTORS.userMessage).length;
+  },
+
+  countResponses(): number {
+    return queryOutermost(CLAUDE_SELECTORS.assistantMessage).length;
+  },
+
+  /** Side effect: feeds the thinking aggregator on every call. */
   isGenerating(): boolean {
-    const hasStreamingAttr = document.querySelector(CLAUDE_SELECTORS.streamingContainer) !== null;
-    const hasStopButton = document.querySelector(CLAUDE_SELECTORS.stopButton) !== null;
-    const generating = hasStreamingAttr || hasStopButton;
-    claudeThinkingAggregator.tick(generating, extractVisibleAssistantText(latestAssistantNode()));
+    const generating =
+      document.querySelector(CLAUDE_SELECTORS.streamingContainer) !== null ||
+      document.querySelector(CLAUDE_SELECTORS.stopButton) !== null;
+    thinkingAggregator.tick(
+      generating,
+      readResponseText(latestOf(CLAUDE_SELECTORS.assistantMessage)),
+    );
     return generating;
   },
 
   isStreamingVisibleText(): boolean {
-    return extractVisibleAssistantText(latestAssistantNode()).length > 0;
+    return readResponseText(latestOf(CLAUDE_SELECTORS.assistantMessage)).length > 0;
   },
 
-  countUserMessages(): number {
-    return document.querySelectorAll(CLAUDE_SELECTORS.userMessage).length;
-  },
-
-  countResponses(): number {
-    return document.querySelectorAll(CLAUDE_SELECTORS.assistantMessage).length;
-  },
-
+  /** Side effect: a hit starts a new thinking-time turn. */
   isPromptInput(target: Element): boolean {
     const matched = target.closest(CLAUDE_SELECTORS.promptInput) !== null;
-    if (matched) {
-      claudeThinkingAggregator.startTurn();
-    }
+    if (matched) thinkingAggregator.startTurn();
     return matched;
   },
 
+  /** Side effect: a hit starts a new thinking-time turn. */
   isSendButton(target: Element): boolean {
     const matched = target.closest(CLAUDE_SELECTORS.sendButton) !== null;
-    if (matched) {
-      claudeThinkingAggregator.startTurn();
-    }
+    if (matched) thinkingAggregator.startTurn();
     return matched;
   },
 
   consumeThinkingTimeMs(t0: number, tStreamStart: number, t1: number): number {
-    return claudeThinkingAggregator.consume(t0, tStreamStart, t1);
+    return thinkingAggregator.consume(t0, tStreamStart, t1);
   },
 };

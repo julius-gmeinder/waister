@@ -1,5 +1,5 @@
 /**
- * FactsPage: background facts about tokens and AI usage. Empty for now.
+ * FactsPage: background facts about tokens and AI usage (placeholder).
  *
  * Context: app page
  * Docs: docs/modules.md#ui

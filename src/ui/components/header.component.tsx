@@ -1,11 +1,11 @@
 /**
- * Header: the full Waister logo, centered at the top of the popup.
+ * Header: the full Waister logo, centered.
  *
- * Context: popup
+ * Context: popup, app page
  * Docs: docs/modules.md#ui
  */
 
-/** public/logo/ is copied to the extension root, so this path works from popup/index.html. */
+/** public/ is copied to the extension root, so this absolute path works from every page. */
 const LOGO_SRC = '/logo/waister-full.svg';
 
 export function Header() {

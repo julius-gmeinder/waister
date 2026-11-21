@@ -1,5 +1,8 @@
-/* Popup layout only. Tokens: ../base.css, component styles: ../components/components.css.
-   Docs: docs/styling.md */
+/**
+ * Popup layout only. Tokens live in ../base.css, component styles in ../components/components.css.
+ *
+ * Docs: docs/styling.md
+ */
 
 body {
   min-width: 260px;
@@ -13,7 +16,7 @@ body {
   padding: 10px 16px 16px;
 }
 
-.period {
+.popup-period {
   margin: -8px 0 0;
   font-size: 12px;
   color: var(--text-muted);

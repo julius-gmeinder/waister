@@ -2,7 +2,7 @@
   "name": "waister",
   "version": "0.1.0",
   "private": true,
-  "description": "A browser extension written in TypeScript.",
+  "description": "Browser extension that estimates the total token usage of a prompt in ChatGPT, Claude and Gemini.",
   "type": "module",
   "scripts": {
     "dev": "node scripts/build.mjs --watch",
