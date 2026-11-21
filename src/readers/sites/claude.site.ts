@@ -112,9 +112,11 @@ function readUserText(userEl: Element | undefined): string {
 /**
  * Markdown of a Claude response without thinking blocks, tool blocks and artifact cards, so
  * thinking summaries don't trigger `isStreamingVisibleText()` early or mask interleaved pauses.
+ * Thinking blocks are only skipped *inside* the message: an ancestor check (`closest`) also
+ * matched wrappers around the whole answer, so the response read as '' and no prompt ever
+ * finished capturing.
  */
 function readResponseText(assistantEl: Element | undefined): string {
-  if (!assistantEl || assistantEl.closest(CLAUDE_SELECTORS.thinkingBlock) !== null) return '';
   return domToMarkdown(assistantEl, { skip: CLAUDE_MESSAGE_CHROME });
 }
 
