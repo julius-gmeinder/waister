@@ -345,19 +345,21 @@ components/                           shared components (used by either surface)
   impact-figures.component.tsx        ImpactFigures (history): energy / water / CO2 as small icon + value pairs
   history-row.component.tsx           HistoryRow (history): one prompt as a clickable row (time, app, model, total, TokenBar, impact)
   prompt-detail-modal.component.tsx   PromptDetailModal (history): native <dialog> with breakdown legend, impact tiles, model & timings, conversation link, ← / → stepping
+  fact-card.component.tsx             FactCard (facts): glassmorphic benchmark card with tinted SVG icon medallion & comparison multiplier
 popup/
   popup.html                          <div id="root">, loads index.js + index.css
   popup.css                           popup layout only (full-window card, `.popup-period` line)
   popup.app.tsx                       PopupApp: fetches the last 24h summary, renders it
 app/
   app.html                            <div id="root">, loads index.js + index.css
-  app.css                             app page layout only (flat sidebar + content grid, dashboard grid, history list)
-  app.app.tsx                         App: reads the hash route, holds the dashboard timeframe and the HistoryView, fetches summary + history pages, renders Sidebar + the page
+  app.css                             app page layout only (flat sidebar + content grid, dashboard grid, history list, facts grids)
+  app.app.tsx                         App: reads the hash route, holds the dashboard timeframe and the HistoryView, fetches summaries + history pages, renders Sidebar + the page
   pages/
     dashboard.page.tsx                DashboardPage: title, picker, token subtitle, PowerCard + WaterCard + Co2Card
     dashboard.helpers.ts              dashboardAnimation(summary): pulse / drip / puff period, pool fill, cloud count from config
     analytics.page.tsx                AnalyticsPage (empty)
-    facts.page.tsx                    FactsPage (empty)
+    facts.page.tsx                    FactsPage: Daily, Weekly and All-Time everyday perspective benchmarks with Shuffle
+    facts.helpers.ts                  shuffleFactsBoard, smart-window filtering (0.25..15), multiplier & raw KPI formatting
     tips.page.tsx                     TipsPage (empty)
     history.page.tsx                  HistoryPage: pickers, summary strip, day groups or ranking, "Load more", PromptDetailModal
 ```
@@ -468,10 +470,11 @@ May import: `dto/`.
 ([ADR 0012](decisions/0012-central-config.md)). To tune the estimate, edit `config.json`. No
 TypeScript changes are needed.
 
-| File              | Role                                                                                                                                                      |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `config.json`     | The values, one section per consumer (below)                                                                                                              |
-| `config.types.ts` | `WaisterConfig` and its parts (**field docs and the assumptions behind the numbers**), `ModelFamily<P>`, and the compile-time checks (`CheckedConfig`, …) |
+| File              | Role                                                                                                                                                  |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config.json`     | The values, one section per consumer (below)                                                                                                          |
+| `factSheet.json`  | 60 everyday perspective benchmarks (20 each for Power, Water, CO2) with SVG icon paths in `public/icons/` (`icons/*.svg`)                             |
+| `config.types.ts` | `WaisterConfig`, `FactSheetConfig` and their parts (**field docs and the assumptions behind the numbers**), `ModelFamily<P>`, and compile-time checks |
 
 The field list, units and calibration notes live in `config.types.ts`, not here. Sections:
 

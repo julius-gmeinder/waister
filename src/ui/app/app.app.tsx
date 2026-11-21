@@ -12,17 +12,21 @@ import { parseRouteHash, type AppRouteId } from '../app-routes';
 import { Sidebar } from '../components/sidebar.component';
 import { DEFAULT_HISTORY_VIEW, type HistoryView } from '../history.helpers';
 import { DEFAULT_TIMEFRAME, timeframeSinceMs, type TimeframeId } from '../timeframe.helpers';
-import { usePromptHistory, useUsageSummary, type HistoryFilter } from '../usage-api';
+import {
+  useFactsSummaries,
+  usePromptHistory,
+  useUsageSummary,
+  type HistoryFilter,
+} from '../usage-api';
 import { AnalyticsPage } from './pages/analytics.page';
 import { DashboardPage } from './pages/dashboard.page';
 import { FactsPage } from './pages/facts.page';
 import { HistoryPage } from './pages/history.page';
 import { TipsPage } from './pages/tips.page';
 
-/** Pages without props. The dashboard and the history get their data from here, see below. */
-const PAGES: Record<Exclude<AppRouteId, 'dashboard' | 'history'>, ComponentType> = {
+/** Pages without props. The dashboard, the history and the facts get their data from here, see below. */
+const PAGES: Record<Exclude<AppRouteId, 'dashboard' | 'history' | 'facts'>, ComponentType> = {
   analytics: AnalyticsPage,
-  facts: FactsPage,
   tips: TipsPage,
 };
 
@@ -41,6 +45,7 @@ export function App() {
   // Fixed per selection, so the rolling windows don't refetch on every render.
   const sinceMs = useMemo(() => timeframeSinceMs(timeframe, Date.now()), [timeframe]);
   const summary = useUsageSummary(sinceMs);
+  const factsSummaries = useFactsSummaries();
 
   const [historyView, setHistoryView] = useState<HistoryView>(DEFAULT_HISTORY_VIEW);
   // Memoized like `sinceMs`: a new filter object restarts the paging.
@@ -66,6 +71,8 @@ export function App() {
     );
   } else if (route.id === 'history') {
     page = <HistoryPage view={historyView} onViewChange={setHistoryView} history={history} />;
+  } else if (route.id === 'facts') {
+    page = <FactsPage summaries={factsSummaries} />;
   } else {
     const Page = PAGES[route.id];
     page = <Page />;

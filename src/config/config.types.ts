@@ -16,8 +16,10 @@ import type {
   ToolCallKind,
 } from '../dto/chat-capture.dto';
 import type rawConfig from './config.json';
+import type rawFactSheet from './factSheet.json';
 
 type RawConfig = typeof rawConfig;
+type RawFactSheet = typeof rawFactSheet;
 
 /**
  * Per-model rates. Hidden-token rates plus the environmental impact per `perTokensUnit` tokens.
@@ -331,3 +333,62 @@ export type CheckedModelKeywordFamilies = [
   Expect<HasOnlyKeys<RawConfig['capture']['models']['gemini']['families'], ModelFamily<'google'>>>,
   Expect<HasOnlyKeys<RawConfig['capture']['models']['chatgpt']['families'], ModelFamily<'openai'>>>,
 ];
+
+/** Everyday benchmark tier in `factSheet.json`. */
+export type FactTier = 'micro' | 'daily' | 'weekly' | 'heavy';
+
+/** KPI keys in `factSheet.json`. */
+export type FactKpiId = 'power' | 'water' | 'co2';
+
+/** Source of the SVG icon in `public/icons/`. */
+export type FactIconSource = 'lucide' | 'custom';
+
+/** Single everyday perspective benchmark item in `factSheet.json`. */
+export interface FactItem {
+  id: string;
+  tier: string;
+  value: number;
+  unit: string;
+  equivalent: string;
+  shortCopy: string;
+  isVirtualWater?: boolean;
+  icon: string;
+  iconHint: string;
+  iconSource: string;
+}
+
+/** Per-KPI benchmark group and display unit thresholds in `factSheet.json`. */
+export interface FactKpiGroup {
+  label: string;
+  baseUnit: string;
+  displayUnits: {
+    small: string;
+    large: string;
+    largeThreshold: number;
+  };
+  items: FactItem[];
+}
+
+/** Schema of `src/config/factSheet.json`. */
+export interface FactSheetConfig {
+  meta: {
+    version: string;
+    description: string;
+    assumptions: {
+      gridCarbonIntensity_gCO2ePerKWh: number;
+      gasCarEmissions_gCO2PerKm: number;
+      virtualWaterNote: string;
+    };
+    tiers: string[];
+    shuffleDefaults: {
+      minRatio: number;
+      maxRatio: number;
+    };
+  };
+  kpis: Record<FactKpiId, FactKpiGroup>;
+}
+
+type FactSheetShapeCheck<T extends FactSheetConfig> = T;
+
+/** Compile-time only: errors if `factSheet.json` doesn't match `FactSheetConfig`. */
+export type CheckedFactSheet = FactSheetShapeCheck<RawFactSheet>;

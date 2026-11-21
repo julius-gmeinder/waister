@@ -59,6 +59,14 @@
   /* PromptDetailModal: the dimmed page behind it and its lift. */
   --backdrop: rgb(28 25 23 / 40%);
   --shadow: 0 24px 48px -12px rgb(28 25 23 / 25%);
+
+  /* Glassmorphic tokens (Facts Page cards & ambient orbs). */
+  --glass-surface-top: rgba(255, 255, 255, 0.78);
+  --glass-surface-mid: rgba(255, 255, 255, 0.56);
+  --glass-border-specular: rgba(255, 255, 255, 0.72);
+  --glass-highlight-top: rgba(255, 255, 255, 0.92);
+  --glass-shadow: rgba(28, 25, 23, 0.06);
+  --glass-shadow-hover: rgba(28, 25, 23, 0.11);
 }
 
 body {

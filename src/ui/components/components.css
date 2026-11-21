@@ -1349,9 +1349,261 @@
   }
 }
 
+/* FactCard (facts page): organic glassmorphic card with KPI accent variables, tinted glassy icon
+   medallion, specular border, inner top-edge highlight, and staggered entrance animation. */
+.fact-card--power {
+  --fact-color: var(--power);
+  --fact-strong: var(--power-strong);
+  --fact-soft: var(--power-soft);
+  --fact-tint: var(--power-tint);
+}
+
+.fact-card--water {
+  --fact-color: var(--water);
+  --fact-strong: var(--water-strong);
+  --fact-soft: var(--water-soft);
+  --fact-tint: var(--water-tint);
+}
+
+.fact-card--co2 {
+  --fact-color: var(--co2);
+  --fact-strong: var(--co2-strong);
+  --fact-soft: var(--co2-soft);
+  --fact-tint: var(--co2-tint);
+}
+
+.fact-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 18px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--fact-color) 24%, var(--glass-border-specular));
+  background: linear-gradient(
+    145deg,
+    var(--glass-surface-top) 0%,
+    var(--glass-surface-mid) 52%,
+    color-mix(in srgb, var(--fact-tint) 80%, transparent) 100%
+  );
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight-top),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 10px 28px -8px var(--glass-shadow),
+    0 2px 10px -2px color-mix(in srgb, var(--fact-color) 12%, transparent);
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 220ms ease,
+    box-shadow 220ms ease;
+  animation: fact-card-enter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--fact-stagger, 0ms);
+}
+
+.fact-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--fact-color) 52%, var(--glass-border-specular));
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight-top),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+    0 16px 34px -8px var(--glass-shadow-hover),
+    0 0 20px -4px color-mix(in srgb, var(--fact-color) 28%, transparent);
+}
+
+@keyframes fact-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.fact-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fact-card-medallion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  color: var(--fact-strong);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--fact-soft) 75%, var(--surface)) 0%,
+    color-mix(in srgb, var(--fact-tint) 88%, transparent) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--fact-color) 32%, var(--glass-border-specular));
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight-top),
+    0 4px 12px -2px color-mix(in srgb, var(--fact-color) 20%, transparent);
+}
+
+.fact-card--hero .fact-card-medallion,
+.fact-card--ribbon .fact-card-medallion {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+}
+
+.fact-card-icon-svg,
+.fact-card-icon-img {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
+.fact-card--hero .fact-card-icon-svg,
+.fact-card--hero .fact-card-icon-img,
+.fact-card--ribbon .fact-card-icon-svg,
+.fact-card--ribbon .fact-card-icon-img {
+  width: 28px;
+  height: 28px;
+}
+
+.fact-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.fact-card-kpi-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fact-strong);
+  background: color-mix(in srgb, var(--fact-soft) 62%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--fact-color) 28%, transparent);
+}
+
+.fact-card-virtual-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--water-strong);
+  background: color-mix(in srgb, var(--water-soft) 50%, var(--surface));
+  border: 1px dashed color-mix(in srgb, var(--water) 45%, transparent);
+  cursor: help;
+}
+
+.fact-card-virtual-badge .lucide {
+  width: 12px;
+  height: 12px;
+  color: var(--water-strong);
+}
+
+.fact-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fact-card-multiplier-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fact-card-multiplier {
+  font-family: var(--font-serif);
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--fact-strong);
+}
+
+.fact-card--hero .fact-card-multiplier,
+.fact-card--ribbon .fact-card-multiplier {
+  font-size: 42px;
+}
+
+.fact-card-qualifier {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.fact-card-copy {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.fact-card--hero .fact-card-copy,
+.fact-card--ribbon .fact-card-copy {
+  font-size: 19px;
+}
+
+.fact-card-equivalent {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.fact-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--fact-color) 18%, var(--border));
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.fact-card-readout-user {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fact-card-readout-bench {
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fact-card {
+    animation: none;
+    transition: none;
+  }
+
+  .fact-card:hover {
+    transform: none;
+  }
+}
+
 /* Interaction states, shared by TabBar and Sidebar links, TimeframePicker and ProviderFilter
-   chips, the SortPicker, HistoryRows, the History "Load more" button and the PromptDetailModal's
-   buttons
+   chips, the SortPicker, HistoryRows, the History "Load more" button, the PromptDetailModal's
+   buttons and the Facts shuffle button
    (docs/styling.md#interaction-states). Neutral items: --neutral-hover / --neutral-pressed. The
    selected item (aria-current page, aria-pressed chip) is --accent with its own hover/pressed
    steps. The selected rules come last, so they win over the neutral ones at equal specificity. */
@@ -1363,11 +1615,14 @@
 .history-row,
 .history-more,
 .prompt-detail-icon-button,
-.prompt-detail-link {
+.prompt-detail-link,
+.facts-shuffle-btn {
   transition:
     background-color 120ms ease,
     border-color 120ms ease,
-    color 120ms ease;
+    color 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .tab-bar-link:hover,
@@ -1427,7 +1682,8 @@
 .history-row:focus-visible,
 .history-more:focus-visible,
 .prompt-detail-icon-button:focus-visible,
-.prompt-detail-link:focus-visible {
+.prompt-detail-link:focus-visible,
+.facts-shuffle-btn:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
