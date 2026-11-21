@@ -5,19 +5,73 @@
  */
 
 body {
-  min-width: 260px;
+  width: 408px;
+  background: var(--surface);
 }
 
-/* The card fills the whole popup window: no wrapper, border or radius. */
+/* The popup fills the window directly on --surface so whitespace frames the flat --bg tiles. */
 .popup {
   display: grid;
+  gap: 20px;
+  padding: 18px 24px 16px;
+}
+
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  /* Less on top: the logo SVG already has some empty space above the artwork. */
-  padding: 10px 16px 16px;
+}
+
+.popup-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.popup-logo {
+  display: block;
+  width: 92px;
+  height: auto;
 }
 
 .popup-period {
-  margin: -8px 0 0;
   font-size: 12px;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.popup-impacts {
+  display: grid;
+  gap: 12px;
+}
+
+.popup-tokens {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: -4px;
+  padding: 0 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.popup-tokens-total {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.popup-tokens-total .lucide {
+  width: 15px;
+  height: 15px;
+  color: var(--tokens);
+}
+
+.popup-tokens-avg {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }

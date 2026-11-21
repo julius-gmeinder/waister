@@ -6,7 +6,7 @@
 | ---------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------- |
 | `src/ui/base.css`                  | font imports, color/font variables, `body`, `.lucide` defaults                                      | both entries      |
 | `src/ui/components/components.css` | styles of the shared components, one commented block per component, incl. their keyframes           | both entries      |
-| `src/ui/popup/popup.css`           | popup layout only (`.popup`, `.popup-period`)                                                       | `popup.entry.tsx` |
+| `src/ui/popup/popup.css`           | popup layout only (`.popup`, `.popup-header`, `.popup-impacts`, `.popup-tokens`)                    | `popup.entry.tsx` |
 | `src/ui/app/app.css`               | app page layout only (`.app`, `.app-content`, `.dashboard*`, `.history*`, `.facts*`, `.analytics*`) | `app.entry.tsx`   |
 
 Each entry imports them in this order, and esbuild bundles them into `popup/index.css` /
@@ -147,10 +147,16 @@ clickable component gets added to those selectors instead of defining its own co
 Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `body` is `--bg`
 (`base.css`).
 
-- **Popup:** `.popup` fills the whole popup window (padding 10px on top and 16px elsewhere).
-  Inside: Header, Total, period line, Breakdown, ImpactTachos (three columns), TabBar. Every tab
-  is 68px wide (fits "Dashboard"), spare width goes between them. The tab bar has no divider. 8px of extra
-  top margin (on top of the 12px gap) sets it apart from the breakdown.
+- **Popup:** `body` is `--surface` (`408px` wide) so whitespace frames the flat `--bg` tiles just
+  like the app pages. `.popup` (padding `18px 24px 16px`, `20px` gap) stacks a compact top bar
+  (logo left, prompt count + `TimeframeSelect` dropdown pill right, offering the Dashboard's
+  timeframes in a floating `--surface` / `--border` / `--shadow` menu with `--accent` on the active
+  option), three stacked horizontal `PowerCard` / `WaterCard` / `Co2Card` tiles (`variant="compact"`,
+  inline accent icon + label instead of corner `ImpactBadge`, 28px serif figure on the left,
+  scaled-down 96×85 animated scene on the right), a quiet token summary line (`Coins` + inline
+  `TokenCount` + average per prompt) and the `TabBar`. Every tab is 68px wide (fits "Dashboard"),
+  spare width goes between them. The tab bar has no divider; whitespace separates it from the
+  content above.
 - **App page:** `.app` is a grid: the Sidebar (240px, `--bg`, full height, sticky) on the left,
   and the content (`.app-content`, `--surface`, padding 32px 40px) on the right. No border
   between them. Only the background color separates them.

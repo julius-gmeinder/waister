@@ -3,10 +3,11 @@
  * lightning bolt into a set of gears that turn one tooth further. The whole timing is CSS
  * (`--pulse`), so bolts, glow and gears stay in sync when the period changes.
  *
- * Context: app page
+ * Context: popup, app page
  * Docs: docs/modules.md#ui
  */
 
+import { Zap } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { formatEnergy } from '../format.helpers';
 import { ImpactBadge } from './impact-badge.component';
@@ -16,6 +17,8 @@ interface PowerCardProps {
   energyWh: number | undefined;
   /** Time between two pulses. `null` = no usage, nothing moves. */
   pulseMs: number | null;
+  /** `card` = Dashboard vertical tile with corner badge; `compact` = popup horizontal tile. */
+  variant?: 'card' | 'compact';
 }
 
 /** Gear outline centered on 0,0 (one tooth along +x) with the axle hole cut out (evenodd). */
@@ -62,21 +65,42 @@ const BOLTS = [
   { points: '176,0 166,25 178,36 164,66 172,77 162,109.5', tip: { x: 162, y: 109.5 } },
 ];
 
-export function PowerCard({ energyWh, pulseMs }: PowerCardProps) {
+export function PowerCard({ energyWh, pulseMs, variant = 'card' }: PowerCardProps) {
   const { value, unit } = formatEnergy(energyWh);
   const idle = pulseMs === null;
+  const compact = variant === 'compact';
   const style = idle ? undefined : ({ '--pulse': `${pulseMs}ms` } as CSSProperties);
+  const className = ['power-card', compact && 'power-card--compact', idle && 'power-card--idle']
+    .filter(Boolean)
+    .join(' ');
 
-  return (
-    <article className={idle ? 'power-card power-card--idle' : 'power-card'} style={style}>
+  const reading = (
+    <>
       <h2 className="power-card-label">
-        <ImpactBadge kind="power" />
+        {compact ? (
+          <>
+            <Zap aria-hidden="true" />
+            Energy
+          </>
+        ) : (
+          <ImpactBadge kind="power" />
+        )}
       </h2>
       <p className="power-card-value">
         {value}
         <span className="power-card-unit">{unit}</span>
       </p>
-      <svg className="power-card-scene" viewBox="0 0 240 170" aria-hidden="true">
+    </>
+  );
+
+  return (
+    <article className={className} style={style}>
+      {compact ? <div className="power-card-info">{reading}</div> : reading}
+      <svg
+        className="power-card-scene"
+        viewBox={compact ? '24 -4 192 170' : '0 0 240 170'}
+        aria-hidden="true"
+      >
         {GEARS.map(({ x, y, d, base, step }) => (
           <g key={`${x},${y}`} transform={`translate(${x} ${y}) rotate(${base})`}>
             <g className="power-gear" style={{ '--gear-step': `${step}deg` } as CSSProperties}>

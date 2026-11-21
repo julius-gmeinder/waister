@@ -3,10 +3,11 @@
  * swell and fade, and every puff sends a toxic haze off the number. The puff rate comes in as
  * props, the motion itself is CSS (`--puff`).
  *
- * Context: app page
+ * Context: popup, app page
  * Docs: docs/modules.md#ui
  */
 
+import { Factory } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { formatCo2 } from '../format.helpers';
 import { ImpactBadge } from './impact-badge.component';
@@ -18,6 +19,8 @@ interface Co2CardProps {
   puffMs: number | null;
   /** Clouds in the loop. Each one restarts after `cloudCount × puffMs`, which keeps the stream even. */
   cloudCount: number;
+  /** `card` = Dashboard vertical tile with corner badge; `compact` = popup horizontal tile. */
+  variant?: 'card' | 'compact';
 }
 
 // Scene geometry in viewBox units (240 × 170), ground at the same height as the other cards.
@@ -39,24 +42,45 @@ const CHIMNEYS = [TALL_CHIMNEY, SHORT_CHIMNEY];
 /** Puffy cloud of three bumps around 0,0, flat bottom. */
 const CLOUD_PATH = 'M-7 6 A5 5 0 0 1 -7 -4 A7 7 0 0 1 7 -3.9 A5 5 0 0 1 8 6 Z';
 
-export function Co2Card({ co2Grams, puffMs, cloudCount }: Co2CardProps) {
+export function Co2Card({ co2Grams, puffMs, cloudCount, variant = 'card' }: Co2CardProps) {
   const { value, unit } = formatCo2(co2Grams);
   const idle = puffMs === null;
+  const compact = variant === 'compact';
   const style = idle
     ? undefined
     : ({ '--puff': `${puffMs}ms`, '--cloud-count': cloudCount } as CSSProperties);
   const clouds = idle ? [] : Array.from({ length: cloudCount }, (_, index) => index);
+  const className = ['co2-card', compact && 'co2-card--compact', idle && 'co2-card--idle']
+    .filter(Boolean)
+    .join(' ');
 
-  return (
-    <article className={idle ? 'co2-card co2-card--idle' : 'co2-card'} style={style}>
+  const reading = (
+    <>
       <h2 className="co2-card-label">
-        <ImpactBadge kind="co2" />
+        {compact ? (
+          <>
+            <Factory aria-hidden="true" />
+            CO₂
+          </>
+        ) : (
+          <ImpactBadge kind="co2" />
+        )}
       </h2>
       <p className="co2-card-value">
         {value}
         <span className="co2-card-unit">{unit}</span>
       </p>
-      <svg className="co2-card-scene" viewBox="0 0 240 170" aria-hidden="true">
+    </>
+  );
+
+  return (
+    <article className={className} style={style}>
+      {compact ? <div className="co2-card-info">{reading}</div> : reading}
+      <svg
+        className="co2-card-scene"
+        viewBox={compact ? '24 -4 192 170' : '0 0 240 170'}
+        aria-hidden="true"
+      >
         {/* Clouds first: they start inside the chimney and come out of its top. */}
         {clouds.map((index) => {
           // The chimneys take turns, so a fast stream comes out of both.

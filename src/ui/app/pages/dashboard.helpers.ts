@@ -2,7 +2,7 @@
  * Dashboard helpers: turn a usage summary into animation speeds, the pool level and the cloud
  * count (formula in `DashboardConfig`, config.types.ts).
  *
- * Context: app page
+ * Context: popup, app page
  * Docs: docs/modules.md#ui
  */
 

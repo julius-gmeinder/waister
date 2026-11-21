@@ -2,10 +2,11 @@
  * WaterCard: water used in the selected timeframe. Drops fall from the number into a swaying
  * pool, and the number wobbles like liquid as each drop tears off. Drip rate and pool level come in as props, the motion itself is CSS (`--drip`).
  *
- * Context: app page
+ * Context: popup, app page
  * Docs: docs/modules.md#ui
  */
 
+import { Droplet } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { formatWater } from '../format.helpers';
 import { ImpactBadge } from './impact-badge.component';
@@ -17,6 +18,8 @@ interface WaterCardProps {
   dripMs: number | null;
   /** Pool fill level, 0..1 of the basin height. */
   poolFill: number;
+  /** `card` = Dashboard vertical tile with corner badge; `compact` = popup horizontal tile. */
+  variant?: 'card' | 'compact';
 }
 
 // Scene geometry in viewBox units (240 × 170).
@@ -49,26 +52,47 @@ const FRONT_WAVE = wavePath(2.5, 18);
 /** Only one WaterCard is ever on a page, so a fixed id is unique. */
 const CLIP_ID = 'water-card-pool';
 
-export function WaterCard({ waterMl, dripMs, poolFill }: WaterCardProps) {
+export function WaterCard({ waterMl, dripMs, poolFill, variant = 'card' }: WaterCardProps) {
   const { value, unit } = formatWater(waterMl);
   const idle = dripMs === null;
+  const compact = variant === 'compact';
   const surfaceY = BASIN_BOTTOM - poolFill * (BASIN_BOTTOM - BASIN_TOP);
   const dropFall = surfaceY - DROP_TOP - DROP_HEIGHT * DROP_STRETCH;
   const style = {
     '--drop-fall': `${dropFall}px`,
     ...(idle ? {} : { '--drip': `${dripMs}ms` }),
   } as CSSProperties;
+  const className = ['water-card', compact && 'water-card--compact', idle && 'water-card--idle']
+    .filter(Boolean)
+    .join(' ');
 
-  return (
-    <article className={idle ? 'water-card water-card--idle' : 'water-card'} style={style}>
+  const reading = (
+    <>
       <h2 className="water-card-label">
-        <ImpactBadge kind="water" />
+        {compact ? (
+          <>
+            <Droplet aria-hidden="true" />
+            Water
+          </>
+        ) : (
+          <ImpactBadge kind="water" />
+        )}
       </h2>
       <p className="water-card-value">
         {value}
         <span className="water-card-unit">{unit}</span>
       </p>
-      <svg className="water-card-scene" viewBox="0 0 240 170" aria-hidden="true">
+    </>
+  );
+
+  return (
+    <article className={className} style={style}>
+      {compact ? <div className="water-card-info">{reading}</div> : reading}
+      <svg
+        className="water-card-scene"
+        viewBox={compact ? '24 -4 192 170' : '0 0 240 170'}
+        aria-hidden="true"
+      >
         <defs>
           <clipPath id={CLIP_ID}>
             <path d={BASIN_INTERIOR} />

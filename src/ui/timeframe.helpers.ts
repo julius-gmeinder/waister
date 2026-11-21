@@ -1,7 +1,7 @@
 /**
  * Timeframe helpers: the dashboard's selectable windows and where each one starts.
  *
- * Context: app page
+ * Context: popup, app page
  * Docs: docs/modules.md#ui
  */
 

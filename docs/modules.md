@@ -304,11 +304,13 @@ the EstimationHandler right after `buildTokenEstimateDto`.
 ([ADR 0010](decisions/0010-react-popup.md)). There are two surfaces, and each is its own
 esbuild entry ([ADR 0011](decisions/0011-app-page.md)):
 
-- **Popup** (`ui/popup/`, toolbar button): the dashboard. When opened, it asks the database for
-  the last 24 hours (`GET_USAGE_SUMMARY { sinceMs: now − 24 h }`) and shows the summed
-  `totalTokens`, the breakdown (input, history, output, thinking, tools, overhead), the
-  accumulated energy (Wh), water (mL) and CO2 (g) tachos, and the prompt count. A tab bar at the bottom
-  opens the app page.
+- **Popup** (`ui/popup/`, toolbar button): the quick impact glance. When opened, it starts on the
+  default Dashboard timeframe (`Today`) and lets the user switch between `Today`, `Last week`,
+  `Last 30 days` and `All time` via `TimeframeSelect` (`GET_USAGE_SUMMARY`). It leads with
+  accumulated energy, water and CO2 in three compact horizontal `PowerCard` / `WaterCard` /
+  `Co2Card` tiles (scaled-down Dashboard scenes, no corner `ImpactBadge`), framed by whitespace on
+  `--surface`, followed by a quiet token summary line (`TokenCount` + average per prompt). A
+  `TabBar` at the bottom opens the app page.
 - **App page** (`ui/app/`, a full browser tab at `app/index.html`): a sidebar plus one page per
   route (Dashboard, Analytics, Facts, Tips, History). The Dashboard
   ([ADR 0014](decisions/0014-dashboard-page.md)) shows tokens, energy, water and CO2 for a chosen
@@ -347,9 +349,10 @@ components/                           shared components (used by either surface)
   chip.component.tsx                  Chip (app page): pill toggle button (aria-pressed), yellow when selected
   chip-group.component.tsx            ChipGroup (app page): labelled, wrapping row of Chips (role="group")
   timeframe-picker.component.tsx      TimeframePicker (dashboard, history): one Chip per timeframe, optional `order`
-  power-card.component.tsx            PowerCard (dashboard): energy, pulsing number, lightning + gears scene
-  water-card.component.tsx            WaterCard (dashboard): water, drops falling into a swaying pool
-  co2-card.component.tsx              Co2Card (dashboard): CO2, a small factory puffing rising, fading clouds
+  timeframe-select.component.tsx      TimeframeSelect (popup): compact dropdown pill + floating option window for the Dashboard timeframes
+  power-card.component.tsx            PowerCard (dashboard, popup): energy, pulsing number, lightning + gears scene (`card` or compact horizontal popup variant)
+  water-card.component.tsx            WaterCard (dashboard, popup): water, drops falling into a swaying pool (`card` or compact horizontal popup variant)
+  co2-card.component.tsx              Co2Card (dashboard, popup): CO2, a small factory puffing rising, fading clouds (`card` or compact horizontal popup variant)
   provider-filter.component.tsx       ProviderFilter (history): "All apps" + one toggle Chip per chat app
   sort-picker.component.tsx           SortPicker (history): native select for the order, ChevronDown instead of the native arrow
   token-bar.component.tsx             TokenBar (history): one rounded pill per breakdown part with a hover label, thin (row) or thick with hatched hidden parts (modal)

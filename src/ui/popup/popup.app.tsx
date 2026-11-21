@@ -1,23 +1,25 @@
 /**
- * PopupApp: root component of the popup. Fetches the last 24h of token usage from the database
- * and renders it.
+ * PopupApp: root component of the popup. Fetches usage for the chosen Dashboard timeframe and
+ * leads with energy, water and CO2 in compact animated tiles, with tokens as a quiet summary.
  *
  * Context: popup
  * Docs: docs/modules.md#ui
  */
 
-import { useState } from 'react';
-import { ui } from '../../config/config.json';
-import { Breakdown } from '../components/breakdown.component';
-import { Header } from '../components/header.component';
+import { Coins } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { dashboardAnimation } from '../app/pages/dashboard.helpers';
+import { Co2Card } from '../components/co2-card.component';
+import { PowerCard } from '../components/power-card.component';
 import { TabBar } from '../components/tab-bar.component';
-import { ImpactTachos } from '../components/tacho.component';
-import { Total } from '../components/total.component';
+import { TimeframeSelect } from '../components/timeframe-select.component';
+import { TokenCount } from '../components/token-count.component';
+import { WaterCard } from '../components/water-card.component';
 import { formatCount } from '../format.helpers';
+import { DEFAULT_TIMEFRAME, timeframeSinceMs, type TimeframeId } from '../timeframe.helpers';
 import { useUsageSummary, type SummaryState } from '../usage-api';
 
-const USAGE_WINDOW_MS = ui.usageWindowHours * 60 * 60 * 1000;
-const USAGE_WINDOW_LABEL = `last ${ui.usageWindowHours}h`;
+const LOGO_SRC = '/logo/waister-full.svg';
 
 function describePromptCount(summary: SummaryState): string {
   if (summary === undefined) return '–';
@@ -27,19 +29,53 @@ function describePromptCount(summary: SummaryState): string {
 }
 
 export function PopupApp() {
-  // Fixed when the popup opens: it only lives while it is open.
-  const [sinceMs] = useState(() => Date.now() - USAGE_WINDOW_MS);
+  const [timeframe, setTimeframe] = useState<TimeframeId>(DEFAULT_TIMEFRAME);
+  // Fixed per selection, so the rolling windows don't refetch on every render.
+  const sinceMs = useMemo(() => timeframeSinceMs(timeframe, Date.now()), [timeframe]);
   const summary = useUsageSummary(sinceMs);
+  const animation = useMemo(() => dashboardAnimation(summary), [summary]);
+  const avgTokens =
+    summary && summary.promptCount > 0
+      ? Math.round(summary.totalTokens / summary.promptCount)
+      : null;
 
   return (
     <main className="popup">
-      <Header />
-      <Total totalTokens={summary?.totalTokens} />
-      <p className="popup-period">
-        {describePromptCount(summary)} · {USAGE_WINDOW_LABEL}
-      </p>
-      <Breakdown breakdown={summary?.breakdown} />
-      <ImpactTachos impact={summary?.impact} />
+      <header className="popup-header">
+        <img className="popup-logo" src={LOGO_SRC} alt="Waister" />
+        <div className="popup-header-controls">
+          <span className="popup-period">{describePromptCount(summary)}</span>
+          <TimeframeSelect value={timeframe} onChange={setTimeframe} />
+        </div>
+      </header>
+      <section className="popup-impacts" aria-label="Environmental impact">
+        <PowerCard
+          variant="compact"
+          energyWh={summary?.impact.energyWh}
+          pulseMs={animation.pulseMs}
+        />
+        <WaterCard
+          variant="compact"
+          waterMl={summary?.impact.waterMl}
+          dripMs={animation.dripMs}
+          poolFill={animation.poolFill}
+        />
+        <Co2Card
+          variant="compact"
+          co2Grams={summary?.impact.co2Grams}
+          puffMs={animation.puffMs}
+          cloudCount={animation.cloudCount}
+        />
+      </section>
+      <div className="popup-tokens">
+        <span className="popup-tokens-total">
+          <Coins aria-hidden="true" />
+          <TokenCount value={summary === null ? 0 : summary?.totalTokens} />
+        </span>
+        {avgTokens !== null && (
+          <span className="popup-tokens-avg">avg {formatCount(avgTokens)} / prompt</span>
+        )}
+      </div>
       <TabBar />
     </main>
   );
