@@ -4,8 +4,16 @@
  * One answer can span several assistant role nodes (reasoning, tool calls, final answer), so all
  * reads work on turns: consecutive role nodes of the same author merged together.
  *
- * ChatGPT serves two DOMs and every selector covers both: the classic app and the "web-mobile"
- * shell (seen logged out, `#web-mobile-root`).
+ * ChatGPT serves different DOM architectures depending on auth state, and every selector covers all:
+ * - Logged-in app (`#root`, React / Codex app-shell): turns live inside `[data-virtualized-turn]`
+ *   with `[data-user-message-bubble]` for user prompts and `[data-response-body]` (containing
+ *   `[data-markdown-text-style="assistant-message"]` / `[data-dil-response]`) for assistant answers;
+ *   composer is `form[data-chatgpt-composer]` with `.ProseMirror[data-composer-markdown]`.
+ * - Logged-out "web-mobile" shell (`#web-mobile-root`, Octane): `li[data-message-role]` turns,
+ *   `[data-assistant-markdown-root]` answers, `textarea#mobile-composer-prompt`, and
+ *   `button[data-composer-submit]`.
+ * - Classic app fallback: `[data-message-author-role]`, `.markdown`, `#prompt-textarea`, and
+ *   `data-testid` send/stop buttons.
  *
  * Context: content script
  * Docs: docs/modules.md#site-adapters
@@ -15,29 +23,39 @@ import type { ChatTurn, ModelInfo, ThinkingEffort } from '../../dto/chat-capture
 import type { SiteAdapter } from './site-adapter.types';
 
 export const CHATGPT_SELECTORS = {
-  promptInput: '#prompt-textarea, #mobile-composer-prompt, [data-mobile-composer-prompt]',
-  sendButton: 'button[data-testid="send-button"], #composer-submit-button',
+  promptInput:
+    '#prompt-textarea, #mobile-composer-prompt, [data-mobile-composer-prompt], [data-composer-markdown], form[data-chatgpt-composer] .ProseMirror[contenteditable="true"], #pending-conversation-input',
+  sendButton:
+    'button[data-testid="send-button"], #composer-submit-button, button[data-composer-submit]:not([data-stop-generating]), form[data-chatgpt-composer] button[type="submit"]:not([disabled]):not([aria-disabled="true"])',
   /**
-   * `data-testid` only: aria-labels are localized and a page-wide `aria-label*="Stop"` matches
-   * unrelated buttons (dictation, read aloud).
+   * Scoped to the composer so localized or unrelated page buttons (dictation, read aloud) never match.
    */
-  stopButton: 'button[data-testid="stop-button"]',
-  roleNode: '[data-message-author-role], [data-message-role]',
+  stopButton:
+    'button[data-testid="stop-button"], button[data-composer-submit][data-stop-generating], form[data-chatgpt-composer] button[aria-label="Stop"], form[data-chatgpt-composer] button[aria-label="Stop generating"]',
+  roleNode:
+    '[data-message-author-role], [data-message-role], [data-user-message-bubble], [data-response-body]',
   /** Classic app, web-mobile shell. */
   roleAttrs: ['data-message-author-role', 'data-message-role'],
-  /** Excludes the "Thinking…" placeholder. */
-  assistantMarkdown: '.markdown, [data-assistant-markdown-root]',
-  /** Web-mobile shell only. Without it the whole role node's text is used. */
+  /** Excludes the "Thinking…" placeholder (`[data-response-starting]`). */
+  assistantMarkdown:
+    '.markdown, [data-assistant-markdown-root], [data-markdown-text-style="assistant-message"], [data-dil-response]',
+  /** User message bubble (present in both logged-in and web-mobile shells). */
   userBubble: '[data-user-message-bubble]',
   /** Web-mobile shell: set on an assistant message once its answer is finished. */
   messageCompleteAttr: 'data-message-complete',
-  /** Legacy streaming class. Only checked inside the latest turn. */
-  streamingIndicator: '.result-streaming',
+  /** Web-mobile shell: set on an assistant message while it is actively streaming. */
+  messageStreamingAttr: 'data-message-streaming',
+  /** Page-level indicators present only while a turn is starting or actively streaming. */
+  activeGenerationIndicator:
+    '[data-response-starting], [data-d-streaming-reveal], [data-loading-indicator], form[data-octane-followup-submitting]',
+  /** Turn-scoped streaming indicator. Only checked inside the latest turn. */
+  streamingIndicator: '.result-streaming, [data-d-streaming-reveal]',
   /** Model that actually answered (e.g. "gpt-5-1"), which can differ from the picker in Auto. */
   modelSlugAttr: 'data-message-model-slug',
   modelSelector:
-    '[data-testid="model-switcher-dropdown-button"], button[aria-label*="Model selector"]',
-  thinkingBadge: '[data-testid*="thought"], [aria-label*="Thinking"], [aria-label*="Reason"]',
+    '[data-testid="model-switcher-dropdown-button"], button[aria-label*="Model selector"], [data-model-selection-label], button[aria-label="Select ChatGPT model"]',
+  thinkingBadge:
+    '[data-testid*="thought"], [aria-label*="Thinking"], [aria-label*="Reason"], form[data-chatgpt-composer] button[aria-pressed="true"]',
 } as const;
 
 type Role = 'user' | 'assistant';
@@ -52,14 +70,23 @@ function extractCleanText(element: Element | null | undefined): string {
   return (element.textContent ?? '').trim();
 }
 
+function resolveNodeRole(node: Element): Role | null {
+  for (const attr of CHATGPT_SELECTORS.roleAttrs) {
+    const value = node.getAttribute(attr);
+    if (value === 'user' || value === 'assistant') return value;
+    if (value !== null) return null;
+  }
+  if (node.hasAttribute('data-user-message-bubble')) return 'user';
+  if (node.hasAttribute('data-response-body')) return 'assistant';
+  return null;
+}
+
 function readTurns(): GptTurn[] {
   const turns: GptTurn[] = [];
   for (const node of Array.from(document.querySelectorAll(CHATGPT_SELECTORS.roleNode))) {
     // A role node nested in another one belongs to the outer message: don't count it twice.
     if (node.parentElement?.closest(CHATGPT_SELECTORS.roleNode)) continue;
-    const role = CHATGPT_SELECTORS.roleAttrs
-      .map((attr) => node.getAttribute(attr))
-      .find((value) => value !== null);
+    const role = resolveNodeRole(node);
     if (role !== 'user' && role !== 'assistant') continue;
     const last = turns[turns.length - 1];
     if (last?.role === role) {
@@ -80,12 +107,13 @@ function latestAssistantTurn(): GptTurn | null {
 
 /** Skips matches nested in another match so text isn't counted twice. */
 function outermostMatches(turn: GptTurn, selector: string): Element[] {
-  return turn.nodes.flatMap((node) =>
-    Array.from(node.querySelectorAll(selector)).filter((el) => {
+  return turn.nodes.flatMap((node) => {
+    if (node.matches(selector)) return [node];
+    return Array.from(node.querySelectorAll(selector)).filter((el) => {
       const outer = el.parentElement?.closest(selector);
       return !outer || !node.contains(outer);
-    }),
-  );
+    });
+  });
 }
 
 function joinText(elements: Element[]): string {
@@ -240,14 +268,16 @@ export const chatgptSite: SiteAdapter = {
 
   isGenerating(): boolean {
     if (document.querySelector(CHATGPT_SELECTORS.stopButton) !== null) return true;
+    if (document.querySelector(CHATGPT_SELECTORS.activeGenerationIndicator) !== null) return true;
     const turn = latestAssistantTurn();
     return (
       turn?.nodes.some(
         (node) =>
           node.matches(CHATGPT_SELECTORS.streamingIndicator) ||
           node.querySelector(CHATGPT_SELECTORS.streamingIndicator) !== null ||
-          // Web-mobile shell: no "complete" flag yet means still running.
-          (node.hasAttribute('data-message-role') &&
+          node.hasAttribute(CHATGPT_SELECTORS.messageStreamingAttr) ||
+          // Web-mobile shell: an assistant message without the "complete" flag is still running.
+          (node.getAttribute('data-message-role') === 'assistant' &&
             !node.hasAttribute(CHATGPT_SELECTORS.messageCompleteAttr)),
       ) ?? false
     );
