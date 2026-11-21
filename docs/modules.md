@@ -347,9 +347,10 @@ components/                           shared components (used by either surface)
   chip.component.tsx                  Chip (app page): pill toggle button (aria-pressed), yellow when selected
   chip-group.component.tsx            ChipGroup (app page): labelled, wrapping row of Chips (role="group")
   timeframe-picker.component.tsx      TimeframePicker (dashboard, history): one Chip per timeframe, optional `order`
-  power-card.component.tsx            PowerCard (dashboard): energy, pulsing number, lightning + gears scene
-  water-card.component.tsx            WaterCard (dashboard): water, drops falling into a swaying pool
-  co2-card.component.tsx              Co2Card (dashboard): CO2, a small factory puffing rising, fading clouds
+  power-card.component.tsx            PowerCard (dashboard): energy, pulsing number, bolts from the number into a meshing gear train
+  water-card.component.tsx            WaterCard (dashboard): water, drops arcing round end first from the number's left side into a pond that drains through a stream
+  co2-card.component.tsx              Co2Card (dashboard): CO2, a factory chimney and two cooling towers spewing smoke / steam at random
+  impact-fact.component.tsx           ImpactFact (dashboard): one fun fact under an impact card's scene (multiplier, phrase, shortCopy)
   provider-filter.component.tsx       ProviderFilter (history): "All apps" + one toggle Chip per chat app
   sort-picker.component.tsx           SortPicker (history): native select for the order, ChevronDown instead of the native arrow
   token-bar.component.tsx             TokenBar (history): one rounded pill per breakdown part with a hover label, thin (row) or thick with hatched hidden parts (modal)
@@ -373,12 +374,12 @@ app/
   app.css                             app page layout only (flat sidebar + content grid, dashboard grid, history list, facts grids, analytics tiles and charts)
   app.app.tsx                         App: reads the hash route, holds the dashboard timeframe and the HistoryView, fetches summaries, history pages and the Analytics records, renders Sidebar + the page
   pages/
-    dashboard.page.tsx                DashboardPage: title, picker, TokenTotalCard, PowerCard + WaterCard + Co2Card
-    dashboard.helpers.ts              dashboardAnimation(summary): pulse / drip / puff period, pool fill, cloud count from config
+    dashboard.page.tsx                DashboardPage: title, picker, TokenTotalCard, PowerCard + WaterCard + Co2Card, a new fact seed per visit
+    dashboard.helpers.ts              dashboardAnimation(summary): pulse / drip / puff period, pond fill, cloud count from config; dashboardFacts(summary, timeframe, random)
     analytics.page.tsx                AnalyticsPage: metric + timeframe chips, KPI tiles, breakdown TokenBar, model donut + comparison, chat memory chart, eco-insight, export / reset footer
     analytics.helpers.ts              aggregateAnalytics(records, metric, timeframe, …) → view models (KPIs, breakdown, donut, comparison, series, eco-insight), CSV / JSON export
     facts.page.tsx                    FactsPage: Daily, Weekly and All-Time everyday perspective benchmarks, seeded per shuffle interval
-    facts.helpers.ts                  shuffleFactsBoard, factsShuffleSeed + seededRandom (ui.facts), smart-window filtering (0.25..15), multiplier & raw KPI formatting
+    facts.helpers.ts                  shuffleFactsBoard, pickFactComparison (also Dashboard), factsShuffleSeed + seededRandom (ui.facts), smart-window filtering (0.25..15), multiplier & raw KPI formatting
     tips.page.tsx                     TipsPage: personalized hero tips, category filter bar, 2-column habit grid with expandable before/after examples, persisted adoption count
     tips-catalog.helpers.ts           TIPS_CATALOG (9 jargon-free everyday habits), categories, impact labels, and lookup helpers
     tips-recommender.helpers.ts       recommendTips (7d/30d personalized scoring + <3 starter fallback) and localStorage persistence for adopted tip IDs
@@ -407,10 +408,13 @@ app/
 - **Dashboard:** `App` holds the `TimeframeId` (starts on Today, not remembered) and fetches
   `useUsageSummary(timeframeSinceMs(timeframe))`. The `sinceMs` is fixed per selection, so a
   rolling window doesn't refetch on every render. `DashboardPage` turns the summary into
-  `pulseMs` / `dripMs` / `poolFill` (`dashboard.helpers.ts`, formula and values in
+  `pulseMs` / `dripMs` / `pondFill` (`dashboard.helpers.ts`, formula and values in
   `config.json` → `ui.dashboard`, field docs in `DashboardConfig`). `null` periods mean no usage,
   so the card stands still. The motion itself is pure CSS driven by custom properties
-  (`--pulse`, `--drip`, `--drop-fall`), see [styling.md](styling.md#motion).
+  (`--pulse`, `--drip`, `--puff`), see [styling.md](styling.md#motion). Each card ends with an
+  ImpactFact: `dashboardFacts` picks one benchmark per KPI with the Facts page's logic
+  (`pickFactComparison`, timeframe mapped to a Facts section for the zero-usage tiers), seeded
+  once per visit, so every opening shows other facts but a refresh keeps them.
 - **History** ([ADR 0015](decisions/0015-history-page.md)): `App` holds a `HistoryView`
   (timeframe, providers, sort; starts on All time / all apps / newest first, not remembered),
   memoizes it into a `HistoryFilter` and calls `usePromptHistory(filter, route is history)`. The
@@ -528,7 +532,7 @@ The field list, units and calibration notes live in `config.types.ts`, not here.
 | `capture.models.claude`, `.gemini` | site adapters                        | `fallbackName`, `families` (name → label keywords), `thinkingKeywords`                                                       |
 | `capture.models.chatgpt`           | ChatGPT adapter                      | `families`, `effortWords`, `slug.*` and `label.*` (regex sources for the model slug and picker label)                        |
 | `ui`                               | PopupApp, ImpactTachos               | `usageWindowHours`, `tachoMax` (`energyWh`, `waterMl`, `co2Grams`)                                                           |
-| `ui.dashboard`                     | Dashboard (`dashboard.helpers.ts`)   | `busyDay` (Wh / mL / g per day = intensity 1), `intensityExponent`, `pulseMs`, `dripMs`, `puffMs`, `cloudRiseMs`, `poolFill` |
+| `ui.dashboard`                     | Dashboard (`dashboard.helpers.ts`)   | `busyDay` (Wh / mL / g per day = intensity 1), `intensityExponent`, `pulseMs`, `dripMs`, `puffMs`, `cloudRiseMs`, `pondFill` |
 | `ui.history`                       | History (`usePromptHistory`)         | `pageSize`: prompts per page / "Load more"; `otherSegmentShare`: TokenBar "Other" merge                                      |
 | `ui.facts`                         | Facts (`facts.helpers.ts`)           | `shuffleIntervalMinutes`: how long one random pick of benchmarks stays                                                       |
 

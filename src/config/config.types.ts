@@ -260,19 +260,19 @@ export interface AnimationPeriodRange {
  * usage, so a light day still visibly moves.
  */
 export interface DashboardConfig {
-  /** Usage per day that counts as intensity 1 (fastest pulse / drip, fullest pool). */
+  /** Usage per day that counts as intensity 1 (fastest pulse / drip, fullest pond). */
   busyDay: { energyWh: number; waterMl: number; co2Grams: number };
   intensityExponent: number;
   /** Time between two power pulses (one lightning strike + gear step each). */
   pulseMs: AnimationPeriodRange;
   /** Time between two water drops. */
   dripMs: AnimationPeriodRange;
-  /** Time between two smoke clouds from the factory chimneys. */
+  /** Time between two smoke clouds from the chimney and the cooling towers (on average). */
   puffMs: AnimationPeriodRange;
-  /** Time one cloud takes from the chimney to fading out (constant, only the frequency changes). */
+  /** Time one cloud takes from a stack to fading out (constant, only the frequency changes). */
   cloudRiseMs: number;
-  /** Pool fill level, as a fraction of the basin height, at intensity 0 and 1. */
-  poolFill: { min: number; max: number };
+  /** Pond water size, as a fraction of the pond's banks, at intensity 0 and 1. */
+  pondFill: { min: number; max: number };
 }
 
 export interface HistoryConfig {

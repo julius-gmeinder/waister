@@ -60,7 +60,9 @@ heading already says tokens, such as the popup breakdown and the modal legend). 
 differs: `inline` follows the surrounding text (sentences, day headers, HistoryRows, legends),
 `large` is 28px (popup total) and `hero` 36px (PromptDetailModal total). An approximate
 estimate has no badge or glyph: the count gets a `help` cursor and explains itself in its title
-on hover. Don't style token numbers by hand.
+on hover. Don't style token numbers by hand. One exception: the TokenTotalCard (Dashboard,
+Analytics) sets its unit like the impact cards' Wh / mL / g (20px serif 700 in `--tokens`, 6px
+from the number), so the token tile and the cards below it read alike.
 
 ### impact accents
 
@@ -80,7 +82,7 @@ accent has three steps.
 | `--power`        | `#FF7A1A` | electric orange: bolts, sparks, gear strokes, glow, icons, tacho arc |
 | `--power-strong` | `#D95A00` | energy numbers (≥ 3:1 on white for large text)                       |
 | `--power-soft`   | `#FFE4CC` | gear fill, tacho track                                               |
-| `--water`        | `#38B6E0` | coral-reef sky blue: drop, basin, front wave, icons, tacho arc       |
+| `--water`        | `#38B6E0` | coral-reef sky blue: drop, pond, stream, icons, tacho arc            |
 | `--water-strong` | `#0B84B0` | water numbers, ripple                                                |
 | `--water-soft`   | `#C9ECF8` | back wave, tacho track                                               |
 | `--co2`          | `#A3C41C` | toxic lime green: factory and cloud strokes, windows, icons, arc     |
@@ -157,11 +159,13 @@ Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `b
 - **Dashboard:** `.dashboard` stacks PageTitle, TimeframePicker, the TokenTotalCard (the same
   full-width token tile as the Analytics headline: 40px TokenCount, solid label, muted detail, no
   badge so no top gap) and `.dashboard-cards` (three equal columns, one column below 1080px). The PowerCard, WaterCard
-  and Co2Card are tiles (see below) with an ImpactBadge in the corner, and the card centers the
-  serif number (40px) and an
-  inline SVG scene (max 320px wide, 28px of whitespace above it). All scenes share one viewBox
-  (240 × 170) and ground line (y ≈ 160: gear bottoms, basin floor, factory floor), so they line
-  up side by side.
+  and Co2Card are tiles (see below) with an ImpactBadge in the top-left corner. A stage (max
+  360px, centered) holds the serif number (40px) right-aligned at the top, the inline SVG scene
+  tucked 10px up under it and the ImpactFact at the bottom (serif multiplier in the accent `-strong`,
+  muted phrase, bold `shortCopy`, like a small FactCard). Bolts leave the scene's top right,
+  just under the digits; the drop (an HTML element on the stage) leaves the number's left side. All scenes share one viewBox (240 × 170) and ground
+  line (y ≈ 160: gear bottoms, pond front, factory floor), so they line up side by side. The
+  stream and smoke run past the scene; the tile clips them.
 
 - **Tiles:** every card and row looks like the HistoryRow: `--bg` background, 12px radius, no
   border, no shadow. One grouped rule in `components.css` gives the dashboard cards, FactCards and
@@ -261,15 +265,18 @@ Reduced motion turns it off.
 The Dashboard cards animate with CSS only (keyframes in `components.css`). The components set
 custom properties, and every animation derives from them:
 
-| Property                        | Set by    | Drives                                                                                     |
-| ------------------------------- | --------- | ------------------------------------------------------------------------------------------ |
-| `--pulse`                       | PowerCard | number glow, gear step (one tooth per pulse), bolts (3 bolts take turns over 3 pulses)     |
-| `--drip`                        | WaterCard | number wobble (sags, snaps back on release), drop (swell, stretch, fall), ripple           |
-| `--drop-fall`                   | WaterCard | fall distance from the number to the pool surface, follows the fill level                  |
-| `--gear-step`                   | PowerCard | per gear: 45° / −45° / −60°, so meshed teeth stay in each other's gaps                     |
-| `--puff`                        | Co2Card   | number haze (lime glow rising off it), time between two clouds (delay per `--cloud-index`) |
-| `--cloud-count`                 | Co2Card   | clouds in the loop; each loops every count × `--puff` ≈ `cloudRiseMs`                      |
-| `--cloud-rise`, `--cloud-drift` | Co2Card   | per chimney: where a cloud ends (up, and right with the wind)                              |
+| Property                                        | Set by    | Drives                                                                                            |
+| ----------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------- |
+| `--pulse`                                       | PowerCard | number glow, gear step (one tooth per pulse), bolts (3 bolts take turns over 3 pulses)            |
+| `--drip`                                        | WaterCard | number wobble, drop (swell, stretch, arc), plop (crown droplets, rebound jet, two rings)          |
+| `offset-path` (inline)                          | WaterCard | the drop's arc in stage px, measured from the number's left edge to the landing point             |
+| `--pond-fill`                                   | WaterCard | pond water size (share of the banks), eases over 900ms                                            |
+| `--gear-step`                                   | PowerCard | per gear: one tooth (360° / teeth), sign alternating along the train, so teeth stay meshed        |
+| `--gear-teeth`, `--gear-turn`                   | PowerCard | outer layer: one tooth ahead per pulse (`steps`), so the inner ratchet's restart never snaps back |
+| `--puff`                                        | Co2Card   | number haze (lime glow rising off it), average time between two clouds                            |
+| `--cloud-count`                                 | Co2Card   | clouds in the loop; each loops every count × `--puff` ≈ `cloudRiseMs`                             |
+| `--cloud-index`                                 | Co2Card   | start delay in `--puff`s: slot number plus a random head start                                    |
+| `--cloud-rise`, `--cloud-drift`, `--cloud-grow` | Co2Card   | where a cloud ends and how much it swells, re-rolled per loop with its stack                      |
 
 - **TokenTotalCard coins** (Dashboard only, the `coins` prop; Analytics stays still): three
   coins per 4.8s cycle (`--coin-cycle`, delays `--coin-index` / `--coin-count`) pop out next to
@@ -281,7 +288,11 @@ custom properties, and every animation derives from them:
 - The periods come from `config.json` → `ui.dashboard` (via `dashboard.helpers.ts`). More CO2
   means more clouds at the same rise speed, not faster clouds. No usage means no smoke, no
   `--pulse` / `--drip` and an `--idle` modifier class that removes the animations.
-- The pool sways all the time (3.6s / 5.2s, independent of usage). The level eases over 900ms
+- Every cloud slot picks a random stack (chimney: small dirty puffs, cooling towers: wide light
+  steam) and a random rise, drift and size each time its loop restarts, so the stacks spew at
+  random while the overall rate stays usage-driven.
+- The stream, water glints, grass tufts, lily pad and chimney beacon move all the time
+  (independent of usage). The pond level eases over 900ms
   when the timeframe changes.
 - `prefers-reduced-motion: reduce` stops every animation and hides the drop and the coins. The values and the
   static scene stay. On Windows, "Animation effects" off counts as reduce.

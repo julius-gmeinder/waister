@@ -203,6 +203,41 @@ function pickRandom<T>(list: readonly T[], randomFn: () => number): T {
 }
 
 /**
+ * Picks one benchmark for a KPI value at random from `getCandidateFacts` and formats the
+ * comparison. Facts in `avoid` are skipped while others fit. Also used by the Dashboard's
+ * ImpactFacts.
+ */
+export function pickFactComparison(
+  kpi: FactKpiId,
+  userValue: number,
+  section: FactsSectionId,
+  randomFn: () => number = Math.random,
+  avoid: ReadonlySet<string> = new Set(),
+): SelectedFactComparison {
+  const candidates = getCandidateFacts(kpi, userValue, section);
+  const unused = candidates.filter((item) => !avoid.has(item.id));
+  const chosen = pickRandom(unused.length > 0 ? unused : candidates, randomFn);
+  const { multiplierText, comparisonQualifier, ratio, isBaselineZero } = formatFactMultiplier(
+    kpi,
+    userValue,
+    chosen.value,
+  );
+
+  return {
+    kpi,
+    section,
+    item: chosen,
+    userValue,
+    ratio,
+    isBaselineZero,
+    multiplierText,
+    comparisonQualifier,
+    formattedUserKpi: formatFactKpiValue(kpi, userValue),
+    formattedBenchmarkKpi: formatFactKpiValue(kpi, chosen.value),
+  };
+}
+
+/**
  * Selects one benchmark for each KPI across Daily, Weekly, and All-Time, avoiding the same fact
  * in two timeframes at once whenever alternative candidates exist.
  */
@@ -227,33 +262,16 @@ export function shuffleFactsBoard(
     const usedIdsInBoard = new Set<string>();
 
     for (const section of sections) {
-      const userValue = sectionValues[section][kpi];
-      const candidates = getCandidateFacts(kpi, userValue, section);
-      const unused = candidates.filter((item) => !usedIdsInBoard.has(item.id));
       // Repeat a fact from another timeframe only when nothing else fits.
-      const pool = unused.length > 0 ? unused : candidates;
-
-      const chosen = pickRandom(pool, randomFn);
-      usedIdsInBoard.add(chosen.id);
-
-      const { multiplierText, comparisonQualifier, ratio, isBaselineZero } = formatFactMultiplier(
+      const comparison = pickFactComparison(
         kpi,
-        userValue,
-        chosen.value,
-      );
-
-      board[section][kpi] = {
-        kpi,
+        sectionValues[section][kpi],
         section,
-        item: chosen,
-        userValue,
-        ratio,
-        isBaselineZero,
-        multiplierText,
-        comparisonQualifier,
-        formattedUserKpi: formatFactKpiValue(kpi, userValue),
-        formattedBenchmarkKpi: formatFactKpiValue(kpi, chosen.value),
-      };
+        randomFn,
+        usedIdsInBoard,
+      );
+      usedIdsInBoard.add(comparison.item.id);
+      board[section][kpi] = comparison;
     }
   }
 

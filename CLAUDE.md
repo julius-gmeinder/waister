@@ -97,7 +97,8 @@ the database and shows the last 24h of token usage (total, breakdown, accumulate
 CO2 tachos, prompt count). Its tab bar opens the full-page app page
 ([ADR 0011](docs/decisions/0011-app-page.md)). Its default page, the Dashboard
 ([ADR 0014](docs/decisions/0014-dashboard-page.md)), shows tokens plus the energy/water/CO2 `impact`
-for a chosen timeframe in three animated cards (CSS + inline SVG). The History
+for a chosen timeframe in three animated cards (CSS + inline SVG), each with a fun fact drawn
+fresh per visit from the Facts logic. The History
 ([ADR 0015](docs/decisions/0015-history-page.md)) lists every saved prompt (timeframe, chat-app
 and sort filters, day groups, "Load more" paging) with a detail modal per prompt. Facts compares
 the impact with everyday benchmarks (hourly seeded pick). All pages share one look: flat tiles
