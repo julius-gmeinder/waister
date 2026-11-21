@@ -8,8 +8,8 @@ const firefox = process.argv.includes('--firefox');
 const outdir = 'dist/waister';
 
 const staticFiles = [
-  ['src/ui/popup/popup.html', 'popup/index.html'],
-  ['src/ui/popup/popup.css', 'popup/index.css'],
+  ['src/ui/popup.html', 'popup/index.html'],
+  // popup.css is not copied: popup.entry.tsx imports it, so esbuild emits popup/index.css.
   ['public', '.'],
   // sqlite-wasm resolves this relative to background.js (via import.meta.url).
   ['node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm', 'sqlite3.wasm'],
@@ -66,6 +66,8 @@ const shared = {
   sourcemap: watch ? 'inline' : false,
   minify: !watch,
   logLevel: 'info',
+  // React strips its dev-only checks when this is 'production'.
+  define: { 'process.env.NODE_ENV': JSON.stringify(watch ? 'development' : 'production') },
 };
 
 /** @type {esbuild.BuildOptions[]} */
@@ -80,10 +82,13 @@ const builds = [
     ...shared,
     entryPoints: {
       content: 'src/entries/content.entry.ts',
-      'popup/index': 'src/entries/popup.entry.ts',
+      'popup/index': 'src/entries/popup.entry.tsx',
     },
     // IIFE keeps every entry self-contained: content scripts can't use ES module imports.
     format: 'iife',
+    // Font files referenced by the bundled popup CSS (@fontsource) are copied, not inlined.
+    loader: { '.woff2': 'file', '.woff': 'file' },
+    assetNames: 'popup/fonts/[name]',
     plugins: [copyStaticPlugin],
   },
 ];

@@ -4,41 +4,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Waister</title>
+    <!-- popup.css + the bundled fonts, built by esbuild from entries/popup.entry.tsx. -->
     <link rel="stylesheet" href="index.css" />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&family=Libre+Baskerville:wght@400;700&display=swap"
-    />
     <script src="index.js" defer></script>
   </head>
   <body>
-    <!-- Every data-lucide name must be registered in POPUP_ICONS (popup.view.ts). -->
-    <main class="popup">
-      <section class="total">
-        <i data-lucide="coins"></i>
-        <span class="total-value" data-field="totalTokens">–</span>
-        <span class="total-label">tokens</span>
-      </section>
-      <p class="period"><span data-field="promptCount">–</span> · last 24h</p>
-
-      <ul class="breakdown">
-        <li>
-          <i data-lucide="message-square"></i><span>Input</span><span data-field="input">–</span>
-        </li>
-        <li>
-          <i data-lucide="history"></i><span>History</span><span data-field="history">–</span>
-        </li>
-        <li>
-          <i data-lucide="message-square-text"></i><span>Output</span
-          ><span data-field="output">–</span>
-        </li>
-        <li>
-          <i data-lucide="brain"></i><span>Thinking</span><span data-field="thinking">–</span>
-        </li>
-        <li>
-          <i data-lucide="settings-2"></i><span>Overhead</span><span data-field="overhead">–</span>
-        </li>
-      </ul>
-    </main>
+    <!-- React renders <PopupApp/> (popup.app.tsx) in here. -->
+    <div id="root"></div>
   </body>
 </html>

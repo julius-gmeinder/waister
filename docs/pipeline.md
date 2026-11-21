@@ -133,7 +133,7 @@ restored when the service worker starts.
 
 ## 6. Popup
 
-When opened, `ui/popup/popup.view.ts` sends `GET_USAGE_SUMMARY { sinceMs: now − 24 h }`.
+When opened, `PopupApp` (`ui/popup.app.tsx`) sends `GET_USAGE_SUMMARY { sinceMs: now − 24 h }`.
 `handlers/usage.handler.ts` passes it to `getUsageSummary(sinceMs)`, which sums all rows with
 `captured_at >= sinceMs`. The popup shows the summed `totalTokens`, the breakdown and the prompt
 count. It has no link to the estimation pipeline.
