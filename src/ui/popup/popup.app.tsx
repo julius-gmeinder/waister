@@ -61,7 +61,7 @@ export function PopupApp() {
           variant="compact"
           waterMl={summary?.impact.waterMl}
           dripMs={animation.dripMs}
-          poolFill={animation.poolFill}
+          pondFill={animation.pondFill}
         />
         <Co2Card
           variant="compact"
