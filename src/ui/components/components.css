@@ -361,7 +361,8 @@
 .analytics-eco-banner,
 .analytics-legacy-notice,
 .featured-tip-card,
-.tip-card {
+.tip-card,
+.token-total-card {
   position: relative;
   overflow: hidden;
   border-radius: 12px;
@@ -381,7 +382,8 @@
 .analytics-kpi,
 .analytics-eco-banner,
 .featured-tip-card,
-.tip-card {
+.tip-card,
+.token-total-card {
   animation: tile-enter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: calc(min(var(--enter-index, 0), 12) * 45ms);
 }
@@ -1663,8 +1665,14 @@
   border: none;
   border-radius: 999px;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--contrast-bright);
   cursor: pointer;
+}
+
+/* Stays indigo on hover (only the neutral background of the shared states applies). The extra
+   class beats the shared hover rule further down. */
+.info-tooltip .info-tooltip-trigger:hover {
+  color: var(--contrast-bright);
 }
 
 .info-tooltip-trigger .lucide {
@@ -1706,16 +1714,17 @@
   transform: translateY(0);
 }
 
-/* ChartCard (analytics): a tile (shared rule above) with a serif title + ⓘ, a one-line insight
-   below it and optional chips or a legend on the right. */
+/* ChartCard (analytics): a tile (shared rule above) with a title + ⓘ, a one-line insight below it
+   and optional chips or a legend on the right. Text and spacing like a FactCard: solid --text
+   title, muted insight, roomy padding. */
 .chart-card {
   /* The ⓘ popover may reach past the tile. */
   overflow: visible;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 28px;
   min-width: 0;
-  padding: 20px 24px 24px;
+  padding: 24px 28px 28px;
 }
 
 .chart-card-header {
@@ -1741,16 +1750,17 @@
 
 .chart-card-title {
   margin: 0;
-  color: var(--contrast);
-  font-family: var(--font-serif);
-  font-size: 17px;
-  font-weight: 700;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.35;
 }
 
 .chart-card-subtitle {
   margin: 0;
   color: var(--text-muted);
   font-size: 13px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1765,9 +1775,199 @@
   flex-direction: column;
 }
 
-/* CategoryFilterBar + FeaturedTipCard + TipCard (tips page): flat tiles matching the rest of the
-   app (--bg, 12px radius, no border/shadow), with the flush top-left corner tab (like ImpactBadge),
-   top-right --surface tag (like Analytics KPI delta) and borderless --surface example drawer. */
+/* TokenTotalCard (dashboard, analytics): a full-width tile read like the Analytics KPI tiles
+   (big value, solid label, muted detail), with no badge and so no top gap. The text is the first
+   column; the second holds the coin track. */
+.token-total-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  align-content: start;
+  min-width: 0;
+  padding: 24px 28px;
+}
+
+.token-total-card-reading,
+.token-total-card-label,
+.token-total-card-detail {
+  grid-column: 1;
+}
+
+.token-total-card-reading {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  font-size: 40px;
+  line-height: 1.15;
+}
+
+.token-total-card-reading .token-count-unit {
+  font-size: 15px;
+}
+
+.token-total-card-label {
+  margin-top: 10px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.token-total-card-detail {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Coin run (Dashboard). The track is the card's second column, stretched over the padding to the
+   card's top, right and bottom edges. Each coin is three layers on one --coin-cycle:
+   .token-coin-run moves it across (its translateX % = the track width, plus a coin, so it leaves
+   the tile, which clips it), .token-coin-hop drops it from the number's height (a % of the track)
+   to the card's bottom edge and skips it along there with ever lower hops, .token-coin pops it in
+   and spins it. A run takes the first 70% of the cycle; the coins start --coin-count evenly
+   spaced delays apart. */
+.token-coins {
+  --coin-cycle: 4.8s;
+  /* Ground: the coin's bottom, just above the card's bottom edge. */
+  --coin-ground: 8px;
+  position: relative;
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  min-width: 0;
+  margin: -24px -28px -24px 12px;
+}
+
+.token-coin-run {
+  position: absolute;
+  inset: 0;
+  animation: token-coin-run var(--coin-cycle) linear infinite;
+  animation-delay: calc(var(--coin-cycle) * var(--coin-index) / var(--coin-count));
+}
+
+.token-coin-hop {
+  position: absolute;
+  bottom: var(--coin-ground);
+  left: 0;
+  display: block;
+  width: 26px;
+  height: 26px;
+  transform-origin: 50% 100%;
+  animation: token-coin-hop var(--coin-cycle) infinite;
+  animation-delay: inherit;
+}
+
+.token-coin {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  animation: token-coin-spin var(--coin-cycle) linear infinite;
+  animation-delay: inherit;
+}
+
+.token-coin-face {
+  fill: var(--tokens-soft);
+  stroke: var(--tokens);
+  stroke-width: 1.5;
+}
+
+.token-coin-rim {
+  fill: none;
+  stroke: var(--tokens);
+  stroke-width: 1;
+  opacity: 0.55;
+}
+
+.token-coin-mark {
+  fill: none;
+  stroke: var(--tokens);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+@keyframes token-coin-run {
+  0% {
+    transform: translateX(0);
+  }
+  70%,
+  100% {
+    transform: translateX(calc(100% + 26px));
+  }
+}
+
+/* Starts at the number's height (55% of the card up), arcs up a little and drops to the ground,
+   then skips: up eases out, down eases in, a small squash on each landing, every hop lower and
+   shorter, then it rolls. `bottom` animates (not translateY) because only it can take a % of the
+   card height. */
+@keyframes token-coin-hop {
+  0% {
+    bottom: 55%;
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.2, 0.6, 0.35, 1);
+  }
+  5% {
+    bottom: calc(55% + 12px);
+    animation-timing-function: cubic-bezier(0.65, 0, 0.8, 0.4);
+  }
+  15%,
+  27%,
+  37%,
+  45%,
+  51% {
+    bottom: var(--coin-ground);
+    transform: scale(1.08, 0.9);
+    animation-timing-function: cubic-bezier(0.2, 0.6, 0.35, 1);
+  }
+  21% {
+    bottom: calc(var(--coin-ground) + 30px);
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.65, 0, 0.8, 0.4);
+  }
+  32% {
+    bottom: calc(var(--coin-ground) + 18px);
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.65, 0, 0.8, 0.4);
+  }
+  41% {
+    bottom: calc(var(--coin-ground) + 9px);
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.65, 0, 0.8, 0.4);
+  }
+  48% {
+    bottom: calc(var(--coin-ground) + 3px);
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.65, 0, 0.8, 0.4);
+  }
+  54%,
+  100% {
+    bottom: var(--coin-ground);
+    transform: scale(1);
+  }
+}
+
+@keyframes token-coin-spin {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(0deg);
+  }
+  4% {
+    opacity: 1;
+    transform: scale(1) rotate(60deg);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1) rotate(1440deg);
+  }
+  71%,
+  100% {
+    opacity: 0;
+    transform: scale(1) rotate(1440deg);
+  }
+}
+
+/* CategoryFilterBar + FeaturedTipCard + TipCard (tips page): tiles (shared rule) with two flush
+   corner tabs (like ImpactBadge) and a borderless --surface example drawer. */
 .tips-filter-bar {
   display: flex;
   flex-wrap: wrap;
@@ -1792,15 +1992,26 @@
   cursor: pointer;
 }
 
-/* Top padding clears the flush corner tab (.tip-impact-tab), matching .analytics-kpi / .fact-card. */
+/* Same spacing as a FactCard: top padding clears the corner tabs, 20px between the text and the
+   actions. Two subgrid rows (text, actions) shared with the grid neighbor, so the buttons of a row
+   line up and stay put when either card opens its example. */
 .featured-tip-card,
 .tip-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-rows: auto auto;
+  grid-row: span 2;
+  align-content: start;
+  row-gap: 20px;
   min-width: 0;
-  padding: 46px 24px 18px;
+  padding: 56px 28px 24px;
   transition: opacity 160ms ease;
+}
+
+@supports (grid-template-rows: subgrid) {
+  .featured-tip-card,
+  .tip-card {
+    grid-template-rows: subgrid;
+  }
 }
 
 .tip-card--adopted {
@@ -1812,16 +2023,15 @@
   opacity: 1;
 }
 
-/* Flush top-left corner tab mirroring .impact-badge geometry and typography. */
-.tip-impact-tab {
+/* Corner tabs mirroring .impact-badge: impact flush top left (accent), category flush top right
+   (neutral, a step darker than the tile). */
+.tip-tab {
   position: absolute;
   top: 0;
-  left: 0;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border-radius: 0 0 12px 0;
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 400;
@@ -1829,43 +2039,46 @@
   white-space: nowrap;
 }
 
-.tip-impact-tab .lucide {
+.tip-tab .lucide {
   width: 13px;
   height: 13px;
+}
+
+.tip-tab--impact {
+  left: 0;
+  border-radius: 0 0 12px 0;
+}
+
+.tip-tab--impact .lucide {
   fill: currentColor;
 }
 
-.tip-impact-tab--high {
+.tip-tab--high {
   background: var(--power-soft);
   color: var(--power-strong);
 }
 
-.tip-impact-tab--quick {
+.tip-tab--quick {
   background: var(--co2-soft);
   color: var(--co2-strong);
 }
 
-/* Top-right category tag level with the corner tab, mirroring .analytics-kpi-delta. */
-.tip-corner-tag {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--surface);
+.tip-tab--category {
+  right: 0;
+  border-radius: 0 0 0 12px;
+  background: var(--neutral-hover);
   color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.35;
-  white-space: nowrap;
 }
 
+/* Muted line above the title, like the FactCard phrase; the icon takes the text color. */
 .featured-tip-hook {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin: 0;
+  margin: 0 0 4px;
   color: var(--text-muted);
   font-size: 13px;
+  font-weight: 500;
   line-height: 1.35;
   font-variant-numeric: tabular-nums;
 }
@@ -1873,50 +2086,59 @@
 .featured-tip-hook .lucide {
   width: 14px;
   height: 14px;
-  color: var(--contrast-bright);
 }
 
 .tip-card-body {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
 }
 
-/* Featured cards carry a serif title like ChartCard; grid cards use sans semibold like FactCard
-   copy so the page stays calm and scannable. */
-.featured-tip-title {
-  margin: 0;
-  color: var(--contrast);
-  font-family: var(--font-serif);
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 1.3;
-  text-wrap: pretty;
-}
-
+/* Text like a FactCard: solid --text sentence (larger on the featured card, like a wide
+   FactCard), muted text around it. */
+.featured-tip-title,
 .tip-card-title {
   margin: 0;
   color: var(--text);
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 650;
   line-height: 1.35;
   text-wrap: pretty;
+}
+
+.featured-tip-title {
+  font-size: 19px;
 }
 
 .tip-card-summary {
   margin: 0;
   color: var(--text-muted);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
   text-wrap: pretty;
 }
 
-/* Borderless --surface inset matching .fact-card-readout inside --bg tiles. */
+.tip-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.tip-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+/* Borderless --surface inset like .fact-card-readout inside --bg tiles. */
 .tip-example-drawer {
   display: grid;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: 10px;
+  padding: 14px 16px;
   border-radius: 8px;
   background: var(--surface);
   animation: tip-drawer-in 160ms ease-out;
@@ -1933,22 +2155,15 @@
   display: grid;
   grid-template-columns: 76px minmax(0, 1fr);
   align-items: baseline;
-  gap: 4px 10px;
+  gap: 4px 12px;
   font-size: 13px;
   line-height: 1.45;
 }
 
 .tip-example-label {
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.tip-example-label--instead {
   color: var(--text-muted);
-}
-
-.tip-example-label--try {
-  color: var(--contrast);
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .tip-example-text {
@@ -1957,14 +2172,8 @@
   overflow-wrap: anywhere;
 }
 
-.tip-card-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 12px;
-  margin-top: auto;
-  padding-top: 4px;
+.tip-example-label--instead + .tip-example-text {
+  color: var(--text-muted);
 }
 
 /* Negative left margin keeps the label text flush with the card title while preserving hover pill padding. */
@@ -1973,7 +2182,7 @@
   align-items: center;
   gap: 4px;
   margin-left: -10px;
-  padding: 5px 10px;
+  padding: 7px 10px;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -1997,8 +2206,8 @@
 .tip-card-adopt {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
+  gap: 6px;
+  padding: 7px 18px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
@@ -2012,7 +2221,6 @@
 .tip-card-adopt .lucide {
   width: 14px;
   height: 14px;
-  color: var(--contrast-bright);
 }
 
 @media (max-width: 560px) {
@@ -2032,8 +2240,13 @@
   .analytics-eco-banner,
   .featured-tip-card,
   .tip-card,
-  .tip-example-drawer {
+  .tip-example-drawer,
+  .token-total-card {
     animation: none;
+  }
+
+  .token-coins {
+    display: none;
   }
 
   .tip-card-chevron {

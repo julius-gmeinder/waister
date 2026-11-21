@@ -335,6 +335,7 @@ components/                           shared components (used by either surface)
   components.css                      styles of all components, one block each
   header.component.tsx                Header: full logo, centered (/logo/waister-full.svg), popup and app page
   total.component.tsx                 Total: Coins icon + summed token count (a <div>)
+  token-total-card.component.tsx      TokenTotalCard (dashboard, analytics): full-width token tile (TokenCount, label, detail, optional corner pill), optional coins skipping along the bottom (Dashboard)
   token-count.component.tsx           TokenCount: every token number (serif, --tokens), optional "tokens" unit, approximate note on hover, sizes inline / large / hero
   token-category.helpers.ts           TOKEN_CATEGORIES: order, label, icon and visible/hidden of the six breakdown parts
   breakdown.component.tsx             Breakdown: the six rows (from TOKEN_CATEGORIES)
@@ -358,11 +359,11 @@ components/                           shared components (used by either surface)
   impact-badge.component.tsx          ImpactBadge (dashboard, facts, modal): corner tab, -soft fill, solid icon + label (Energy, Water, CO₂)
   prompt-detail-modal.component.tsx   PromptDetailModal (history): native <dialog> with breakdown legend, impact tiles (ImpactBadge), model & timings, full-width conversation link, ← / → stepping
   fact-card.component.tsx             FactCard (facts): benchmark tile, ImpactBadge, multiplier + plain phrase, one-sentence fact, SVG watermark top right
-  chart-card.component.tsx            ChartCard (analytics): tile with serif title + InfoTooltip, one-line insight, optional header action (chips, legend)
+  chart-card.component.tsx            ChartCard (analytics): tile with solid title + indigo InfoTooltip, one-line insight, optional header action (chips, legend)
   info-tooltip.component.tsx          InfoTooltip (analytics): quiet ⓘ button, explanation popover on hover, focus or click
   category-filter-bar.component.tsx   CategoryFilterBar (tips): category ChipGroup + "Hide adopted" checkbox toggle
-  featured-tip-card.component.tsx     FeaturedTipCard (tips): personalized or starter hero tile with data-backed hook, expandable example drawer, and adopt toggle
-  tip-card.component.tsx              TipCard (tips): compact habit tile with impact/category pills, expandable before/after example drawer, and adopt toggle
+  featured-tip-card.component.tsx     FeaturedTipCard (tips): personalized or starter hero tile: muted data-backed hook, larger title, TipCard's tabs + actions
+  tip-card.component.tsx              TipCard (tips): habit tile, impact tab top left + neutral category tab top right, actions with the example drawer below; exports TipCardTabs / TipCardActions
 popup/
   popup.html                          <div id="root">, loads index.js + index.css
   popup.css                           popup layout only (full-window card, `.popup-period` line)
@@ -372,7 +373,7 @@ app/
   app.css                             app page layout only (flat sidebar + content grid, dashboard grid, history list, facts grids, analytics tiles and charts)
   app.app.tsx                         App: reads the hash route, holds the dashboard timeframe and the HistoryView, fetches summaries, history pages and the Analytics records, renders Sidebar + the page
   pages/
-    dashboard.page.tsx                DashboardPage: title, picker, token subtitle, PowerCard + WaterCard + Co2Card
+    dashboard.page.tsx                DashboardPage: title, picker, TokenTotalCard, PowerCard + WaterCard + Co2Card
     dashboard.helpers.ts              dashboardAnimation(summary): pulse / drip / puff period, pool fill, cloud count from config
     analytics.page.tsx                AnalyticsPage: metric + timeframe chips, KPI tiles, breakdown TokenBar, model donut + comparison, chat memory chart, eco-insight, export / reset footer
     analytics.helpers.ts              aggregateAnalytics(records, metric, timeframe, …) → view models (KPIs, breakdown, donut, comparison, series, eco-insight), CSV / JSON export

@@ -182,12 +182,6 @@ export function TipsPage({ records }: TipsPageProps) {
           </div>
         )}
       </section>
-
-      <footer className="tips-footer">
-        <p className="tips-footer-note">
-          You don&apos;t need to use less AI—just use it with intention.
-        </p>
-      </footer>
     </section>
   );
 }

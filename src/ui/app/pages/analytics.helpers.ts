@@ -316,7 +316,7 @@ function getMetricDisplayNames(metric: AnalyticsMetricTab): {
         lowerCase: 'water',
         topUserLabel: 'Top water user',
         breakdownTitle: 'Where your water goes',
-        donutToggleLabel: 'Water (%)',
+        donutToggleLabel: 'Water',
       };
     case 'co2':
       return {
@@ -324,7 +324,7 @@ function getMetricDisplayNames(metric: AnalyticsMetricTab): {
         lowerCase: 'CO₂',
         topUserLabel: 'Top CO₂ user',
         breakdownTitle: 'Where your CO₂ goes',
-        donutToggleLabel: 'CO₂ (%)',
+        donutToggleLabel: 'CO₂',
       };
     case 'tokens':
       return {
@@ -332,7 +332,7 @@ function getMetricDisplayNames(metric: AnalyticsMetricTab): {
         lowerCase: 'tokens',
         topUserLabel: 'Top token user',
         breakdownTitle: 'Where your tokens go',
-        donutToggleLabel: 'Tokens (%)',
+        donutToggleLabel: 'Tokens',
       };
     case 'all':
     case 'power':
@@ -341,7 +341,7 @@ function getMetricDisplayNames(metric: AnalyticsMetricTab): {
         lowerCase: 'energy',
         topUserLabel: 'Top energy user',
         breakdownTitle: 'Where your energy goes',
-        donutToggleLabel: 'Energy (%)',
+        donutToggleLabel: 'Energy',
       };
   }
 }
@@ -1358,7 +1358,7 @@ export function buildModelDonut(
   return {
     mode,
     impactToggleLabel: metricNames.donutToggleLabel,
-    messagesToggleLabel: 'Messages (%)',
+    messagesToggleLabel: 'Messages',
     totalValue,
     centerValue,
     centerUnit,
@@ -2088,7 +2088,19 @@ export function buildKpiCards(
     );
     const avgTokPerMsg = promptCount > 0 ? Math.round(tokensNow / promptCount) : 0;
 
+    // Tokens first: the page shows the first card as the full-width headline tile.
     return [
+      {
+        id: 'total-tokens',
+        label: 'Total tokens',
+        tone: 'neutral',
+        value: formatCompactTokens(tokensNow),
+        unit: 'tok',
+        tokens: tokensNow,
+        deltaText: tokensDelta.deltaText,
+        deltaTrend: tokensDelta.deltaTrend,
+        comparisonText: `${formatMessageCount(promptCount)} · avg ${formatCompactTokens(avgTokPerMsg)}/msg`,
+      },
       {
         id: 'total-power',
         label: 'Total energy',
@@ -2118,17 +2130,6 @@ export function buildKpiCards(
         deltaText: co2Delta.deltaText,
         deltaTrend: co2Delta.deltaTrend,
         comparisonText: formatRealWorldComparison('co2', co2Now),
-      },
-      {
-        id: 'total-tokens',
-        label: 'Total tokens',
-        tone: 'neutral',
-        value: formatCompactTokens(tokensNow),
-        unit: 'tok',
-        tokens: tokensNow,
-        deltaText: tokensDelta.deltaText,
-        deltaTrend: tokensDelta.deltaTrend,
-        comparisonText: `${formatMessageCount(promptCount)} · avg ${formatCompactTokens(avgTokPerMsg)}/msg`,
       },
     ];
   }

@@ -30,6 +30,8 @@
   /* Brass gold of every token number (TokenCount), next to the Coins icon. Docs:
      docs/styling.md#colors */
   --tokens: #8a5a00;
+  /* Coin face of the TokenTotalCard animation: a light brass under the --tokens outline. */
+  --tokens-soft: #f4dc9c;
 
   /* Impact accents (dashboard cards): electric orange for energy, coral-reef sky blue for water,
      dirty toxic green for CO2. Each has a base (strokes, glow), -strong (text, ≥ 3:1 on white),

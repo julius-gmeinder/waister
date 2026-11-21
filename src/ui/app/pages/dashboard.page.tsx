@@ -1,5 +1,5 @@
 /**
- * DashboardPage: tokens, energy, water and CO2 of the selected timeframe. The App root owns the
+ * DashboardPage: tokens (TokenTotalCard), energy, water and CO2 of the selected timeframe. The App root owns the
  * timeframe and the fetched summary, this page only renders them.
  *
  * Context: app page
@@ -11,8 +11,8 @@ import { Co2Card } from '../../components/co2-card.component';
 import { PageTitle } from '../../components/page-title.component';
 import { PowerCard } from '../../components/power-card.component';
 import { TimeframePicker } from '../../components/timeframe-picker.component';
+import { TokenTotalCard } from '../../components/token-total-card.component';
 import { WaterCard } from '../../components/water-card.component';
-import { TokenCount } from '../../components/token-count.component';
 import { formatCount } from '../../format.helpers';
 import type { TimeframeId } from '../../timeframe.helpers';
 import type { SummaryState } from '../../usage-api';
@@ -24,16 +24,12 @@ interface DashboardPageProps {
   summary: SummaryState;
 }
 
-function describeUsage(summary: SummaryState) {
-  if (summary === null) return 'No data';
-  const prompts = summary?.promptCount;
-  return (
-    <>
-      <TokenCount value={summary?.totalTokens} size="large" />
-      {prompts !== undefined &&
-        ` across ${formatCount(prompts)} ${prompts === 1 ? 'prompt' : 'prompts'}`}
-    </>
-  );
+function describeUsage(summary: SummaryState): string {
+  if (summary === undefined) return 'Loading…';
+  if (summary === null || summary.promptCount === 0) return 'No prompts yet';
+  const prompts = summary.promptCount;
+  const avg = Math.round(summary.totalTokens / prompts);
+  return `${formatCount(prompts)} ${prompts === 1 ? 'prompt' : 'prompts'} · avg ${formatCount(avg)} per prompt`;
 }
 
 export function DashboardPage({ timeframe, onTimeframeChange, summary }: DashboardPageProps) {
@@ -43,7 +39,12 @@ export function DashboardPage({ timeframe, onTimeframeChange, summary }: Dashboa
     <section className="dashboard">
       <PageTitle>Dashboard</PageTitle>
       <TimeframePicker value={timeframe} onChange={onTimeframeChange} />
-      <p className="dashboard-subtitle">{describeUsage(summary)}</p>
+      <TokenTotalCard
+        tokens={summary === null ? 0 : summary?.totalTokens}
+        label="Total tokens"
+        detail={describeUsage(summary)}
+        coins
+      />
       <div className="dashboard-cards">
         <PowerCard energyWh={summary?.impact.energyWh} pulseMs={animation.pulseMs} />
         <WaterCard

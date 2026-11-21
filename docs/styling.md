@@ -47,6 +47,7 @@ the hex value.
 | `--text`            | `#1C1917`             | body text                                                      |
 | `--text-muted`      | `#57534E`             | secondary text (period line, tab labels, placeholders)         |
 | `--tokens`          | `#8A5A00`             | brass gold: every token number (TokenCount) and the Coins icon |
+| `--tokens-soft`     | `#F4DC9C`             | light brass: coin face in the TokenTotalCard animation         |
 | `--watermark`       | `#EBE2C4`             | FactCard background icon, one tint for every KPI               |
 | `--scrollbar`       | `#D8CEA8`             | thumb of the thin scrollbars (page, modal body)                |
 
@@ -57,7 +58,7 @@ Every token figure in the extension goes through the **TokenCount** component
 700, `--tokens`, tabular digits, followed by a muted sans "tokens" unit (left out in lists whose
 heading already says tokens, such as the popup breakdown and the modal legend). Only the size
 differs: `inline` follows the surrounding text (sentences, day headers, HistoryRows, legends),
-`large` is 28px (popup total, Dashboard subtitle) and `hero` 36px (PromptDetailModal total). An approximate
+`large` is 28px (popup total) and `hero` 36px (PromptDetailModal total). An approximate
 estimate has no badge or glyph: the count gets a `help` cursor and explains itself in its title
 on hover. Don't style token numbers by hand.
 
@@ -153,8 +154,9 @@ Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `b
 - **App page:** `.app` is a grid: the Sidebar (240px, `--bg`, full height, sticky) on the left,
   and the content (`.app-content`, `--surface`, padding 32px 40px) on the right. No border
   between them. Only the background color separates them.
-- **Dashboard:** `.dashboard` stacks PageTitle, TimeframePicker, the token subtitle and
-  `.dashboard-cards` (three equal columns, one column below 1080px). The PowerCard, WaterCard
+- **Dashboard:** `.dashboard` stacks PageTitle, TimeframePicker, the TokenTotalCard (the same
+  full-width token tile as the Analytics headline: 40px TokenCount, solid label, muted detail, no
+  badge so no top gap) and `.dashboard-cards` (three equal columns, one column below 1080px). The PowerCard, WaterCard
   and Co2Card are tiles (see below) with an ImpactBadge in the corner, and the card centers the
   serif number (40px) and an
   inline SVG scene (max 320px wide, 28px of whitespace above it). All scenes share one viewBox
@@ -216,11 +218,14 @@ Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `b
   only.
 - **Analytics:** `.analytics-page` stacks a plain header (PageTitle + subtitle), one filter row
   (metric and timeframe ChipGroups, 28px apart like the History), four KPI tiles, then
-  ChartCards. Everything is a tile (shared rule): KPI tiles carry an ImpactBadge when they show
-  energy, water or CO₂ and leave the same top padding without one, so labels and values line up;
-  token values use TokenCount; the change vs. the previous period is a small pill in the top-right
-  corner. A ChartCard has a serif title with an InfoTooltip (ⓘ, the third floating box: border +
-  `--shadow`), a muted one-line insight and optional Chips or a legend on the right. The breakdown
+  ChartCards. Everything is a tile (shared rule). The first KPI tile (total tokens for "All",
+  else the metric's total) spans the row with a 40px value like the Dashboard cards, the other
+  three sit below it. Every KPI tile reads the same way: big colored value (32px), the label in
+  solid `--text`, then a muted example. KPI tiles carry an ImpactBadge when they show energy,
+  water or CO₂ and leave the same top padding without one, so values line up; token values use
+  TokenCount; the change vs. the previous period is a small pill in the top-right
+  corner. A ChartCard has a solid `--text` title (sans 650, like the FactCard sentence) with an
+  indigo InfoTooltip (ⓘ, the third floating box: border + `--shadow`), a muted one-line insight and optional Chips or a legend on the right. The breakdown
   is one thick TokenBar (token category colors, hidden parts hatched, a 12px gap instead of a
   divider between the visible and the behind-the-scenes group) with a swatch legend per group. The
   model donut takes the token palette in its order (Other in `--token-other`), the model
@@ -228,6 +233,16 @@ Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `b
   `--token-history` / `--token-input` columns over faint solid gridlines. Impact accents are only
   for energy, water and CO₂. The eco-insight is a tile with an ImpactBadge for the selected
   metric, the footer is set apart by padding only, and its buttons are pills like "Load more".
+  Spacing follows the Facts page: tiles 18px apart, the header 32px above them, FactCard padding.
+- **Tips:** the Facts rhythm (plain header, sections 36px apart, serif section title + muted meta,
+  tiles 18px apart). A tip tile has two flush corner tabs mirroring the ImpactBadge: impact top left
+  (accent fill), category top right (`--neutral-hover`, muted text). Text like a FactCard: muted
+  hook, solid title, muted summary. The actions row comes before the example drawer, and each
+  card is a two-row subgrid (text, actions) of the grid, so the buttons of neighbors line up and
+  never move when an example opens.
+- **Card text:** inside tiles, headings are solid `--text` (sans, weight 650) with muted text
+  around them; serif is for numbers and page / section titles. An icon next to muted text takes
+  that muted color.
 - **Scrollbars:** thin everywhere, `--scrollbar` thumb on a transparent track (`:root` in
   `base.css`, the modal body opts in with `scrollbar-width: thin`).
 - **No uppercase labels:** small labels (modal subheadings, card qualifiers) are sentence case,
@@ -236,7 +251,7 @@ Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `b
 ## motion
 
 **Page open:** tiles fade and lift in one after another (`tile-enter` in `components.css`, 380ms,
-10px lift): the Dashboard's three cards, the FactCards, the History summary strip, the
+10px lift): the Dashboard's token tile and three cards, the FactCards, the History summary strip, the
 HistoryRows and the Analytics tiles (KPIs 0–3, ChartCards 4–7, eco-insight 8). Each tile's `--enter-index` delays it by 45ms per step, capped at 12. The water and
 CO2 cards set theirs in CSS, FactCards and HistoryRows get it as a prop (`enterIndex`), and
 History rows restart the count with every loaded page, so "Load more" rows come in right away.
@@ -256,12 +271,19 @@ custom properties, and every animation derives from them:
 | `--cloud-count`                 | Co2Card   | clouds in the loop; each loops every count × `--puff` ≈ `cloudRiseMs`                      |
 | `--cloud-rise`, `--cloud-drift` | Co2Card   | per chimney: where a cloud ends (up, and right with the wind)                              |
 
+- **TokenTotalCard coins** (Dashboard only, the `coins` prop; Analytics stays still): three
+  coins per 4.8s cycle (`--coin-cycle`, delays `--coin-index` / `--coin-count`) pop out next to
+  the number, drop to the card's bottom edge (`--coin-ground`), skip along it in ever lower hops
+  (squash on each landing), then roll off the right edge, where the tile clips them. The track is
+  the card's second grid column, stretched over the padding to the card's edges. Three layers
+  per coin: run (translateX), hop (`bottom`, so the drop can start at a % of the card height),
+  coin (pop-in scale + spin). Fixed timing, not usage-driven; no coins while loading or at 0.
 - The periods come from `config.json` → `ui.dashboard` (via `dashboard.helpers.ts`). More CO2
   means more clouds at the same rise speed, not faster clouds. No usage means no smoke, no
   `--pulse` / `--drip` and an `--idle` modifier class that removes the animations.
 - The pool sways all the time (3.6s / 5.2s, independent of usage). The level eases over 900ms
   when the timeframe changes.
-- `prefers-reduced-motion: reduce` stops every animation and hides the drop. The values and the
+- `prefers-reduced-motion: reduce` stops every animation and hides the drop and the coins. The values and the
   static scene stay. On Windows, "Animation effects" off counts as reduce.
 
 ### dark mode
@@ -292,35 +314,36 @@ browser only loads the Latin files it needs (~110 KB, from disk). A new weight i
 (`import { Coins } from 'lucide-react'`). The lucide site lists icons in kebab-case
 (`message-square-text`), and the React component is the PascalCase name (`MessageSquareText`).
 
-| Field / route | Icon                 | Used in                                           |
-| ------------- | -------------------- | ------------------------------------------------- |
-| totalTokens   | `Coins`              | `total.component.tsx` (in `--tokens`)             |
-| model         | `Cpu`                | (not shown yet)                                   |
-| latencyMs     | `Timer`              | (not shown yet)                                   |
-| input         | `MessageSquare`      | `token-category.helpers.ts`                       |
-| history       | `History`            | `token-category.helpers.ts`                       |
-| output        | `MessageSquareText`  | `token-category.helpers.ts`                       |
-| thinking      | `Brain`              | `token-category.helpers.ts`                       |
-| tools         | `Wrench`             | `token-category.helpers.ts`                       |
-| overhead      | `Settings2`          | `token-category.helpers.ts`                       |
-| energyWh      | `Zap`                | tacho, power card, impact figures, detail modal   |
-| waterMl       | `Droplet`            | tacho, water card, impact figures, detail modal   |
-| co2Grams      | `Factory`            | tacho, CO2 card, impact figures, detail modal     |
-| Dashboard     | `LayoutDashboard`    | `app-routes.ts`                                   |
-| Analytics     | `ChartColumn`        | `app-routes.ts`                                   |
-| Facts         | `BookOpen`           | `app-routes.ts`                                   |
-| Tips          | `Lightbulb`          | `app-routes.ts`                                   |
-| History page  | `Clock`              | `app-routes.ts`, `history.page.tsx` (empty state) |
-| sort          | `ArrowDownUp`        | `sort-picker.component.tsx`                       |
-| select arrow  | `ChevronDown`        | `sort-picker.component.tsx`                       |
-| prev / next   | `ChevronLeft/Right`  | `prompt-detail-modal.component.tsx`               |
-| close         | `X`                  | `prompt-detail-modal.component.tsx`               |
-| open chat     | `ExternalLink`       | `prompt-detail-modal.component.tsx`               |
-| methodology   | `Info`               | `info-tooltip.component.tsx`                      |
-| eco-insight   | `Leaf` / `Sparkles`  | `analytics.page.tsx` (tip / not enough data)      |
-| export, reset | `Download`, `Trash2` | `analytics.page.tsx`                              |
-| legacy notice | `AlertTriangle`      | `analytics.page.tsx`                              |
-| tech details  | `SlidersHorizontal`  | `analytics.page.tsx`                              |
+| Field / route | Icon                                        | Used in                                                               |
+| ------------- | ------------------------------------------- | --------------------------------------------------------------------- |
+| totalTokens   | `Coins`                                     | `total.component.tsx` (in `--tokens`)                                 |
+| model         | `Cpu`                                       | (not shown yet)                                                       |
+| latencyMs     | `Timer`                                     | (not shown yet)                                                       |
+| input         | `MessageSquare`                             | `token-category.helpers.ts`                                           |
+| history       | `History`                                   | `token-category.helpers.ts`                                           |
+| output        | `MessageSquareText`                         | `token-category.helpers.ts`                                           |
+| thinking      | `Brain`                                     | `token-category.helpers.ts`                                           |
+| tools         | `Wrench`                                    | `token-category.helpers.ts`                                           |
+| overhead      | `Settings2`                                 | `token-category.helpers.ts`                                           |
+| energyWh      | `Zap`                                       | tacho, power card, impact figures, detail modal                       |
+| waterMl       | `Droplet`                                   | tacho, water card, impact figures, detail modal                       |
+| co2Grams      | `Factory`                                   | tacho, CO2 card, impact figures, detail modal                         |
+| Dashboard     | `LayoutDashboard`                           | `app-routes.ts`                                                       |
+| Analytics     | `ChartColumn`                               | `app-routes.ts`                                                       |
+| Facts         | `BookOpen`                                  | `app-routes.ts`                                                       |
+| Tips          | `Lightbulb`                                 | `app-routes.ts`                                                       |
+| History page  | `Clock`                                     | `app-routes.ts`, `history.page.tsx` (empty state)                     |
+| sort          | `ArrowDownUp`                               | `sort-picker.component.tsx`                                           |
+| select arrow  | `ChevronDown`                               | `sort-picker.component.tsx`                                           |
+| prev / next   | `ChevronLeft/Right`                         | `prompt-detail-modal.component.tsx`                                   |
+| close         | `X`                                         | `prompt-detail-modal.component.tsx`                                   |
+| open chat     | `ExternalLink`                              | `prompt-detail-modal.component.tsx`                                   |
+| methodology   | `Info`                                      | `info-tooltip.component.tsx`                                          |
+| eco-insight   | `Leaf` / `Sparkles`                         | `analytics.page.tsx` (tip / not enough data)                          |
+| tip category  | `ListChecks` / `PenLine` / `MessagesSquare` | `tip-card.component.tsx` (before you ask / how you ask / chat habits) |
+| export, reset | `Download`, `Trash2`                        | `analytics.page.tsx`                                                  |
+| legacy notice | `AlertTriangle`                             | `analytics.page.tsx`                                                  |
+| tech details  | `SlidersHorizontal`                         | `analytics.page.tsx`                                                  |
 
 The History page uses `Clock`, not `History`, because `History` already marks the history
 tokens in the breakdown.

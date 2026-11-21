@@ -18,6 +18,7 @@ import { ChipGroup } from '../../components/chip-group.component';
 import { ImpactBadge, type ImpactKind } from '../../components/impact-badge.component';
 import { PageTitle } from '../../components/page-title.component';
 import { TokenCount } from '../../components/token-count.component';
+import { TokenTotalCard } from '../../components/token-total-card.component';
 import { formatCount } from '../../format.helpers';
 import type { PromptRecordsState } from '../../usage-api';
 import {
@@ -84,28 +85,52 @@ function triggerFileDownload(content: string, filename: string, mimeType: string
   URL.revokeObjectURL(url);
 }
 
-function KpiCard({ card, enterIndex }: { card: AnalyticsKpiCardViewModel; enterIndex: number }) {
+/**
+ * Value (colored) → label → muted example. The first card of a set is the full-width headline;
+ * a token headline is the shared TokenTotalCard.
+ */
+function KpiCard({
+  card,
+  enterIndex,
+  headline,
+}: {
+  card: AnalyticsKpiCardViewModel;
+  enterIndex: number;
+  headline: boolean;
+}) {
   const kind = impactKind(card.tone);
+  const delta = card.deltaText && (
+    <span
+      className={
+        card.deltaTrend
+          ? `analytics-kpi-delta analytics-kpi-delta--${card.deltaTrend}`
+          : 'analytics-kpi-delta'
+      }
+    >
+      {card.deltaText}
+    </span>
+  );
+
+  // The token headline is the same tile as on the Dashboard.
+  if (headline && card.tokens !== undefined) {
+    return (
+      <TokenTotalCard
+        tokens={card.tokens}
+        label={card.label}
+        detail={card.comparisonText}
+        corner={delta}
+        enterIndex={enterIndex}
+      />
+    );
+  }
+
   return (
     <article
-      className={`analytics-kpi analytics-kpi--${card.tone}`}
+      className={`analytics-kpi analytics-kpi--${card.tone}${headline ? ' analytics-kpi--headline' : ''}`}
       style={{ '--enter-index': enterIndex } as CSSProperties}
     >
       {kind && <ImpactBadge kind={kind} />}
-      <div className="analytics-kpi-top">
-        <span className="analytics-kpi-label">{card.label}</span>
-        {card.deltaText && (
-          <span
-            className={
-              card.deltaTrend
-                ? `analytics-kpi-delta analytics-kpi-delta--${card.deltaTrend}`
-                : 'analytics-kpi-delta'
-            }
-          >
-            {card.deltaText}
-          </span>
-        )}
-      </div>
+      {delta}
       <div className="analytics-kpi-reading">
         {card.tokens !== undefined ? (
           <TokenCount value={card.tokens} />
@@ -118,6 +143,7 @@ function KpiCard({ card, enterIndex }: { card: AnalyticsKpiCardViewModel; enterI
           </>
         )}
       </div>
+      <span className="analytics-kpi-label">{card.label}</span>
       <p className="analytics-kpi-comparison">{card.comparisonText}</p>
     </article>
   );
@@ -174,15 +200,6 @@ function HiddenCostBarSection({
         <p className="analytics-empty-chart">No activity recorded for the selected timeframe.</p>
       ) : (
         <div className="analytics-breakdown">
-          <div className="analytics-bar-captions">
-            <span className="analytics-bar-caption">
-              Visible · <strong>{breakdown.formattedVisibleSharePct}</strong>
-            </span>
-            <span className="analytics-bar-caption">
-              Behind the scenes · <strong>{breakdown.formattedHiddenSharePct}</strong>
-            </span>
-          </div>
-
           <div
             className="token-bar token-bar--thick analytics-stacked-bar"
             role="img"
@@ -511,10 +528,16 @@ function EcoInsightBanner({ insight }: { insight: EcoInsightViewModel }) {
       aria-label="Personalized eco-insight"
     >
       {kind && <ImpactBadge kind={kind} />}
-      <div className="analytics-eco-icon">{insight.id === 'sparse' ? <Sparkles /> : <Leaf />}</div>
       <div className="analytics-eco-content">
         <div className="analytics-eco-header">
-          <span className="analytics-eco-badge">{insight.badge}</span>
+          <span className="analytics-eco-badge">
+            {insight.id === 'sparse' ? (
+              <Sparkles aria-hidden="true" />
+            ) : (
+              <Leaf aria-hidden="true" />
+            )}
+            {insight.badge}
+          </span>
           {insight.savingsBadge && (
             <span className="analytics-eco-savings">{insight.savingsBadge}</span>
           )}
@@ -660,10 +683,10 @@ export function AnalyticsPage({
         </div>
       )}
 
-      {/* Row 1: Compact KPI Cards */}
+      {/* Row 1: headline KPI full width, the other three below it */}
       <div className="analytics-kpi-grid">
         {viewModel.kpis.map((card, index) => (
-          <KpiCard key={card.id} card={card} enterIndex={index} />
+          <KpiCard key={card.id} card={card} enterIndex={index} headline={index === 0} />
         ))}
       </div>
 
