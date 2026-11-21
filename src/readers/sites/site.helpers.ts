@@ -62,12 +62,11 @@ export function rootsOf(node: Element | undefined): Element[] {
 }
 
 /**
- * Whether `selector` matches in or below any of `roots`, e.g. the latest assistant turn. Limitation:
- * with no roots (answer not rendered yet) the whole page is checked, so blocks of earlier turns
- * can match.
+ * Whether `selector` matches in or below any of `roots`, e.g. the latest assistant turn.
+ * Returns `false` when `roots` is empty so state from earlier turns never leaks into a new turn.
  */
 export function hasMatch(roots: readonly Element[], selector: string): boolean {
-  if (roots.length === 0) return document.querySelector(selector) !== null;
+  if (roots.length === 0 || !selector) return false;
   return roots.some((root) => matchesOrContains(root, selector));
 }
 

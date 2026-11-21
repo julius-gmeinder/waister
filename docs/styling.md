@@ -2,12 +2,12 @@
 
 ## css files
 
-| File                               | Holds                                                                                     | Imported by       |
-| ---------------------------------- | ----------------------------------------------------------------------------------------- | ----------------- |
-| `src/ui/base.css`                  | font imports, color/font variables, `body`, `.lucide` defaults                            | both entries      |
-| `src/ui/components/components.css` | styles of the shared components, one commented block per component, incl. their keyframes | both entries      |
-| `src/ui/popup/popup.css`           | popup layout only (`.popup`, `.popup-period`)                                             | `popup.entry.tsx` |
-| `src/ui/app/app.css`               | app page layout only (`.app`, `.app-content`, `.dashboard*`, `.history*`)                 | `app.entry.tsx`   |
+| File                               | Holds                                                                                               | Imported by       |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------- |
+| `src/ui/base.css`                  | font imports, color/font variables, `body`, `.lucide` defaults                                      | both entries      |
+| `src/ui/components/components.css` | styles of the shared components, one commented block per component, incl. their keyframes           | both entries      |
+| `src/ui/popup/popup.css`           | popup layout only (`.popup`, `.popup-period`)                                                       | `popup.entry.tsx` |
+| `src/ui/app/app.css`               | app page layout only (`.app`, `.app-content`, `.dashboard*`, `.history*`, `.facts*`, `.analytics*`) | `app.entry.tsx`   |
 
 Each entry imports them in this order, and esbuild bundles them into `popup/index.css` /
 `app/index.css`. A new component's styles go into `components.css`, and a new surface's layout
@@ -123,7 +123,9 @@ a selected state. The popup tab bar always opens a new tab, so it has none. Navi
 (sidebar, tab bar) keep icon and label in one color: `--text-muted` at rest, `--contrast-bright`
 when hovered, pressed or current (the icon is `currentColor`). The History adds the
 SortPicker select, HistoryRows, the "Load more" button and the modal's icon buttons and
-conversation link (neutral states only). Disabled buttons
+conversation link (neutral states only). The Analytics page uses Chips for its metric,
+timeframe and mode toggles and adds the InfoTooltip button and its action buttons (neutral
+states only). Disabled buttons
 (`:enabled` guard) don't react to hover.
 
 | State                       | Unselected item (tab bar, sidebar link, chip)              | Selected (current page / pressed chip) |
@@ -212,6 +214,20 @@ Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `b
   it. No
   background blobs, colored borders or horizontal rules; the card footer is set apart by padding
   only.
+- **Analytics:** `.analytics-page` stacks a plain header (PageTitle + subtitle), one filter row
+  (metric and timeframe ChipGroups, 28px apart like the History), four KPI tiles, then
+  ChartCards. Everything is a tile (shared rule): KPI tiles carry an ImpactBadge when they show
+  energy, water or CO₂ and leave the same top padding without one, so labels and values line up;
+  token values use TokenCount; the change vs. the previous period is a small pill in the top-right
+  corner. A ChartCard has a serif title with an InfoTooltip (ⓘ, the third floating box: border +
+  `--shadow`), a muted one-line insight and optional Chips or a legend on the right. The breakdown
+  is one thick TokenBar (token category colors, hidden parts hatched, a 12px gap instead of a
+  divider between the visible and the behind-the-scenes group) with a swatch legend per group. The
+  model donut takes the token palette in its order (Other in `--token-other`), the model
+  comparison bars one indigo that gets stronger the more a model uses, and the chat memory chart
+  `--token-history` / `--token-input` columns over faint solid gridlines. Impact accents are only
+  for energy, water and CO₂. The eco-insight is a tile with an ImpactBadge for the selected
+  metric, the footer is set apart by padding only, and its buttons are pills like "Load more".
 - **Scrollbars:** thin everywhere, `--scrollbar` thumb on a transparent track (`:root` in
   `base.css`, the modal body opts in with `scrollbar-width: thin`).
 - **No uppercase labels:** small labels (modal subheadings, card qualifiers) are sentence case,
@@ -220,8 +236,8 @@ Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `b
 ## motion
 
 **Page open:** tiles fade and lift in one after another (`tile-enter` in `components.css`, 380ms,
-10px lift): the Dashboard's three cards, the FactCards, the History summary strip and the
-HistoryRows. Each tile's `--enter-index` delays it by 45ms per step, capped at 12. The water and
+10px lift): the Dashboard's three cards, the FactCards, the History summary strip, the
+HistoryRows and the Analytics tiles (KPIs 0–3, ChartCards 4–7, eco-insight 8). Each tile's `--enter-index` delays it by 45ms per step, capped at 12. The water and
 CO2 cards set theirs in CSS, FactCards and HistoryRows get it as a prop (`enterIndex`), and
 History rows restart the count with every loaded page, so "Load more" rows come in right away.
 Only mounting plays it, so a new filter or timeframe doesn't replay it for tiles that stay.
@@ -276,30 +292,35 @@ browser only loads the Latin files it needs (~110 KB, from disk). A new weight i
 (`import { Coins } from 'lucide-react'`). The lucide site lists icons in kebab-case
 (`message-square-text`), and the React component is the PascalCase name (`MessageSquareText`).
 
-| Field / route | Icon                | Used in                                           |
-| ------------- | ------------------- | ------------------------------------------------- |
-| totalTokens   | `Coins`             | `total.component.tsx` (in `--tokens`)             |
-| model         | `Cpu`               | (not shown yet)                                   |
-| latencyMs     | `Timer`             | (not shown yet)                                   |
-| input         | `MessageSquare`     | `token-category.helpers.ts`                       |
-| history       | `History`           | `token-category.helpers.ts`                       |
-| output        | `MessageSquareText` | `token-category.helpers.ts`                       |
-| thinking      | `Brain`             | `token-category.helpers.ts`                       |
-| tools         | `Wrench`            | `token-category.helpers.ts`                       |
-| overhead      | `Settings2`         | `token-category.helpers.ts`                       |
-| energyWh      | `Zap`               | tacho, power card, impact figures, detail modal   |
-| waterMl       | `Droplet`           | tacho, water card, impact figures, detail modal   |
-| co2Grams      | `Factory`           | tacho, CO2 card, impact figures, detail modal     |
-| Dashboard     | `LayoutDashboard`   | `app-routes.ts`                                   |
-| Analytics     | `ChartColumn`       | `app-routes.ts`                                   |
-| Facts         | `BookOpen`          | `app-routes.ts`                                   |
-| Tips          | `Lightbulb`         | `app-routes.ts`                                   |
-| History page  | `Clock`             | `app-routes.ts`, `history.page.tsx` (empty state) |
-| sort          | `ArrowDownUp`       | `sort-picker.component.tsx`                       |
-| select arrow  | `ChevronDown`       | `sort-picker.component.tsx`                       |
-| prev / next   | `ChevronLeft/Right` | `prompt-detail-modal.component.tsx`               |
-| close         | `X`                 | `prompt-detail-modal.component.tsx`               |
-| open chat     | `ExternalLink`      | `prompt-detail-modal.component.tsx`               |
+| Field / route | Icon                 | Used in                                           |
+| ------------- | -------------------- | ------------------------------------------------- |
+| totalTokens   | `Coins`              | `total.component.tsx` (in `--tokens`)             |
+| model         | `Cpu`                | (not shown yet)                                   |
+| latencyMs     | `Timer`              | (not shown yet)                                   |
+| input         | `MessageSquare`      | `token-category.helpers.ts`                       |
+| history       | `History`            | `token-category.helpers.ts`                       |
+| output        | `MessageSquareText`  | `token-category.helpers.ts`                       |
+| thinking      | `Brain`              | `token-category.helpers.ts`                       |
+| tools         | `Wrench`             | `token-category.helpers.ts`                       |
+| overhead      | `Settings2`          | `token-category.helpers.ts`                       |
+| energyWh      | `Zap`                | tacho, power card, impact figures, detail modal   |
+| waterMl       | `Droplet`            | tacho, water card, impact figures, detail modal   |
+| co2Grams      | `Factory`            | tacho, CO2 card, impact figures, detail modal     |
+| Dashboard     | `LayoutDashboard`    | `app-routes.ts`                                   |
+| Analytics     | `ChartColumn`        | `app-routes.ts`                                   |
+| Facts         | `BookOpen`           | `app-routes.ts`                                   |
+| Tips          | `Lightbulb`          | `app-routes.ts`                                   |
+| History page  | `Clock`              | `app-routes.ts`, `history.page.tsx` (empty state) |
+| sort          | `ArrowDownUp`        | `sort-picker.component.tsx`                       |
+| select arrow  | `ChevronDown`        | `sort-picker.component.tsx`                       |
+| prev / next   | `ChevronLeft/Right`  | `prompt-detail-modal.component.tsx`               |
+| close         | `X`                  | `prompt-detail-modal.component.tsx`               |
+| open chat     | `ExternalLink`       | `prompt-detail-modal.component.tsx`               |
+| methodology   | `Info`               | `info-tooltip.component.tsx`                      |
+| eco-insight   | `Leaf` / `Sparkles`  | `analytics.page.tsx` (tip / not enough data)      |
+| export, reset | `Download`, `Trash2` | `analytics.page.tsx`                              |
+| legacy notice | `AlertTriangle`      | `analytics.page.tsx`                              |
+| tech details  | `SlidersHorizontal`  | `analytics.page.tsx`                              |
 
 The History page uses `Clock`, not `History`, because `History` already marks the history
 tokens in the breakdown.

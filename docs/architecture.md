@@ -35,6 +35,7 @@ the tokens and saves every prompt to a SQLite database, and the popup reads that
                             │ chrome.runtime message GET_USAGE_SUMMARY
                             │ (popup: last 24h · app page: selected timeframe)
                             │ + GET_PROMPT_HISTORY (app page: History pages)
+                            │ + GET_PROMPT_RECORDS / CLEAR_PROMPT_RECORDS (Analytics)
 ┌─ popup ───────────────────────────────────────────────────────────────────┐
 │  ui/popup/popup.app.tsx (React)    shows the last 24h of token usage      │
 │  ui/components/tab-bar             opens a route in a new browser tab ──┐ │

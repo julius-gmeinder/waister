@@ -43,7 +43,8 @@ popup:       ui/popup/  (React, dashboard)  ← GET_USAGE_SUMMARY (reads only th
                  │ tab bar → chrome.tabs.create
 app page:    ui/app/    (React, full tab, hash routes: dashboard · analytics · facts · tips · history)
                  ├─ dashboard ← GET_USAGE_SUMMARY per timeframe (fetched by the App root)
-                 └─ history   ← GET_PROMPT_HISTORY pages per filter (fetched by the App root)
+                 ├─ history   ← GET_PROMPT_HISTORY pages per filter (fetched by the App root)
+                 └─ analytics ← GET_PROMPT_RECORDS (all records) + CLEAR_PROMPT_RECORDS
              ui/components/ + ui/base.css + ui/app-routes.ts + ui/usage-api.ts shared by both
 shared:      dto/, messages/, config/ (config.json: every tunable rate, heuristic and timing)
 entries/:    one esbuild entry per context, wiring only
@@ -102,7 +103,9 @@ and sort filters, day groups, "Load more" paging) with a detail modal per prompt
 the impact with everyday benchmarks (hourly seeded pick). All pages share one look: flat tiles
 modeled on the History row, shared TokenCount / ImpactBadge / Chip / ProviderIcon components, no
 rules or uppercase labels ([ADR 0016](docs/decisions/0016-unified-ui-look.md),
-`docs/styling.md`). Analytics and Tips are empty placeholders so far. `npm run check` and
+`docs/styling.md`). Analytics breaks all saved prompts down per metric and timeframe (KPI
+tiles, breakdown bar, model donut + comparison, chat memory chart, eco-insight, CSV/JSON export,
+history reset) in the same look. Tips is an empty placeholder so far. `npm run check` and
 `npm run build` pass.
 
 ## Commands

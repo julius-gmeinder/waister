@@ -90,6 +90,9 @@ const CHATGPT_SELECTORS = {
     '[data-testid="model-switcher-dropdown-button"], button[aria-label*="Model selector"], [data-model-selection-label], button[aria-label="Select ChatGPT model"]',
   /** Thinking markers inside an answer. Checked in the latest turn only. */
   thinkingBadge: '[data-testid*="thought"], [aria-label*="Thinking"], [aria-label*="Reason"]',
+  /** Collapsible thought/reasoning drawers that must not be scraped as visible output markdown. */
+  thinkingBlock:
+    '[data-testid*="thought"], [aria-label*="Thinking"], [aria-label*="Reason"], details[class*="thought"], [class*="thought-block"]',
   /** Pressed composer toggle (e.g. "Think"). Page state, not part of any turn. */
   thinkingToggle: 'form[data-chatgpt-composer] button[aria-pressed="true"]',
   /** Inside a message but not model output: role headings, action rows, placeholders. */
@@ -117,8 +120,9 @@ const CHATGPT_TOOLS: ToolSelectors = {
     'a[href*="utm_source=chatgpt.com"], [data-testid*="citation"], [data-testid*="webpage-citation"]',
 };
 
-/** Not model output: UI chrome, canvas cards and tool blocks (counted separately). */
+/** Not model output: thinking drawers, UI chrome, canvas cards and tool blocks (counted separately). */
 const CHATGPT_MESSAGE_CHROME = joinSelectors(
+  CHATGPT_SELECTORS.thinkingBlock,
   CHATGPT_SELECTORS.messageChrome,
   CHATGPT_SELECTORS.artifactCard,
   toolBlockSelector(CHATGPT_TOOLS),
@@ -213,9 +217,12 @@ function outermostMatches(turn: GptTurn, selector: string): Element[] {
   return turn.nodes.flatMap((node) => outermost(node, selector));
 }
 
-/** '' while the model is still thinking. */
+/** '' while the model is still thinking. Excludes `.markdown` nodes nested inside thought drawers. */
 function readAnswerMarkdown(turn: GptTurn): string {
-  return joinMarkdown(outermostMatches(turn, CHATGPT_SELECTORS.assistantMarkdown), {
+  const answerNodes = outermostMatches(turn, CHATGPT_SELECTORS.assistantMarkdown).filter(
+    (el) => el.closest(CHATGPT_SELECTORS.thinkingBlock) === null,
+  );
+  return joinMarkdown(answerNodes, {
     skip: CHATGPT_MESSAGE_CHROME,
   });
 }

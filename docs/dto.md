@@ -62,10 +62,12 @@ saved as one row of the SQLite `prompts` table. Response of `ESTIMATE_PROMPT`.
 
 All fields of `TokenEstimateDto`, plus:
 
-| Field             | Type     | Description                                       |
-| ----------------- | -------- | ------------------------------------------------- |
-| `id`              | `string` | Random UUID (`crypto.randomUUID()`), primary key  |
-| `conversationUrl` | `string` | Link to the conversation, echoed from the capture |
+| Field                | Type      | Description                                                                                               |
+| -------------------- | --------- | --------------------------------------------------------------------------------------------------------- |
+| `id`                 | `string`  | Random UUID (`crypto.randomUUID()`), primary key                                                          |
+| `conversationUrl`    | `string`  | Link to the conversation, echoed from the capture                                                         |
+| `estimationVersion?` | `string`  | Config/formula stamp set when the record was validated (`record-validator.ts`)                            |
+| `isLegacy?`          | `boolean` | Old record without a per-category breakdown: can't be recomputed, left out of Analytics model comparisons |
 
 No chat text (`userInput`, `response`, `chatHistory`) is saved.
 

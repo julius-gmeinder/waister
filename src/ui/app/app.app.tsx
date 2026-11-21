@@ -7,7 +7,14 @@
  * Docs: docs/modules.md#ui
  */
 
-import { useEffect, useMemo, useState, useSyncExternalStore, type ComponentType } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ComponentType,
+} from 'react';
 import { parseRouteHash, type AppRouteId } from '../app-routes';
 import { Sidebar } from '../components/sidebar.component';
 import { DEFAULT_HISTORY_VIEW, type HistoryView } from '../history.helpers';
@@ -15,6 +22,7 @@ import { DEFAULT_TIMEFRAME, timeframeSinceMs, type TimeframeId } from '../timefr
 import {
   useFactsSummaries,
   usePromptHistory,
+  usePromptRecords,
   useUsageSummary,
   type HistoryFilter,
 } from '../usage-api';
@@ -24,9 +32,11 @@ import { FactsPage } from './pages/facts.page';
 import { HistoryPage } from './pages/history.page';
 import { TipsPage } from './pages/tips.page';
 
-/** Pages without props. The dashboard, the history and the facts get their data from here, see below. */
-const PAGES: Record<Exclude<AppRouteId, 'dashboard' | 'history' | 'facts'>, ComponentType> = {
-  analytics: AnalyticsPage,
+/** Pages without props. Dashboard, Analytics, History and Facts receive fetched data from here. */
+const PAGES: Record<
+  Exclude<AppRouteId, 'dashboard' | 'analytics' | 'history' | 'facts'>,
+  ComponentType
+> = {
   tips: TipsPage,
 };
 
@@ -42,10 +52,16 @@ function readHash(): string {
 export function App() {
   const route = parseRouteHash(useSyncExternalStore(subscribeToHash, readHash));
   const [timeframe, setTimeframe] = useState<TimeframeId>(DEFAULT_TIMEFRAME);
+  const [dataRevision, setDataRevision] = useState(0);
+  const handleHistoryCleared = useCallback(() => {
+    setDataRevision((rev) => rev + 1);
+  }, []);
+
   // Fixed per selection, so the rolling windows don't refetch on every render.
   const sinceMs = useMemo(() => timeframeSinceMs(timeframe, Date.now()), [timeframe]);
-  const summary = useUsageSummary(sinceMs);
-  const factsSummaries = useFactsSummaries();
+  const summary = useUsageSummary(sinceMs, dataRevision);
+  const factsSummaries = useFactsSummaries(dataRevision);
+  const { records, resetHistory, clearLegacyHistory } = usePromptRecords(handleHistoryCleared);
 
   const [historyView, setHistoryView] = useState<HistoryView>(DEFAULT_HISTORY_VIEW);
   // Memoized like `sinceMs`: a new filter object restarts the paging.
@@ -68,6 +84,14 @@ export function App() {
   if (route.id === 'dashboard') {
     page = (
       <DashboardPage timeframe={timeframe} onTimeframeChange={setTimeframe} summary={summary} />
+    );
+  } else if (route.id === 'analytics') {
+    page = (
+      <AnalyticsPage
+        records={records}
+        onResetHistory={resetHistory}
+        onClearLegacyHistory={clearLegacyHistory}
+      />
     );
   } else if (route.id === 'history') {
     page = <HistoryPage view={historyView} onViewChange={setHistoryView} history={history} />;

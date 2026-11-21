@@ -16,6 +16,8 @@
 .app-content {
   padding: 32px 40px;
   background: var(--surface);
+  scrollbar-gutter: stable;
+  min-width: 0;
 }
 
 .page-placeholder {
@@ -340,5 +342,849 @@ body:has(.prompt-detail[open]) {
   .facts-grid--weekly,
   .facts-grid--allTime {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Analytics Page: title + subtitle, one filter row (metric and timeframe chips), four KPI tiles,
+   then chart tiles (ChartCard): breakdown bar, model donut + model comparison side by side, chat
+   memory over time, the eco-insight tile and a plain footer. Tiles part by whitespace, no lines. */
+.analytics-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1200px;
+  padding-bottom: 40px;
+}
+
+.analytics-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.analytics-header .page-title {
+  margin: 0;
+}
+
+.analytics-page-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Same as the History filters: the wider column gap keeps the chip groups apart. */
+.analytics-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 28px;
+  margin-top: 16px;
+}
+
+/* KPI tiles (tile look from components.css). Top padding clears the ImpactBadge on every tile, so
+   labels and values line up across the row whether a tile has a badge or not. */
+.analytics-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.analytics-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 44px 18px 16px;
+}
+
+.analytics-kpi--power {
+  --kpi-strong: var(--power-strong);
+}
+
+.analytics-kpi--water {
+  --kpi-strong: var(--water-strong);
+}
+
+.analytics-kpi--co2 {
+  --kpi-strong: var(--co2-strong);
+}
+
+.analytics-kpi-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.analytics-kpi-label {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* The change vs. the previous period sits level with the badge, in the top-right corner. */
+.analytics-kpi-delta {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics-kpi-delta--up {
+  background: var(--power-soft);
+  color: var(--power-strong);
+}
+
+.analytics-kpi-delta--down {
+  background: var(--co2-soft);
+  color: var(--co2-strong);
+}
+
+.analytics-kpi-reading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.analytics-kpi-value {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--kpi-strong, var(--contrast));
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analytics-kpi-unit {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.analytics-kpi-reading .token-count-unit {
+  font-size: 13px;
+}
+
+.analytics-kpi-comparison {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics-empty-chart {
+  margin: 0;
+  padding: 20px 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Breakdown: one TokenBar (thick, hidden parts hatched), a wider gap between the visible and the
+   behind-the-scenes group instead of a divider, then a legend per group. */
+.analytics-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.analytics-bar-captions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics-bar-caption strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.analytics-stacked-split {
+  margin-left: 12px;
+}
+
+.analytics-legend-groups {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 28px;
+  margin-top: 8px;
+}
+
+.analytics-legend-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.analytics-legend-group-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics-legend-group-title {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.analytics-legend-group-list {
+  display: grid;
+  gap: 6px 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analytics-legend-group-list--visible {
+  grid-template-columns: 1fr;
+}
+
+.analytics-legend-group-list--hidden {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.analytics-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The swatch takes --segment-color from its token-bar-segment--<category> class. */
+.analytics-legend-swatch {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background-color: var(--segment-color);
+}
+
+.analytics-legend-swatch--hidden {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--token-hatch) 0 2px,
+    transparent 2px 5px
+  );
+}
+
+.analytics-legend-name {
+  margin-right: auto;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analytics-legend-pct {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.analytics-legend-val,
+.analytics-legend-weight {
+  color: var(--text-muted);
+}
+
+/* Model donut + model comparison side by side. */
+.analytics-model-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.analytics-donut-layout {
+  display: grid;
+  grid-template-columns: 168px 1fr;
+  align-items: center;
+  gap: 24px;
+}
+
+.analytics-donut-wrap {
+  position: relative;
+  width: 168px;
+  height: 168px;
+  margin: 0 auto;
+}
+
+.analytics-donut-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.analytics-donut-track {
+  fill: none;
+  stroke: var(--surface);
+  stroke-width: 18;
+}
+
+.analytics-donut-slice {
+  fill: none;
+  stroke: var(--slice-color);
+  stroke-width: 18;
+  transition:
+    stroke-dasharray 240ms ease,
+    stroke-dashoffset 240ms ease;
+}
+
+.analytics-donut-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--slice-color);
+}
+
+/* Models are no impact category, so the slices take the validated token palette (in its order),
+   and "Other" (index 5) the neutral stone of the HistoryRow's "Other" pill. */
+.analytics-donut-slice--0,
+.analytics-donut-dot--0 {
+  --slice-color: var(--token-input);
+}
+
+.analytics-donut-slice--1,
+.analytics-donut-dot--1 {
+  --slice-color: var(--token-history);
+}
+
+.analytics-donut-slice--2,
+.analytics-donut-dot--2 {
+  --slice-color: var(--token-output);
+}
+
+.analytics-donut-slice--3,
+.analytics-donut-dot--3 {
+  --slice-color: var(--token-thinking);
+}
+
+.analytics-donut-slice--4,
+.analytics-donut-dot--4 {
+  --slice-color: var(--token-tools);
+}
+
+.analytics-donut-slice--5,
+.analytics-donut-dot--5 {
+  --slice-color: var(--token-other);
+}
+
+.analytics-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.analytics-donut-center-value {
+  color: var(--contrast);
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics-donut-center-unit {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.analytics-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analytics-donut-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics-donut-label {
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analytics-donut-meta {
+  color: var(--text-muted);
+}
+
+.analytics-donut-pct {
+  min-width: 38px;
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Model comparison: ranked rows with one bar each. One indigo, stronger the more a model uses,
+   instead of impact accents (a bar is no energy, water or CO2). */
+.analytics-efficiency-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.analytics-direction-cue {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.analytics-low-sample-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.analytics-efficiency-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+}
+
+.analytics-efficiency-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 6px;
+}
+
+.analytics-efficiency-item:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+
+.analytics-efficiency-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.analytics-efficiency-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.analytics-efficiency-name-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.analytics-efficiency-rank {
+  color: var(--text-muted);
+}
+
+.analytics-efficiency-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.analytics-efficiency-subline {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.analytics-efficiency-primary {
+  flex-shrink: 0;
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.analytics-efficiency-track {
+  overflow: hidden;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.analytics-efficiency-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 240ms ease;
+}
+
+.analytics-efficiency-fill--efficient {
+  background: color-mix(in srgb, var(--contrast-bright) 40%, var(--surface));
+}
+
+.analytics-efficiency-fill--moderate {
+  background: color-mix(in srgb, var(--contrast-bright) 70%, var(--surface));
+}
+
+.analytics-efficiency-fill--intensive {
+  background: var(--contrast-bright);
+}
+
+/* Chat memory over time: stacked columns per bucket in the token category colors. */
+.analytics-series-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.analytics-series-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.analytics-series-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.analytics-series-swatch--history,
+.analytics-bucket-bar--history {
+  background: var(--token-history);
+}
+
+.analytics-series-swatch--new,
+.analytics-bucket-bar--new {
+  background: var(--token-input);
+}
+
+.analytics-timeseries {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: stretch;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.analytics-timeseries-yaxis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-bottom: 24px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.analytics-timeseries-plot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Faint solid gridlines for reading values, not dividers. */
+.analytics-timeseries-gridlines {
+  position: absolute;
+  inset: 0 0 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.analytics-timeseries-gridline {
+  width: 100%;
+  height: 1px;
+  background: var(--border);
+}
+
+.analytics-timeseries-bars {
+  position: relative;
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  align-items: end;
+  gap: 8px;
+  height: 170px;
+}
+
+.analytics-bucket {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+}
+
+.analytics-bucket-column {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+}
+
+.analytics-bucket-stack {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 3px;
+  width: 100%;
+  max-width: 36px;
+  height: 100%;
+}
+
+.analytics-bucket-bar {
+  width: 100%;
+  border-radius: 4px;
+  transition: height 240ms ease;
+}
+
+.analytics-bucket-label {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Eco-insight: a tile, with an ImpactBadge for the selected metric when it has one. */
+.analytics-eco-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 24px;
+  --enter-index: 8;
+}
+
+.analytics-eco-banner--badged {
+  padding-top: 48px;
+}
+
+.analytics-eco-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--contrast-bright);
+}
+
+.analytics-eco-icon .lucide {
+  width: 22px;
+  height: 22px;
+}
+
+.analytics-eco-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.analytics-eco-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.analytics-eco-badge {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.analytics-eco-savings {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.analytics-eco-headline {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.analytics-eco-detail {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Older records without a breakdown: a tile with a warning icon, not a colored box. */
+.analytics-legacy-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 12px 16px;
+  font-size: 13px;
+}
+
+.analytics-legacy-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.analytics-legacy-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--power-strong);
+}
+
+/* Footer: set apart by padding only. */
+.analytics-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding-top: 8px;
+}
+
+.analytics-footer-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.analytics-footer-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.analytics-tech-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.analytics-tech-checkbox {
+  margin: 0;
+  accent-color: var(--contrast-bright);
+  cursor: pointer;
+}
+
+.analytics-tech-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.analytics-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Pill buttons like "Load more", with their own --bg so the neutral states work on --surface. */
+.analytics-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.analytics-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.analytics-action-btn .lucide {
+  width: 14px;
+  height: 14px;
+  color: var(--contrast-bright);
+}
+
+.analytics-action-btn--danger .lucide {
+  color: var(--power-strong);
+}
+
+.analytics-action-btn--confirm {
+  border-color: var(--power-soft);
+  background: var(--power-soft);
+  color: var(--power-strong);
+}
+
+.analytics-reset-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.analytics-reset-prompt {
+  color: var(--power-strong);
+  font-size: 13px;
+}
+
+@media (max-width: 1080px) {
+  .analytics-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analytics-legend-groups,
+  .analytics-legend-group-list--hidden,
+  .analytics-model-grid,
+  .analytics-donut-layout {
+    grid-template-columns: 1fr;
   }
 }

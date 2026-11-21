@@ -17,7 +17,20 @@ import type {
 import type { PromptRecordDto } from '../../dto/prompt-record.dto';
 import type { TokenEstimateDto } from '../../dto/token-estimate.dto';
 import type { UsageSummaryDto } from '../../dto/usage-summary.dto';
+import {
+  CURRENT_ESTIMATION_VERSION,
+  validateAndNormalizeRecord,
+  validateAndNormalizeRecords,
+  resolveStoredModelInfo,
+} from './record-validator';
 import { getDatabase, writeAndPersist } from './sqlite-database';
+
+export {
+  CURRENT_ESTIMATION_VERSION,
+  validateAndNormalizeRecord,
+  validateAndNormalizeRecords,
+  resolveStoredModelInfo,
+};
 
 /** Runs on every start, so statements must stay idempotent. */
 const CREATE_SCHEMA = `
@@ -42,7 +55,8 @@ const CREATE_SCHEMA = `
     energy_wh        REAL    NOT NULL,
     water_ml         REAL    NOT NULL,
     co2_grams        REAL    NOT NULL,
-    tool_tokens      INTEGER NOT NULL DEFAULT 0
+    tool_tokens      INTEGER NOT NULL DEFAULT 0,
+    estimation_version TEXT  NOT NULL DEFAULT ''
   );
   CREATE INDEX IF NOT EXISTS prompts_captured_at ON prompts (captured_at);
 `;
@@ -53,6 +67,7 @@ const CREATE_SCHEMA = `
  */
 const ADDED_COLUMNS: { name: string; definition: string }[] = [
   { name: 'tool_tokens', definition: 'INTEGER NOT NULL DEFAULT 0' },
+  { name: 'estimation_version', definition: "TEXT NOT NULL DEFAULT ''" },
 ];
 
 function applySchema(db: Database): void {
@@ -70,12 +85,14 @@ const INSERT_PROMPT = `
     id, conversation_url, captured_at, provider,
     model_name, model_version, thinking_effort, model_raw_label,
     input_tokens, history_tokens, output_tokens, thinking_tokens, tool_tokens, overhead_tokens,
-    total_tokens, latency_ms, thinking_time_ms, approximate, energy_wh, water_ml, co2_grams
+    total_tokens, latency_ms, thinking_time_ms, approximate, energy_wh, water_ml, co2_grams,
+    estimation_version
   ) VALUES (
     $id, $conversationUrl, $capturedAt, $provider,
     $modelName, $modelVersion, $thinkingEffort, $modelRawLabel,
     $input, $history, $output, $thinking, $tools, $overhead,
-    $totalTokens, $latencyMs, $thinkingTimeMs, $approximate, $energyWh, $waterMl, $co2Grams
+    $totalTokens, $latencyMs, $thinkingTimeMs, $approximate, $energyWh, $waterMl, $co2Grams,
+    $estimationVersion
   )
 `;
 
@@ -106,7 +123,8 @@ const SELECT_PROMPT_RECORDS = `
     input_tokens AS input, history_tokens AS history, output_tokens AS output,
     thinking_tokens AS thinking, tool_tokens AS tools, overhead_tokens AS overhead,
     total_tokens AS totalTokens, latency_ms AS latencyMs, thinking_time_ms AS thinkingTimeMs,
-    approximate, energy_wh AS energyWh, water_ml AS waterMl, co2_grams AS co2Grams
+    approximate, energy_wh AS energyWh, water_ml AS waterMl, co2_grams AS co2Grams,
+    estimation_version AS estimationVersion
   FROM prompts
 `;
 
@@ -151,39 +169,47 @@ export function createPromptRecord(
   capture: ChatCaptureDto,
   estimate: TokenEstimateDto,
 ): PromptRecordDto {
-  return {
+  const candidate: PromptRecordDto = {
     id: crypto.randomUUID(),
     conversationUrl: capture.conversationUrl,
     ...estimate,
+    estimationVersion: CURRENT_ESTIMATION_VERSION,
+    isLegacy: false,
   };
+  return validateAndNormalizeRecord(candidate) ?? candidate;
 }
 
 export async function savePromptRecord(record: PromptRecordDto): Promise<void> {
+  const normalized = validateAndNormalizeRecord(record);
+  if (!normalized) {
+    throw new Error('Cannot save corrupt or invalid prompt record');
+  }
   await writeAndPersist(applySchema, (db: Database) => {
     db.exec({
       sql: INSERT_PROMPT,
       bind: {
-        $id: record.id,
-        $conversationUrl: record.conversationUrl,
-        $capturedAt: record.capturedAt,
-        $provider: record.provider,
-        $modelName: record.model.name,
-        $modelVersion: record.model.version,
-        $thinkingEffort: record.model.thinkingEffort,
-        $modelRawLabel: record.model.rawLabel,
-        $input: record.breakdown.input,
-        $history: record.breakdown.history,
-        $output: record.breakdown.output,
-        $thinking: record.breakdown.thinking,
-        $tools: record.breakdown.tools,
-        $overhead: record.breakdown.overhead,
-        $totalTokens: record.totalTokens,
-        $latencyMs: record.timings.latencyMs,
-        $thinkingTimeMs: record.timings.thinkingTimeMs,
-        $approximate: record.approximate ? 1 : 0,
-        $energyWh: record.impact.energyWh,
-        $waterMl: record.impact.waterMl,
-        $co2Grams: record.impact.co2Grams,
+        $id: normalized.id,
+        $conversationUrl: normalized.conversationUrl,
+        $capturedAt: normalized.capturedAt,
+        $provider: normalized.provider,
+        $modelName: normalized.model.name,
+        $modelVersion: normalized.model.version,
+        $thinkingEffort: normalized.model.thinkingEffort,
+        $modelRawLabel: normalized.model.rawLabel,
+        $input: normalized.breakdown.input,
+        $history: normalized.breakdown.history,
+        $output: normalized.breakdown.output,
+        $thinking: normalized.breakdown.thinking,
+        $tools: normalized.breakdown.tools,
+        $overhead: normalized.breakdown.overhead,
+        $totalTokens: normalized.totalTokens,
+        $latencyMs: normalized.timings.latencyMs,
+        $thinkingTimeMs: normalized.timings.thinkingTimeMs,
+        $approximate: normalized.approximate ? 1 : 0,
+        $energyWh: normalized.impact.energyWh,
+        $waterMl: normalized.impact.waterMl,
+        $co2Grams: normalized.impact.co2Grams,
+        $estimationVersion: normalized.estimationVersion ?? CURRENT_ESTIMATION_VERSION,
       },
     });
   });
@@ -210,7 +236,7 @@ export async function getPromptHistory(query: PromptHistoryQuery): Promise<Promp
   );
 
   return {
-    records: rows.map(toPromptRecord),
+    records: rows.map((row) => toPromptRecord(row)),
     summary: summarize(db, query.sinceMs, query.providers),
   };
 }
@@ -242,39 +268,92 @@ function summarize(db: Database, sinceMs: number, providers: readonly Provider[]
   };
 }
 
+const VALID_PROVIDERS = new Set<Provider>(['openai', 'anthropic', 'google']);
+const VALID_EFFORTS = new Set<ThinkingEffort>([
+  'none',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+  'unknown',
+]);
+
 /** Inverse of the INSERT binding in `savePromptRecord`. */
-function toPromptRecord(row: Record<string, SqlValue>): PromptRecordDto {
+function toPromptRecord(
+  row: Record<string, SqlValue>,
+  parseNum: (value: SqlValue | undefined) => number = num,
+): PromptRecordDto {
+  const rawProvider = str(row.provider) as Provider;
+  const provider: Provider = VALID_PROVIDERS.has(rawProvider) ? rawProvider : 'openai';
+  const rawEffort = str(row.thinkingEffort) as ThinkingEffort;
+  const thinkingEffort: ThinkingEffort = VALID_EFFORTS.has(rawEffort) ? rawEffort : 'unknown';
+
   return {
     id: str(row.id),
     conversationUrl: str(row.conversationUrl),
-    capturedAt: num(row.capturedAt),
-    // Rows only come from `handleEstimation`, which rejects unknown providers; the readers only
-    // emit known efforts. The UI still renders any string it gets.
-    provider: str(row.provider) as Provider,
+    capturedAt: parseNum(row.capturedAt),
+    provider,
     model: {
-      name: str(row.modelName),
-      version: str(row.modelVersion),
-      thinkingEffort: str(row.thinkingEffort) as ThinkingEffort,
-      rawLabel: str(row.modelRawLabel),
+      name: str(row.modelName) || 'unknown',
+      version: str(row.modelVersion) || 'unknown',
+      thinkingEffort,
+      rawLabel: str(row.modelRawLabel) || 'unknown',
     },
-    totalTokens: num(row.totalTokens),
+    totalTokens: parseNum(row.totalTokens),
     breakdown: {
-      input: num(row.input),
-      history: num(row.history),
-      output: num(row.output),
-      thinking: num(row.thinking),
-      tools: num(row.tools),
-      overhead: num(row.overhead),
+      input: parseNum(row.input),
+      history: parseNum(row.history),
+      output: parseNum(row.output),
+      thinking: parseNum(row.thinking),
+      tools: parseNum(row.tools),
+      overhead: parseNum(row.overhead),
     },
     impact: {
-      energyWh: num(row.energyWh),
-      waterMl: num(row.waterMl),
-      co2Grams: num(row.co2Grams),
+      energyWh: parseNum(row.energyWh),
+      waterMl: parseNum(row.waterMl),
+      co2Grams: parseNum(row.co2Grams),
     },
     timings: {
-      latencyMs: num(row.latencyMs),
-      thinkingTimeMs: num(row.thinkingTimeMs),
+      latencyMs: parseNum(row.latencyMs),
+      thinkingTimeMs: parseNum(row.thinkingTimeMs),
     },
-    approximate: num(row.approximate) === 1,
+    approximate: parseNum(row.approximate) !== 0,
+    estimationVersion: str(row.estimationVersion),
   };
+}
+
+/**
+ * Returns all valid stored prompt records with `capturedAt >= sinceMs`, ordered oldest to newest.
+ * Each record is validated, model-resolved, and dynamically recomputed against the current
+ * `config.json` via `validateAndNormalizeRecord`.
+ */
+export async function getPromptRecords(sinceMs = 0): Promise<PromptRecordDto[]> {
+  const db = await getDatabase(applySchema);
+  const rows = db.selectObjects(
+    `${SELECT_PROMPT_RECORDS} WHERE captured_at >= $sinceMs ORDER BY captured_at ASC`,
+    { $sinceMs: sinceMs },
+  );
+  const rawNum = (value: SqlValue | undefined): number => Number(value ?? 0);
+  return validateAndNormalizeRecords(rows.map((row) => toPromptRecord(row, rawNum)));
+}
+
+/** Deletes all stored prompt records and persists the empty database snapshot to IndexedDB. */
+export async function clearPromptRecords(): Promise<void> {
+  await writeAndPersist(applySchema, (db: Database) => {
+    db.exec('DELETE FROM prompts');
+  });
+}
+
+/**
+ * Deletes only legacy records that lack a per-category token breakdown and cannot be recomputed.
+ */
+export async function clearLegacyPromptRecords(): Promise<void> {
+  await writeAndPersist(applySchema, (db: Database) => {
+    db.exec(`
+      DELETE FROM prompts
+      WHERE (input_tokens + history_tokens + output_tokens + thinking_tokens + tool_tokens + overhead_tokens) = 0
+        AND total_tokens > 0
+    `);
+  });
 }

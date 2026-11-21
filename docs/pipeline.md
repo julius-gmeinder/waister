@@ -15,6 +15,7 @@ Reader ──ChatCaptureDto──▶ EstimationHandler ──▶ TokenizerServic
 
 Popup / App ──GET_USAGE_SUMMARY──▶ UsageHandler ──▶ PromptStoreService ──SELECT──▶ UsageSummaryDto
 App History ──GET_PROMPT_HISTORY─▶ UsageHandler ──▶ PromptStoreService ──SELECT──▶ PromptHistoryDto
+App Analytics ─GET_PROMPT_RECORDS─▶ UsageHandler ──▶ PromptStoreService ──SELECT──▶ PromptRecordDto[]
 ```
 
 ## 1. Reader & Consolidated Strategy (content script)
@@ -170,6 +171,14 @@ water. Their animation speed follows the usage per active day relative to `ui.da
 open. `getPromptHistory` returns one page of saved rows (metrics only, as stored) and the sums of
 every row matching the same filter. "Load more" asks for the next `offset`
 ([ADR 0015](decisions/0015-history-page.md)).
+
+## 10. Analytics (app page)
+
+`App` sends `GET_PROMPT_RECORDS { sinceMs: 0 }` once. `getPromptRecords` returns every saved row,
+passed through `record-validator.ts` (corrupt rows dropped, impact recomputed against the current
+config, rows without a breakdown flagged `isLegacy`). The page aggregates them in the app page
+(`analytics.helpers.ts`). "Reset history" / "Clear older data" send `CLEAR_PROMPT_RECORDS`
+(all rows / legacy rows only).
 
 ## Open questions
 

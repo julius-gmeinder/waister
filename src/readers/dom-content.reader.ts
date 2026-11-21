@@ -148,22 +148,44 @@ export function readAttachments(roots: readonly Element[], fileSelector: string)
   return kinds;
 }
 
+/**
+ * Counts distinct tool invocations inside `roots` for a tool selector.
+ * Collapses adjacent/sibling matches (e.g., code input + execution output in the same wrapper)
+ * so one tool run with multiple status badges isn't multiplied.
+ */
+function countDistinctToolBlocks(roots: readonly Element[], selector: string): number {
+  if (!selector) return 0;
+  let total = 0;
+  for (const root of roots) {
+    const matches = outermost(root, selector);
+    if (matches.length <= 1) {
+      total += matches.length;
+      continue;
+    }
+    const distinctParents = new Set<Element>();
+    for (const el of matches) {
+      distinctParents.add(el.parentElement ?? el);
+    }
+    total += distinctParents.size;
+  }
+  return total;
+}
+
 /** Tool calls visible in the latest answer (`roots` = its role nodes). */
 export function readToolCalls(roots: readonly Element[], selectors: ToolSelectors): ToolCallKind[] {
-  const count = (selector: string) =>
-    roots.reduce((sum, root) => sum + outermost(root, selector).length, 0);
   const repeat = (kind: ToolCallKind, times: number): ToolCallKind[] =>
     Array.from({ length: times }, () => kind);
 
-  const searches = count(selectors.search);
-  const hasSearchEvidence = roots.some((root) => hasMatch(root, selectors.searchEvidence));
-  // Citations without a recognizable search block still mean at least one search happened.
-  const searchCount = searches > 0 ? searches : hasSearchEvidence ? 1 : 0;
+  // Count at most 1 web search invocation per assistant turn root that shows search blocks or
+  // citation evidence, so 5 source chips or multiple search status badges in 1 turn = 1 search.
+  const searchCount = roots.filter(
+    (root) => hasMatch(root, selectors.search) || hasMatch(root, selectors.searchEvidence),
+  ).length;
 
   return [
     ...repeat('search', searchCount),
-    ...repeat('code', count(selectors.code)),
-    ...repeat('other', count(selectors.other)),
+    ...repeat('code', countDistinctToolBlocks(roots, selectors.code)),
+    ...repeat('other', countDistinctToolBlocks(roots, selectors.other)),
   ];
 }
 
@@ -404,8 +426,26 @@ function renderLink(anchor: Element, ctx: RenderContext): string {
 }
 
 function isContentImage(img: HTMLImageElement): boolean {
+  if (
+    img.closest(
+      '[aria-hidden="true"], button, [class*="avatar"], [data-testid*="avatar"], [data-test-id*="avatar"]',
+    ) !== null
+  ) {
+    return false;
+  }
+  const alt = (img.getAttribute('alt') ?? '').toLowerCase();
+  if (alt.includes('avatar') || alt.includes('profile') || alt.includes('icon')) {
+    return false;
+  }
+
   const rect = img.getBoundingClientRect();
-  const isIcon =
-    rect.width > 0 && rect.height > 0 && rect.width <= maxIconPx && rect.height <= maxIconPx;
-  return !isIcon && img.closest('[aria-hidden="true"], button') === null;
+  if (rect.width > 0 && rect.height > 0) {
+    return rect.width > maxIconPx || rect.height > maxIconPx;
+  }
+
+  // Unlaid-out / virtualized DOM (0x0 bounding rect): require explicit dimensions > maxIconPx so
+  // 0x0 decorative icons or unrendered avatars are never misclassified as uploaded images.
+  const attrW = Number(img.getAttribute('width') ?? 0) || img.naturalWidth || 0;
+  const attrH = Number(img.getAttribute('height') ?? 0) || img.naturalHeight || 0;
+  return attrW > maxIconPx || attrH > maxIconPx;
 }

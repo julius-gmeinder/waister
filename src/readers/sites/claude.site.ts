@@ -61,7 +61,7 @@ const CLAUDE_SELECTORS = {
   thinkingIndicator: '[data-testid*="thinking"], [aria-expanded][class*="thinking"]',
   /** Collapsible thinking/thought blocks inside an assistant turn that must not count as visible answer text. */
   thinkingBlock:
-    '[data-testid*="thinking"], [aria-expanded][class*="thinking"], details[class*="thinking"], [class*="thinking-block"]',
+    '[data-testid*="thinking"], [data-testid*="thought"], [aria-expanded][class*="thinking"], details[class*="thinking"], [class*="thinking-block"]',
   /**
    * Wrapper of one message, holding a user turn's attachment cards next to its text. This is a
    * React dev attribute (render counter), not a semantic one, so it may disappear. Attachments
@@ -114,6 +114,7 @@ function readUserText(userEl: Element | undefined): string {
  * thinking summaries don't trigger `isStreamingVisibleText()` early or mask interleaved pauses.
  */
 function readResponseText(assistantEl: Element | undefined): string {
+  if (!assistantEl || assistantEl.closest(CLAUDE_SELECTORS.thinkingBlock) !== null) return '';
   return domToMarkdown(assistantEl, { skip: CLAUDE_MESSAGE_CHROME });
 }
 

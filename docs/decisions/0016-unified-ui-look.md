@@ -39,6 +39,10 @@ page also reshuffled on every visit and had a manual Shuffle button.
 - **Navigation:** sidebar and tab bar icon + label share one color, neutral at rest, indigo on
   hover, press and the current page.
 
+- **Analytics** (added later) follows the same rules: KPI and chart tiles (ChartCard), Chips
+  for every toggle, TokenCount for token values, ImpactBadge for energy / water / CO₂, the token
+  category palette for categories and models, sentence-case labels.
+
 ## Consequences
 
 - A new page reuses the tile rule, TokenCount and ImpactBadge instead of styling its own; the
