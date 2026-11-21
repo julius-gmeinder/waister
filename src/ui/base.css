@@ -27,22 +27,31 @@
   --contrast-bright: #4f46e5;
   --text: #1c1917;
   --text-muted: #57534e;
+  /* Brass gold of every token number (TokenCount), next to the Coins icon. Docs:
+     docs/styling.md#colors */
+  --tokens: #8a5a00;
 
   /* Impact accents (dashboard cards): electric orange for energy, coral-reef sky blue for water,
      dirty toxic green for CO2. Each has a base (strokes, glow), -strong (text, ≥ 3:1 on white),
-     -soft (fills) and -tint (card background). Docs: docs/styling.md#colors */
+     -soft (fills, ImpactBadge background). Docs: docs/styling.md#colors */
   --power: #ff7a1a;
   --power-strong: #d95a00;
   --power-soft: #ffe4cc;
-  --power-tint: #fff7f0;
   --water: #38b6e0;
   --water-strong: #0b84b0;
   --water-soft: #c9ecf8;
-  --water-tint: #f1fafd;
   --co2: #a3c41c;
   --co2-strong: #5a7d00;
   --co2-soft: #e6f0b4;
-  --co2-tint: #f8fbe8;
+  /* FactCard watermark icon: one neutral tint a step darker than the --bg tile. */
+  --watermark: #ebe2c4;
+
+  /* Chat app marks (ProviderIcon): Claude's clay orange, ChatGPT's ink, Gemini's blue-to-violet
+     gradient. */
+  --provider-claude: #d97757;
+  --provider-openai: var(--text);
+  --provider-gemini-start: #4285f4;
+  --provider-gemini-end: #9b72cb;
 
   /* Token categories (TokenBar, detail legend): cool hues for the visible parts, warm for the
      hidden ones. Validated as neighbors in this exact order (CVD + normal vision), so keep the
@@ -53,20 +62,24 @@
   --token-thinking: #e87ba4;
   --token-tools: #eda100;
   --token-overhead: #e34948;
+  /* Several tiny categories merged into one HistoryRow pill: neutral, so it is no category. */
+  --token-other: #a8a29e;
   /* Light stripes over hidden (estimated) segments in the detail view. */
   --token-hatch: rgb(255 255 255 / 45%);
+
+  /* Thin scrollbars everywhere (page, modal): a thumb a step darker than the --border tones. */
+  --scrollbar: #d8cea8;
 
   /* PromptDetailModal: the dimmed page behind it and its lift. */
   --backdrop: rgb(28 25 23 / 40%);
   --shadow: 0 24px 48px -12px rgb(28 25 23 / 25%);
+}
 
-  /* Glassmorphic tokens (Facts Page cards & ambient orbs). */
-  --glass-surface-top: rgba(255, 255, 255, 0.78);
-  --glass-surface-mid: rgba(255, 255, 255, 0.56);
-  --glass-border-specular: rgba(255, 255, 255, 0.72);
-  --glass-highlight-top: rgba(255, 255, 255, 0.92);
-  --glass-shadow: rgba(28, 25, 23, 0.06);
-  --glass-shadow-hover: rgba(28, 25, 23, 0.11);
+/* One quiet scrollbar style: scrollbar-color inherits into every scroll container, the width is
+   set per container (here the page, the modal body in components.css). */
+:root {
+  scrollbar-color: var(--scrollbar) transparent;
+  scrollbar-width: thin;
 }
 
 body {

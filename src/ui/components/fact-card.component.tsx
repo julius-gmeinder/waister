@@ -1,7 +1,9 @@
 /**
- * FactCard: glassmorphic benchmark card pairing an SVG icon from `public/icons/` inside a tinted
- * medallion with a bold comparison multiplier, plain-language `shortCopy`, optional virtual-water
- * badge, and exact raw KPI readout.
+ * FactCard: benchmark card (same flat --bg tile as a HistoryRow) with an ImpactBadge in the
+ * corner, the multiplier on its own, then the phrase + plain-language `shortCopy` as one group
+ * (technical `equivalent` on hover), an optional virtual-water badge, and the raw numbers in a
+ * small box that appears on hover. The benchmark's SVG from `public/icons/` is a faint watermark
+ * in the top right.
  *
  * Context: app page
  * Docs: docs/modules.md#ui
@@ -11,16 +13,16 @@ import { Sparkles } from 'lucide-react';
 import { useEffect, useState, type CSSProperties } from 'react';
 import type { SelectedFactComparison } from '../app/pages/facts.helpers';
 import { VIRTUAL_WATER_TOOLTIP } from '../app/pages/facts.helpers';
+import { ImpactBadge } from './impact-badge.component';
 
-export type FactCardVariant = 'hero' | 'compact' | 'stagger' | 'ribbon';
+/** `wide` = the section's featured (1.5× wide) card, with a slightly larger sentence. */
+export type FactCardVariant = 'wide' | 'regular';
 
 interface FactCardProps {
   comparison: SelectedFactComparison;
   variant: FactCardVariant;
-  /** Card index (0..8) used for smooth staggered entrance/shuffle transitions. */
-  staggerIndex: number;
-  /** Incremented on each shuffle to trigger the card's entrance transition. */
-  shuffleGeneration: number;
+  /** Position in the page-open stagger (`--enter-index`, components.css). */
+  enterIndex: number;
 }
 
 interface ParsedSvgNode {
@@ -107,7 +109,7 @@ function FactSvgIcon({ iconPath }: { iconPath: string }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.75}
+      strokeWidth={1.25}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -120,35 +122,27 @@ function FactSvgIcon({ iconPath }: { iconPath: string }) {
   );
 }
 
-export function FactCard({ comparison, variant, staggerIndex, shuffleGeneration }: FactCardProps) {
+export function FactCard({ comparison, variant, enterIndex }: FactCardProps) {
   const {
     kpi,
-    kpiLabel,
     item,
-    isBaselineZero,
     multiplierText,
     comparisonQualifier,
     formattedUserKpi,
     formattedBenchmarkKpi,
   } = comparison;
 
-  const style = {
-    '--fact-stagger': `${staggerIndex * 45}ms`,
-  } as CSSProperties;
+  const style = { '--enter-index': enterIndex } as CSSProperties;
 
   return (
-    <article
-      key={`${item.id}-${shuffleGeneration}`}
-      className={`fact-card fact-card--${kpi} fact-card--${variant}`}
-      style={style}
-    >
-      <div className="fact-card-top">
-        <div className="fact-card-medallion" aria-hidden="true">
-          <FactSvgIcon iconPath={item.icon} />
-        </div>
+    <article className={`fact-card fact-card--${kpi} fact-card--${variant}`} style={style}>
+      <div className="fact-card-backdrop" aria-hidden="true">
+        <FactSvgIcon iconPath={item.icon} />
+      </div>
 
+      <div className="fact-card-top">
+        <ImpactBadge kind={kpi} />
         <div className="fact-card-badges">
-          <span className="fact-card-kpi-pill">{kpiLabel}</span>
           {item.isVirtualWater === true && (
             <span className="fact-card-virtual-badge" title={VIRTUAL_WATER_TOOLTIP}>
               <Sparkles />
@@ -159,24 +153,27 @@ export function FactCard({ comparison, variant, staggerIndex, shuffleGeneration 
       </div>
 
       <div className="fact-card-body">
-        <div className="fact-card-multiplier-row">
-          <span className="fact-card-multiplier">{multiplierText}</span>
+        <span className="fact-card-multiplier">{multiplierText}</span>
+        {/* The phrase reads straight into the sentence, so the two are one group. */}
+        <div className="fact-card-statement">
           <span className="fact-card-qualifier">{comparisonQualifier}</span>
+          <h3 className="fact-card-copy" title={item.equivalent}>
+            {item.shortCopy}
+          </h3>
         </div>
-
-        <h3 className="fact-card-copy">{item.shortCopy}</h3>
-        <p className="fact-card-equivalent">{item.equivalent}</p>
       </div>
 
-      <footer className="fact-card-footer">
-        <span className="fact-card-readout-user">
-          {isBaselineZero ? `0 used so far (${formattedUserKpi})` : `${formattedUserKpi} used`}
-        </span>
-        <span className="fact-card-readout-sep" aria-hidden="true">
-          ·
-        </span>
-        <span className="fact-card-readout-bench">1× = {formattedBenchmarkKpi}</span>
-      </footer>
+      {/* The raw numbers behind the multiplier, shown on hover (always without hover). */}
+      <dl className="fact-card-readout">
+        <div className="fact-card-readout-row">
+          <dt>You used</dt>
+          <dd>{formattedUserKpi}</dd>
+        </div>
+        <div className="fact-card-readout-row">
+          <dt>This takes</dt>
+          <dd>{formattedBenchmarkKpi}</dd>
+        </div>
+      </dl>
     </article>
   );
 }

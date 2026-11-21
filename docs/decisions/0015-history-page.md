@@ -1,6 +1,6 @@
 # 0015: History page with paged prompt list and detail modal
 
-**Status:** Accepted (2026-11-21)
+**Status:** Accepted (2026-11-21), row details superseded by [0016](0016-unified-ui-look.md)
 
 ## Context
 

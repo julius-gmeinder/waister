@@ -7,9 +7,9 @@
  * Docs: docs/modules.md#ui
  */
 
-import { Factory } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { formatCo2 } from '../format.helpers';
+import { ImpactBadge } from './impact-badge.component';
 
 interface Co2CardProps {
   /** `undefined` while loading. */
@@ -50,8 +50,7 @@ export function Co2Card({ co2Grams, puffMs, cloudCount }: Co2CardProps) {
   return (
     <article className={idle ? 'co2-card co2-card--idle' : 'co2-card'} style={style}>
       <h2 className="co2-card-label">
-        <Factory />
-        CO₂
+        <ImpactBadge kind="co2" />
       </h2>
       <p className="co2-card-value">
         {value}

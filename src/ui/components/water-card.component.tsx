@@ -6,9 +6,9 @@
  * Docs: docs/modules.md#ui
  */
 
-import { Droplet } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { formatWater } from '../format.helpers';
+import { ImpactBadge } from './impact-badge.component';
 
 interface WaterCardProps {
   /** `undefined` while loading. */
@@ -62,8 +62,7 @@ export function WaterCard({ waterMl, dripMs, poolFill }: WaterCardProps) {
   return (
     <article className={idle ? 'water-card water-card--idle' : 'water-card'} style={style}>
       <h2 className="water-card-label">
-        <Droplet />
-        Water
+        <ImpactBadge kind="water" />
       </h2>
       <p className="water-card-value">
         {value}

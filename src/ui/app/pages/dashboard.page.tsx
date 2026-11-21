@@ -12,6 +12,7 @@ import { PageTitle } from '../../components/page-title.component';
 import { PowerCard } from '../../components/power-card.component';
 import { TimeframePicker } from '../../components/timeframe-picker.component';
 import { WaterCard } from '../../components/water-card.component';
+import { TokenCount } from '../../components/token-count.component';
 import { formatCount } from '../../format.helpers';
 import type { TimeframeId } from '../../timeframe.helpers';
 import type { SummaryState } from '../../usage-api';
@@ -28,7 +29,7 @@ function describeUsage(summary: SummaryState) {
   const prompts = summary?.promptCount;
   return (
     <>
-      <span className="dashboard-subtitle-value">{formatCount(summary?.totalTokens)}</span> tokens
+      <TokenCount value={summary?.totalTokens} size="large" />
       {prompts !== undefined &&
         ` across ${formatCount(prompts)} ${prompts === 1 ? 'prompt' : 'prompts'}`}
     </>

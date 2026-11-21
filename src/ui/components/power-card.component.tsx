@@ -7,9 +7,9 @@
  * Docs: docs/modules.md#ui
  */
 
-import { Zap } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { formatEnergy } from '../format.helpers';
+import { ImpactBadge } from './impact-badge.component';
 
 interface PowerCardProps {
   /** `undefined` while loading. */
@@ -70,8 +70,7 @@ export function PowerCard({ energyWh, pulseMs }: PowerCardProps) {
   return (
     <article className={idle ? 'power-card power-card--idle' : 'power-card'} style={style}>
       <h2 className="power-card-label">
-        <Zap />
-        Energy
+        <ImpactBadge kind="power" />
       </h2>
       <p className="power-card-value">
         {value}

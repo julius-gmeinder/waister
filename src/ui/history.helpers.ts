@@ -19,6 +19,12 @@ export interface HistoryView {
   sort: HistorySort;
 }
 
+/**
+ * Chip order of the History's TimeframePicker: All time first, since it is the History's default
+ * (the dashboard keeps shortest first).
+ */
+export const HISTORY_TIMEFRAMES: readonly TimeframeId[] = ['all', 'today', 'week', 'month'];
+
 /** History is for looking things up, so it starts with everything, unlike the dashboard. */
 export const DEFAULT_HISTORY_VIEW: HistoryView = {
   timeframe: 'all',
@@ -55,8 +61,6 @@ export interface HistoryDay {
   startMs: number;
   label: string;
   records: PromptRecordDto[];
-  totalTokens: number;
-  energyWh: number;
 }
 
 function localMidnight(epochMs: number): number {
@@ -90,12 +94,10 @@ export function groupByDay(records: readonly PromptRecordDto[], nowMs: number): 
     const startMs = localMidnight(record.capturedAt);
     let day = days.at(-1);
     if (!day || day.startMs !== startMs) {
-      day = { startMs, label: dayLabel(startMs, nowMs), records: [], totalTokens: 0, energyWh: 0 };
+      day = { startMs, label: dayLabel(startMs, nowMs), records: [] };
       days.push(day);
     }
     day.records.push(record);
-    day.totalTokens += record.totalTokens;
-    day.energyWh += record.impact.energyWh;
   }
   return days;
 }

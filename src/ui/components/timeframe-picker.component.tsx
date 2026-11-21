@@ -6,26 +6,27 @@
  */
 
 import { TIMEFRAMES, type TimeframeId } from '../timeframe.helpers';
+import { Chip } from './chip.component';
+import { ChipGroup } from './chip-group.component';
 
 interface TimeframePickerProps {
   value: TimeframeId;
   onChange: (id: TimeframeId) => void;
+  /** Chip order, defaults to the order of TIMEFRAMES (shortest first). */
+  order?: readonly TimeframeId[];
 }
 
-export function TimeframePicker({ value, onChange }: TimeframePickerProps) {
+export function TimeframePicker({ value, onChange, order }: TimeframePickerProps) {
+  const timeframes = order
+    ? order.map((id) => TIMEFRAMES.find((timeframe) => timeframe.id === id)!)
+    : TIMEFRAMES;
   return (
-    <div className="timeframe-picker" role="group" aria-label="Timeframe">
-      {TIMEFRAMES.map(({ id, label }) => (
-        <button
-          key={id}
-          type="button"
-          className="timeframe-picker-chip"
-          aria-pressed={id === value}
-          onClick={() => onChange(id)}
-        >
+    <ChipGroup label="Timeframe">
+      {timeframes.map(({ id, label }) => (
+        <Chip key={id} pressed={id === value} onClick={() => onChange(id)}>
           {label}
-        </button>
+        </Chip>
       ))}
-    </div>
+    </ChipGroup>
   );
 }

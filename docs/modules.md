@@ -312,8 +312,10 @@ esbuild entry ([ADR 0011](decisions/0011-app-page.md)):
   route (Dashboard, Analytics, Facts, Tips, History). The Dashboard
   ([ADR 0014](decisions/0014-dashboard-page.md)) shows tokens, energy, water and CO2 for a chosen
   timeframe. The History lists every saved prompt (filters, day groups, detail modal,
-  [ADR 0015](decisions/0015-history-page.md)). Analytics, Facts and Tips are empty placeholders
-  for now.
+  [ADR 0015](decisions/0015-history-page.md)). The Facts page compares the Today / Last week / All
+  time impact with everyday benchmarks (seeded hourly pick). Analytics and Tips are empty
+  placeholders for now. All pages share one look (tiles, TokenCount, ImpactBadge, Chips;
+  [ADR 0016](decisions/0016-unified-ui-look.md), [styling.md](styling.md)).
 
 Neither surface talks to the estimation pipeline.
 
@@ -323,11 +325,12 @@ app-routes.ts                         shared: APP_ROUTES (id, label, icon), hash
 usage-api.ts                          shared: fetchUsageSummary + useUsageSummary, fetchPromptHistory + usePromptHistory (paging) — hooks for roots only; fills fields a stale worker lacks
 format.helpers.ts                     shared: formatCount, formatMetric (tachos), formatEnergy / formatWater / formatCo2 (auto-scaled Quantity, cards), formatProvider / formatModel / formatEffort, formatDuration, formatClock / formatShortDate / formatDateTime
 timeframe.helpers.ts                  app page: TIMEFRAMES (Today, Last week, Last 30 days, All time), timeframeSinceMs
-history.helpers.ts                    app page: HistoryView (timeframe, providers, sort) + default, HISTORY_SORTS, HISTORY_PROVIDERS, toggleProvider, isChronological, groupByDay
+history.helpers.ts                    app page: HistoryView (timeframe, providers, sort) + default, HISTORY_TIMEFRAMES (chip order), HISTORY_SORTS, HISTORY_PROVIDERS, toggleProvider, isChronological, groupByDay
 components/                           shared components (used by either surface)
   components.css                      styles of all components, one block each
   header.component.tsx                Header: full logo, centered (/logo/waister-full.svg), popup and app page
-  total.component.tsx                 Total: icon + summed token count (a <div>)
+  total.component.tsx                 Total: Coins icon + summed token count (a <div>)
+  token-count.component.tsx           TokenCount: every token number (serif, --tokens), optional "tokens" unit, approximate note on hover, sizes inline / large / hero
   token-category.helpers.ts           TOKEN_CATEGORIES: order, label, icon and visible/hidden of the six breakdown parts
   breakdown.component.tsx             Breakdown: the six rows (from TOKEN_CATEGORIES)
   breakdown-row.component.tsx         BreakdownRow: icon, label, count of one part
@@ -335,17 +338,21 @@ components/                           shared components (used by either surface)
   tab-bar.component.tsx               TabBar (popup): one fixed-width tab per route, opens it in a new browser tab
   sidebar.component.tsx               Sidebar (app page): logo + one hash link per route
   page-title.component.tsx            PageTitle (app page): serif headline of every page
-  timeframe-picker.component.tsx      TimeframePicker (dashboard): one chip per timeframe (aria-pressed)
+  chip.component.tsx                  Chip (app page): pill toggle button (aria-pressed), yellow when selected
+  chip-group.component.tsx            ChipGroup (app page): labelled, wrapping row of Chips (role="group")
+  timeframe-picker.component.tsx      TimeframePicker (dashboard, history): one Chip per timeframe, optional `order`
   power-card.component.tsx            PowerCard (dashboard): energy, pulsing number, lightning + gears scene
   water-card.component.tsx            WaterCard (dashboard): water, drops falling into a swaying pool
   co2-card.component.tsx              Co2Card (dashboard): CO2, a small factory puffing rising, fading clouds
-  provider-filter.component.tsx       ProviderFilter (history): "All apps" + one toggle chip per chat app (aria-pressed)
-  sort-picker.component.tsx           SortPicker (history): native select for the order
-  token-bar.component.tsx             TokenBar (history): stacked bar of one breakdown, thin (row) or thick with hatched hidden parts (modal)
+  provider-filter.component.tsx       ProviderFilter (history): "All apps" + one toggle Chip per chat app
+  sort-picker.component.tsx           SortPicker (history): native select for the order, ChevronDown instead of the native arrow
+  token-bar.component.tsx             TokenBar (history): one rounded pill per breakdown part with a hover label, thin (row) or thick with hatched hidden parts (modal)
   impact-figures.component.tsx        ImpactFigures (history): energy / water / CO2 as small icon + value pairs
-  history-row.component.tsx           HistoryRow (history): one prompt as a clickable row (time, app, model, total, TokenBar, impact)
-  prompt-detail-modal.component.tsx   PromptDetailModal (history): native <dialog> with breakdown legend, impact tiles, model & timings, conversation link, ← / → stepping
-  fact-card.component.tsx             FactCard (facts): glassmorphic benchmark card with tinted SVG icon medallion & comparison multiplier
+  history-row.component.tsx           HistoryRow (history): one prompt as a clickable row (time, ProviderIcon + model, impact, total; full-width TokenBar below)
+  provider-icon.component.tsx         ProviderIcon (history): inline SVG mark per chat app (Claude, ChatGPT, Gemini), name as <title>
+  impact-badge.component.tsx          ImpactBadge (dashboard, facts, modal): corner tab, -soft fill, solid icon + label (Energy, Water, CO₂)
+  prompt-detail-modal.component.tsx   PromptDetailModal (history): native <dialog> with breakdown legend, impact tiles (ImpactBadge), model & timings, full-width conversation link, ← / → stepping
+  fact-card.component.tsx             FactCard (facts): benchmark tile, ImpactBadge, multiplier + plain phrase, one-sentence fact, SVG watermark top right
 popup/
   popup.html                          <div id="root">, loads index.js + index.css
   popup.css                           popup layout only (full-window card, `.popup-period` line)
@@ -358,10 +365,10 @@ app/
     dashboard.page.tsx                DashboardPage: title, picker, token subtitle, PowerCard + WaterCard + Co2Card
     dashboard.helpers.ts              dashboardAnimation(summary): pulse / drip / puff period, pool fill, cloud count from config
     analytics.page.tsx                AnalyticsPage (empty)
-    facts.page.tsx                    FactsPage: Daily, Weekly and All-Time everyday perspective benchmarks with Shuffle
-    facts.helpers.ts                  shuffleFactsBoard, smart-window filtering (0.25..15), multiplier & raw KPI formatting
+    facts.page.tsx                    FactsPage: Daily, Weekly and All-Time everyday perspective benchmarks, seeded per shuffle interval
+    facts.helpers.ts                  shuffleFactsBoard, factsShuffleSeed + seededRandom (ui.facts), smart-window filtering (0.25..15), multiplier & raw KPI formatting
     tips.page.tsx                     TipsPage (empty)
-    history.page.tsx                  HistoryPage: pickers, summary strip, day groups or ranking, "Load more", PromptDetailModal
+    history.page.tsx                  HistoryPage: filter row (timeframe + providers, sort), summary strip, day groups or ranking, "Load more", PromptDetailModal
 ```
 
 | File / folder                | Role                                                                           | Copied/bundled to                               |
@@ -397,9 +404,17 @@ app/
   every visit to the page, appends pages on `loadMore` (dropping ids it already has, since a prompt
   saved meanwhile shifts the offset), drops answers that belong to an older filter, and keeps the
   old rows (dimmed) while a new filter loads. `HistoryPage` groups the rows by local day for the
-  time orders (`groupByDay`; the last day's totals say "so far" while more pages exist) and shows a
+  time orders (`groupByDay`; the last day's prompt count says "so far" while more pages exist) and shows a
   flat ranking with dates for the metric orders. Its only own state is the open prompt's id. The
   modal steps through the loaded rows only.
+- **Facts:** `App` fetches the Today / Last week / All time summaries (`useFactsSummaries`).
+  `FactsPage` picks one benchmark per KPI and section with `shuffleFactsBoard`, driven by a PRNG
+  seeded with the current shuffle interval (`ui.facts.shuffleIntervalMinutes`, default 60). So
+  reopening the page within the same interval shows the same facts, and they change at most
+  once per interval. The seed is fixed while the page is open; summaries that arrive later only
+  refine the pick. There is no manual shuffle.
+- **Token numbers:** every token figure renders through `TokenCount`, see
+  [styling.md](styling.md#token-numbers).
 - **Opening from the popup:** `TabBar` calls `chrome.tabs.create({ url: appRouteUrl(id) })`
   (no permission needed). Every click opens a new tab. Reusing an already open app tab would
   need the `tabs` permission.
@@ -493,7 +508,8 @@ The field list, units and calibration notes live in `config.types.ts`, not here.
 | `capture.models.chatgpt`           | ChatGPT adapter                      | `families`, `effortWords`, `slug.*` and `label.*` (regex sources for the model slug and picker label)                        |
 | `ui`                               | PopupApp, ImpactTachos               | `usageWindowHours`, `tachoMax` (`energyWh`, `waterMl`, `co2Grams`)                                                           |
 | `ui.dashboard`                     | Dashboard (`dashboard.helpers.ts`)   | `busyDay` (Wh / mL / g per day = intensity 1), `intensityExponent`, `pulseMs`, `dripMs`, `puffMs`, `cloudRiseMs`, `poolFill` |
-| `ui.history`                       | History (`usePromptHistory`)         | `pageSize`: prompts per `GET_PROMPT_HISTORY` page / "Load more"                                                              |
+| `ui.history`                       | History (`usePromptHistory`)         | `pageSize`: prompts per page / "Load more"; `otherSegmentShare`: TokenBar "Other" merge                                      |
+| `ui.facts`                         | Facts (`facts.helpers.ts`)           | `shuffleIntervalMinutes`: how long one random pick of benchmarks stays                                                       |
 
 - **Import by section:** `import { capture } from '../../config/config.json'`. esbuild
   tree-shakes JSON per top-level key, so each bundle only contains the sections it reads.

@@ -1,11 +1,13 @@
 /**
- * Facts helpers: smart-window benchmark filtering, cross-timeframe deduplicated shuffling, and
- * human-friendly multiplier and raw KPI formatting from `factSheet.json`.
+ * Facts helpers: smart-window benchmark filtering, cross-timeframe deduplicated shuffling (seeded
+ * per `ui.facts.shuffleIntervalMinutes`), and human-friendly multiplier and raw KPI formatting
+ * from `factSheet.json`.
  *
  * Context: app page
  * Docs: docs/modules.md#ui
  */
 
+import { ui } from '../../../config/config.json';
 import type { FactItem, FactKpiGroup, FactKpiId, FactTier } from '../../../config/config.types';
 import factSheet from '../../../config/factSheet.json';
 import type { FactsSummaries, SummaryState } from '../../usage-api';
@@ -15,29 +17,12 @@ export type FactsSectionId = 'daily' | 'weekly' | 'allTime';
 export interface FactsSectionMeta {
   id: FactsSectionId;
   title: string;
-  subtitle: string;
-  badge: string;
 }
 
 export const FACTS_SECTIONS: readonly FactsSectionMeta[] = [
-  {
-    id: 'daily',
-    title: 'Daily Perspective',
-    subtitle: "Today's AI footprint translated into tangible everyday moments",
-    badge: 'Today',
-  },
-  {
-    id: 'weekly',
-    title: 'Weekly Footprint',
-    subtitle: 'Rolling 7-day consumption stacked against household routines',
-    badge: 'Last 7 days',
-  },
-  {
-    id: 'allTime',
-    title: 'All-Time Cumulative',
-    subtitle: 'Your total recorded AI energy, water and carbon impact',
-    badge: 'Cumulative',
-  },
+  { id: 'daily', title: 'Daily Perspective' },
+  { id: 'weekly', title: 'Weekly Footprint' },
+  { id: 'allTime', title: 'All-Time Cumulative' },
 ];
 
 export const FACT_KPIS: readonly FactKpiId[] = ['power', 'water', 'co2'];
@@ -51,15 +36,14 @@ const BASELINE_TIERS: Record<FactsSectionId, readonly FactTier[]> = {
 
 export interface SelectedFactComparison {
   kpi: FactKpiId;
-  kpiLabel: string;
   section: FactsSectionId;
   item: FactItem;
   userValue: number;
   ratio: number;
   isBaselineZero: boolean;
-  /** Bold primary comparison readout, e.g. `~2.4×`, `45% of`, or `1×`. */
+  /** Bold primary comparison readout, e.g. `~2.4×`, `45%`, or `0%`. */
   multiplierText: string;
-  /** Context label next to the multiplier, e.g. `equivalent` or `baseline benchmark`. */
+  /** Plain phrase after the multiplier that leads into the fact, e.g. `as much energy as`. */
   comparisonQualifier: string;
   /** Formatted user KPI value with unit, e.g. `18.4 Wh`, `1.25 L`, `42 g CO₂e`. */
   formattedUserKpi: string;
@@ -104,8 +88,20 @@ export function formatFactKpiValue(kpi: FactKpiId, rawValue: number): string {
   return `${formattedNum} ${unit}`;
 }
 
-/** Formats the ratio (`userValue / item.value`) into a natural everyday comparison string. */
+/** What a KPI measures, in everyday words, for the comparison line. */
+const KPI_NOUNS: Record<FactKpiId, string> = {
+  power: 'energy',
+  water: 'water',
+  co2: 'CO₂',
+};
+
+/**
+ * Formats the ratio (`userValue / item.value`) as an everyday comparison: the number, then a short
+ * phrase that reads straight into the fact, e.g. "~2.4×" + "as much energy as" or "45%" + "of the
+ * water for".
+ */
 export function formatFactMultiplier(
+  kpi: FactKpiId,
   userValue: number,
   benchmarkValue: number,
 ): {
@@ -114,63 +110,31 @@ export function formatFactMultiplier(
   ratio: number;
   isBaselineZero: boolean;
 } {
+  const noun = KPI_NOUNS[kpi];
+  const share = `of the ${noun} for`;
+  const multiple = `as much ${noun} as`;
+
   if (!Number.isFinite(userValue) || userValue <= 0 || benchmarkValue <= 0) {
-    return {
-      multiplierText: '1×',
-      comparisonQualifier: 'baseline benchmark',
-      ratio: 0,
-      isBaselineZero: true,
-    };
+    return { multiplierText: '0%', comparisonQualifier: share, ratio: 0, isBaselineZero: true };
   }
 
   const ratio = userValue / benchmarkValue;
+  const result = (multiplierText: string, comparisonQualifier: string) => ({
+    multiplierText,
+    comparisonQualifier,
+    ratio,
+    isBaselineZero: false,
+  });
 
-  if (ratio < 0.01) {
-    return {
-      multiplierText: '<1% of',
-      comparisonQualifier: 'this benchmark',
-      ratio,
-      isBaselineZero: false,
-    };
-  }
-
-  if (ratio < 0.95) {
-    const pct = Math.max(1, Math.round(ratio * 100));
-    return {
-      multiplierText: `${pct}% of`,
-      comparisonQualifier: 'this benchmark',
-      ratio,
-      isBaselineZero: false,
-    };
-  }
-
-  if (ratio <= 1.05) {
-    return {
-      multiplierText: '~1×',
-      comparisonQualifier: 'equivalent impact',
-      ratio,
-      isBaselineZero: false,
-    };
-  }
-
+  if (ratio < 0.01) return result('<1%', share);
+  if (ratio < 0.95) return result(`${Math.max(1, Math.round(ratio * 100))}%`, share);
+  if (ratio <= 1.05) return result('About as much', `${noun} as`);
   if (ratio < 10) {
     const rounded = Math.round(ratio * 10) / 10;
     const text = Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(1);
-    return {
-      multiplierText: `~${text}×`,
-      comparisonQualifier: 'equivalent impact',
-      ratio,
-      isBaselineZero: false,
-    };
+    return result(`~${text}×`, multiple);
   }
-
-  const roundedInt = Math.round(ratio);
-  return {
-    multiplierText: `~${roundedInt.toLocaleString()}×`,
-    comparisonQualifier: 'equivalent impact',
-    ratio,
-    isBaselineZero: false,
-  };
+  return result(`~${Math.round(ratio).toLocaleString()}×`, multiple);
 }
 
 /**
@@ -213,20 +177,37 @@ export function getCandidateFacts(
   return sortedByCloseness.slice(0, Math.min(3, sortedByCloseness.length));
 }
 
+/** Number of the shuffle interval `nowMs` falls into. Same number = same facts. */
+export function factsShuffleSeed(nowMs: number): number {
+  return Math.floor(nowMs / (ui.facts.shuffleIntervalMinutes * 60_000));
+}
+
+/**
+ * Small deterministic PRNG (mulberry32): the same seed always yields the same sequence, so the
+ * board only changes when the shuffle interval does.
+ */
+export function seededRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
+  };
+}
+
 function pickRandom<T>(list: readonly T[], randomFn: () => number): T {
   const index = Math.floor(randomFn() * list.length);
   return list[Math.min(index, list.length - 1)]!;
 }
 
 /**
- * Selects one benchmark for each KPI across Daily, Weekly, and All-Time:
- * - Avoids picking the same fact across Daily, Weekly, and All-Time simultaneously.
- * - Avoids repeating the currently displayed fact (`previousBoard`) on manual Shuffle clicks
- *   whenever alternative candidates exist.
+ * Selects one benchmark for each KPI across Daily, Weekly, and All-Time, avoiding the same fact
+ * in two timeframes at once whenever alternative candidates exist.
  */
 export function shuffleFactsBoard(
   summaries: FactsSummaries | undefined,
-  previousBoard?: FactsBoard | null,
   randomFn: () => number = Math.random,
 ): FactsBoard {
   const sectionValues: Record<FactsSectionId, Record<FactKpiId, number>> = {
@@ -244,44 +225,25 @@ export function shuffleFactsBoard(
 
   for (const kpi of FACT_KPIS) {
     const usedIdsInBoard = new Set<string>();
-    const kpiGroup = factSheet.kpis[kpi];
 
     for (const section of sections) {
       const userValue = sectionValues[section][kpi];
       const candidates = getCandidateFacts(kpi, userValue, section);
-      const previousId = previousBoard?.[section]?.[kpi]?.item.id;
-
-      // Prefer candidates neither used in another timeframe nor shown in this slot before shuffle
-      let pool = candidates.filter(
-        (item) => !usedIdsInBoard.has(item.id) && item.id !== previousId,
-      );
-
-      // Next best: not used in another timeframe simultaneously
-      if (pool.length === 0) {
-        pool = candidates.filter((item) => !usedIdsInBoard.has(item.id));
-      }
-
-      // Next best: differs from the previous card in this slot
-      if (pool.length === 0) {
-        pool = candidates.filter((item) => item.id !== previousId);
-      }
-
-      // Final fallback if only 1 candidate exists
-      if (pool.length === 0) {
-        pool = candidates;
-      }
+      const unused = candidates.filter((item) => !usedIdsInBoard.has(item.id));
+      // Repeat a fact from another timeframe only when nothing else fits.
+      const pool = unused.length > 0 ? unused : candidates;
 
       const chosen = pickRandom(pool, randomFn);
       usedIdsInBoard.add(chosen.id);
 
       const { multiplierText, comparisonQualifier, ratio, isBaselineZero } = formatFactMultiplier(
+        kpi,
         userValue,
         chosen.value,
       );
 
       board[section][kpi] = {
         kpi,
-        kpiLabel: kpiGroup.label,
         section,
         item: chosen,
         userValue,

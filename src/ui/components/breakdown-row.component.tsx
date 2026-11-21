@@ -6,7 +6,7 @@
  */
 
 import type { LucideIcon } from 'lucide-react';
-import { formatCount } from '../format.helpers';
+import { TokenCount } from './token-count.component';
 
 interface BreakdownRowProps {
   icon: LucideIcon;
@@ -20,7 +20,9 @@ export function BreakdownRow({ icon: Icon, label, value }: BreakdownRowProps) {
     <li className="breakdown-row">
       <Icon />
       <span>{label}</span>
-      <span className="breakdown-value">{formatCount(value)}</span>
+      <span className="breakdown-value">
+        <TokenCount value={value} unit={false} />
+      </span>
     </li>
   );
 }

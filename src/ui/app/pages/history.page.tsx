@@ -9,6 +9,7 @@
 
 import { Clock } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { ui } from '../../../config/config.json';
 import type { PromptRecordDto } from '../../../dto/prompt-record.dto';
 import { HistoryRow } from '../../components/history-row.component';
 import { ImpactFigures } from '../../components/impact-figures.component';
@@ -17,10 +18,12 @@ import { PromptDetailModal } from '../../components/prompt-detail-modal.componen
 import { ProviderFilter } from '../../components/provider-filter.component';
 import { SortPicker } from '../../components/sort-picker.component';
 import { TimeframePicker } from '../../components/timeframe-picker.component';
-import { formatCount, formatEnergy } from '../../format.helpers';
+import { TokenCount } from '../../components/token-count.component';
+import { formatCount } from '../../format.helpers';
 import {
   DEFAULT_HISTORY_VIEW,
   groupByDay,
+  HISTORY_TIMEFRAMES,
   isChronological,
   type HistoryView,
 } from '../../history.helpers';
@@ -69,8 +72,20 @@ export function HistoryPage({ view, onViewChange, history }: HistoryPageProps) {
   const select = (record: PromptRecordDto) => setSelectedId(record.id);
   const filtered = view.timeframe !== DEFAULT_HISTORY_VIEW.timeframe || view.providers.length > 0;
 
+  // Page-open stagger: the summary is 0, rows count from 1 and restart with every loaded page, so
+  // "Load more" rows come in right away instead of after the capped delay.
+  const enterIndex = useMemo(
+    () => new Map(list.map((record, i) => [record.id, (i % ui.history.pageSize) + 1])),
+    [list],
+  );
   const renderRow = (record: PromptRecordDto) => (
-    <HistoryRow key={record.id} record={record} showDate={!chronological} onSelect={select} />
+    <HistoryRow
+      key={record.id}
+      record={record}
+      showDate={!chronological}
+      onSelect={select}
+      enterIndex={enterIndex.get(record.id) ?? 0}
+    />
   );
 
   let body;
@@ -88,16 +103,14 @@ export function HistoryPage({ view, onViewChange, history }: HistoryPageProps) {
     body = (
       <ol className="history-days">
         {days.map((day, dayIndex) => {
-          // The last day may continue on the next page, so its totals are not final yet.
+          // The last day may continue on the next page, so its count is not final yet.
           const partial = hasMore && dayIndex === days.length - 1;
-          const energy = formatEnergy(day.energyWh);
           return (
             <li key={day.startMs} className="history-day">
               <h2 className="history-day-header">
                 <span className="history-day-label">{day.label}</span>
-                <span className="history-day-total">
-                  {plural(day.records.length, 'prompt')} · {formatCount(day.totalTokens)} tokens ·{' '}
-                  {energy.value} {energy.unit}
+                <span className="history-day-count">
+                  {plural(day.records.length, 'prompt')}
                   {partial && ' so far'}
                 </span>
               </h2>
@@ -114,26 +127,30 @@ export function HistoryPage({ view, onViewChange, history }: HistoryPageProps) {
   return (
     <section className="history">
       <PageTitle>History</PageTitle>
-      <TimeframePicker
-        value={view.timeframe}
-        onChange={(timeframe) => onViewChange({ ...view, timeframe })}
-      />
       <div className="history-controls">
-        <ProviderFilter
-          value={view.providers}
-          onChange={(providers) => onViewChange({ ...view, providers })}
-        />
+        <div className="history-filters">
+          <TimeframePicker
+            order={HISTORY_TIMEFRAMES}
+            value={view.timeframe}
+            onChange={(timeframe) => onViewChange({ ...view, timeframe })}
+          />
+          <ProviderFilter
+            value={view.providers}
+            onChange={(providers) => onViewChange({ ...view, providers })}
+          />
+        </div>
         <SortPicker value={view.sort} onChange={(sort) => onViewChange({ ...view, sort })} />
       </div>
 
       {summary && (
         <p className="history-summary">
-          <span>
-            <span className="history-summary-value">{plural(summary.promptCount, 'prompt')}</span>
-            {' · '}
-            <span className="history-summary-value">{formatCount(summary.totalTokens)}</span> tokens
+          <span className="history-summary-count">{plural(summary.promptCount, 'prompt')}</span>
+          <span className="history-summary-impact">
+            <ImpactFigures impact={summary.impact} />
           </span>
-          <ImpactFigures impact={summary.impact} />
+          <span className="history-summary-tokens">
+            <TokenCount value={summary.totalTokens} />
+          </span>
         </p>
       )}
 

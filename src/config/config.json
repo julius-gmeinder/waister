@@ -272,7 +272,11 @@
       }
     },
     "history": {
-      "pageSize": 50
+      "pageSize": 50,
+      "otherSegmentShare": 0.05
+    },
+    "facts": {
+      "shuffleIntervalMinutes": 60
     }
   }
 }

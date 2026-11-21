@@ -1,6 +1,6 @@
 # 0014: Dashboard page with timeframes and animated impact cards
 
-**Status:** Accepted (2026-11-21)
+**Status:** Accepted (2026-11-21), card look superseded by [0016](0016-unified-ui-look.md)
 
 ## Context
 

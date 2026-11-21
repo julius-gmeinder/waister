@@ -98,8 +98,11 @@ CO2 tachos, prompt count). Its tab bar opens the full-page app page
 ([ADR 0014](docs/decisions/0014-dashboard-page.md)), shows tokens plus the energy/water/CO2 `impact`
 for a chosen timeframe in three animated cards (CSS + inline SVG). The History
 ([ADR 0015](docs/decisions/0015-history-page.md)) lists every saved prompt (timeframe, chat-app
-and sort filters, day groups, "Load more" paging) with a detail modal per prompt. Analytics,
-Facts and Tips are empty placeholders so far. `npm run check` and
+and sort filters, day groups, "Load more" paging) with a detail modal per prompt. Facts compares
+the impact with everyday benchmarks (hourly seeded pick). All pages share one look: flat tiles
+modeled on the History row, shared TokenCount / ImpactBadge / Chip / ProviderIcon components, no
+rules or uppercase labels ([ADR 0016](docs/decisions/0016-unified-ui-look.md),
+`docs/styling.md`). Analytics and Tips are empty placeholders so far. `npm run check` and
 `npm run build` pass.
 
 ## Commands

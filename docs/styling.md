@@ -31,43 +31,60 @@ into its own CSS file.
 Defined as CSS variables on `:root` in `src/ui/base.css`. Always use the variable, never
 the hex value.
 
-| Variable            | Value                 | Use                                                          |
-| ------------------- | --------------------- | ------------------------------------------------------------ |
-| `--bg`              | `#FBF8EE`             | page background (`body`), whole popup, app sidebar           |
-| `--surface`         | `#FFFFFF`             | panels on top of `--bg` (`.breakdown`), app content area     |
-| `--border`          | `#EFE8CF`             | 1px borders (`.breakdown`)                                   |
-| `--accent`          | `#FEF199`             | soft yellow: the selected item (current page in the sidebar) |
-| `--accent-hover`    | `#FDEB7A`             | selected item, hovered                                       |
-| `--accent-pressed`  | `#FCE45C`             | selected item, pressed                                       |
-| `--neutral-hover`   | `#F3EDD9`             | unselected item on `--bg`, hovered                           |
-| `--neutral-pressed` | `#EAE2C6`             | unselected item on `--bg`, pressed                           |
-| `--focus`           | = `--contrast-bright` | keyboard focus ring                                          |
-| `--contrast`        | `#2E2A8C`             | emphasized text (total token count, page titles)             |
-| `--contrast-bright` | `#4F46E5`             | icons                                                        |
-| `--text`            | `#1C1917`             | body text                                                    |
-| `--text-muted`      | `#57534E`             | secondary text (period line, tab labels, placeholders)       |
+| Variable            | Value                 | Use                                                            |
+| ------------------- | --------------------- | -------------------------------------------------------------- |
+| `--bg`              | `#FBF8EE`             | page background (`body`), whole popup, app sidebar             |
+| `--surface`         | `#FFFFFF`             | panels on top of `--bg` (`.breakdown`), app content area       |
+| `--border`          | `#EFE8CF`             | 1px borders (`.breakdown`)                                     |
+| `--accent`          | `#FEF199`             | soft yellow: the selected item (current page in the sidebar)   |
+| `--accent-hover`    | `#FDEB7A`             | selected item, hovered                                         |
+| `--accent-pressed`  | `#FCE45C`             | selected item, pressed                                         |
+| `--neutral-hover`   | `#F3EDD9`             | unselected item on `--bg`, hovered                             |
+| `--neutral-pressed` | `#EAE2C6`             | unselected item on `--bg`, pressed                             |
+| `--focus`           | = `--contrast-bright` | keyboard focus ring                                            |
+| `--contrast`        | `#2E2A8C`             | emphasized text (page titles, headings)                        |
+| `--contrast-bright` | `#4F46E5`             | icons                                                          |
+| `--text`            | `#1C1917`             | body text                                                      |
+| `--text-muted`      | `#57534E`             | secondary text (period line, tab labels, placeholders)         |
+| `--tokens`          | `#8A5A00`             | brass gold: every token number (TokenCount) and the Coins icon |
+| `--watermark`       | `#EBE2C4`             | FactCard background icon, one tint for every KPI               |
+| `--scrollbar`       | `#D8CEA8`             | thumb of the thin scrollbars (page, modal body)                |
+
+### token numbers
+
+Every token figure in the extension goes through the **TokenCount** component
+(`token-count.component.tsx`), so it looks the same everywhere: the number in `--font-serif`,
+700, `--tokens`, tabular digits, followed by a muted sans "tokens" unit (left out in lists whose
+heading already says tokens, such as the popup breakdown and the modal legend). Only the size
+differs: `inline` follows the surrounding text (sentences, day headers, HistoryRows, legends),
+`large` is 28px (popup total, Dashboard subtitle) and `hero` 36px (PromptDetailModal total). An approximate
+estimate has no badge or glyph: the count gets a `help` cursor and explains itself in its title
+on hover. Don't style token numbers by hand.
 
 ### impact accents
+
+**ImpactBadge** (`impact-badge.component.tsx`) names the category of a tile (dashboard cards,
+FactCards, the modal's impact tiles). It is a tab flush in the tile's top-left corner (absolute,
+no inset). The tile's `overflow: hidden` rounds its outer corner, so the badge itself only rounds
+its bottom-right corner (12px). Background `-soft`, text and the solid (filled) lucide icon
+`-strong`, 13px sans at normal weight (Energy, Water, CO₂). Tiles leave top padding for it.
 
 For everything that shows energy, water or CO2: the Dashboard's impact cards and the popup's
 tachos (`.tacho--power` / `.tacho--water` / `.tacho--co2` map them onto `--tacho-color` /
 `-strong` / `-soft`). Each
-accent has four steps.
+accent has three steps.
 
 | Variable         | Value     | Use                                                                  |
 | ---------------- | --------- | -------------------------------------------------------------------- |
 | `--power`        | `#FF7A1A` | electric orange: bolts, sparks, gear strokes, glow, icons, tacho arc |
 | `--power-strong` | `#D95A00` | energy numbers (≥ 3:1 on white for large text)                       |
 | `--power-soft`   | `#FFE4CC` | gear fill, tacho track                                               |
-| `--power-tint`   | `#FFF7F0` | bottom of the PowerCard background gradient                          |
 | `--water`        | `#38B6E0` | coral-reef sky blue: drop, basin, front wave, icons, tacho arc       |
 | `--water-strong` | `#0B84B0` | water numbers, ripple                                                |
 | `--water-soft`   | `#C9ECF8` | back wave, tacho track                                               |
-| `--water-tint`   | `#F1FAFD` | bottom of the WaterCard background gradient                          |
 | `--co2`          | `#A3C41C` | toxic lime green: factory and cloud strokes, windows, icons, arc     |
 | `--co2-strong`   | `#5A7D00` | CO2 numbers                                                          |
 | `--co2-soft`     | `#E6F0B4` | factory and cloud fill, tacho track                                  |
-| `--co2-tint`     | `#F8FBE8` | bottom of the Co2Card background gradient                            |
 
 ### token categories
 
@@ -78,6 +95,12 @@ segment never reads as "energy" or "CO2". The set was checked with the dataviz p
 the order of `TOKEN_CATEGORIES` when changing a value. Three of them are below 3:1 on white, which
 is why the legend always shows the numbers next to the swatches.
 
+Each `.token-bar-segment--<field>` only sets `--segment-color`. The modal (thick bar, legend
+swatches) uses it as is. HistoryRows show many bars at once, so their thin bar mixes it 55% into
+`--bg` and only shows the full color on hover. In a row, two or more categories below
+`ui.history.otherSegmentShare` (5%) of the total merge into one `--token-other` pill labelled
+"Other (…)".
+
 | Variable           | Value              | Use                                                       |
 | ------------------ | ------------------ | --------------------------------------------------------- |
 | `--token-input`    | `#2A78D6`          | input (blue)                                              |
@@ -86,6 +109,7 @@ is why the legend always shows the numbers next to the swatches.
 | `--token-thinking` | `#E87BA4`          | thinking (magenta)                                        |
 | `--token-tools`    | `#EDA100`          | tools (yellow)                                            |
 | `--token-overhead` | `#E34948`          | overhead (red)                                            |
+| `--token-other`    | `#A8A29E`          | merged tiny categories in a HistoryRow (stone)            |
 | `--token-hatch`    | white 45%          | stripes over hidden segments (thick bar, legend swatches) |
 | `--backdrop`       | `--text` 40%       | dimmed page behind the PromptDetailModal                  |
 | `--shadow`         | soft, `--text` 25% | the PromptDetailModal's lift                              |
@@ -94,10 +118,12 @@ is why the legend always shows the numbers next to the swatches.
 
 Every clickable item uses the same steps. Yellow means "selected", never "hovered", so the
 current page stays recognizable. The sidebar (`aria-current="page"` on `.sidebar-link`) and the
-TimeframePicker (`aria-pressed="true"` on `.timeframe-picker-chip`) have a selected state. The
-popup tab bar always opens a new tab, so it has none. The History adds the ProviderFilter chips
-(selected state like the TimeframePicker), the SortPicker select, HistoryRows, the "Load more"
-button and the modal's icon buttons and conversation link (neutral states only). Disabled buttons
+Chips (`aria-pressed="true"` on `.chip`, used by the TimeframePicker and the ProviderFilter) have
+a selected state. The popup tab bar always opens a new tab, so it has none. Navigation links
+(sidebar, tab bar) keep icon and label in one color: `--text-muted` at rest, `--contrast-bright`
+when hovered, pressed or current (the icon is `currentColor`). The History adds the
+SortPicker select, HistoryRows, the "Load more" button and the modal's icon buttons and
+conversation link (neutral states only). Disabled buttons
 (`:enabled` guard) don't react to hover.
 
 | State                       | Unselected item (tab bar, sidebar link, chip)              | Selected (current page / pressed chip) |
@@ -108,7 +134,7 @@ button and the modal's icon buttons and conversation link (neutral states only).
 | `:focus-visible` (keyboard) | 2px `--focus` outline, 2px offset                          | same                                   |
 
 Icon color is set once in a grouped rule at the top of `components.css` (except the impact card and tacho
-icons, which use their accent), and sizes per
+icons, which use their accent, and the navigation icons, which follow their link's text), and sizes per
 component. Backgrounds and text colors fade over 120ms. The neutral tints sit between `--bg` and `--border`,
 so they only work on a `--bg` background. The state rules live at the end of `components.css`. A new
 clickable component gets added to those selectors instead of defining its own colors.
@@ -127,25 +153,79 @@ Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `b
   between them. Only the background color separates them.
 - **Dashboard:** `.dashboard` stacks PageTitle, TimeframePicker, the token subtitle and
   `.dashboard-cards` (three equal columns, one column below 1080px). The PowerCard, WaterCard
-  and Co2Card are the one exception to "no floating cards": 1px `--border`, 12px radius, a
-  `--surface` → `-tint` gradient. Each card centers its label, the serif number (40px) and an
+  and Co2Card are tiles (see below) with an ImpactBadge in the corner, and the card centers the
+  serif number (40px) and an
   inline SVG scene (max 320px wide, 28px of whitespace above it). All scenes share one viewBox
   (240 × 170) and ground line (y ≈ 160: gear bottoms, basin floor, factory floor), so they line
   up side by side.
 
-- **History:** `.history` stacks PageTitle, TimeframePicker, a controls row (ProviderFilter left,
-  SortPicker right), a flat `--bg` summary strip (no border) and the list (max 1000px). Day groups
-  have a sticky header (serif day name, muted totals) over a 1px `--border` line. A HistoryRow is a
-  full-width button, grid `64px | 1fr | 256px`: time, then model + total on the first line and
-  TokenBar + ImpactFigures on the second. The fixed last column lines every bar up. Below 760px
-  everything stacks next to the time.
+- **Tiles:** every card and row looks like the HistoryRow: `--bg` background, 12px radius, no
+  border, no shadow. One grouped rule in `components.css` gives the dashboard cards, FactCards and
+  the modal's impact tiles that look (plus `position: relative` and `overflow: hidden` for the
+  ImpactBadge). Only clickable tiles (HistoryRows) have hover states.
+- **History:** `.history` stacks PageTitle, one controls row (`.history-filters` with the
+  TimeframePicker, All time first via `HISTORY_TIMEFRAMES`, and the ProviderFilter side by side,
+  28px apart instead of a divider, and the SortPicker on the right), a flat `--bg` summary strip
+  and the list (max 1000px). No horizontal rules anywhere: day groups are 36px apart, and each has
+  a sticky header on plain `--surface` (padding 20px top, 14px bottom) with only the serif day name
+  and the prompt count. The figures live in the summary strip and the rows. The summary strip uses
+  the row's columns (`1fr | auto | 150px` with the row's 16px side padding and 20px gap): prompt
+  count on the left, then ImpactFigures and the TokenCount, so they line up with the rows'
+  figures. A HistoryRow is a tile: a full-width button, 8px apart, so the gap separates the
+  rows and the neutral hover tints apply. Its grid is `64px | 1fr | auto | 150px`. The first line holds the time, the
+  ProviderIcon + model, the ImpactFigures and the total (the fixed last column lines the impact
+  figures up). The TokenBar spans the whole second line. Below 760px model, total and impact stack
+  next to the time, with the bar below, and the summary drops its columns.
+- **TokenBar:** each category is its own fully rounded pill, 4px apart (8px high in rows, 14px in
+  the modal, at least 6px wide). Hovering a segment shows a dark label above it (`Input · 1,234`,
+  from `data-label` via `::after`). Muted colors and the "Other" pill in rows, see
+  [token categories](#token-categories).
+- **ProviderIcon:** inline SVG look-alikes of the chat app logos (Claude sunburst, ChatGPT knot,
+  Gemini sparkle), 18px, colored by `--provider-claude` / `--provider-openai` /
+  `--provider-gemini-start` → `-end`. They replace the name chip in the HistoryRow and the modal
+  title (the name is the SVG's `<title>` / `aria-label`).
+- **SortPicker:** the select uses `appearance: none` with a lucide `ChevronDown` laid over it, so
+  the arrow keeps the same inset from the rounded edge as the text on the left.
 - **PromptDetailModal:** native `<dialog>` (max 620px wide), the second exception to "no floating
   cards": 1px `--border`, 16px radius, `--shadow`, `--backdrop` behind it. Sections are split by
-  1px `--border` lines. The impact tiles reuse the card look (border, `--surface` → `-tint`
-  gradient). It fades and lifts in over 180ms (none with reduced motion), and the page behind it
+  whitespace (32px gap), not by lines. The impact tiles are tiles with an ImpactBadge. The legend
+  rows show swatch, label, count and share (no category icons). "Open conversation" spans the
+  footer's full width. The dialog clips (`overflow: hidden`) and its body scrolls, so the thin
+  scrollbar stays inside the rounded corners. It fades and lifts in over 180ms (none with reduced motion), and the page behind it
   doesn't scroll (`body:has(.prompt-detail[open])`).
+- **Facts:** `.facts-page` stacks a plain header (PageTitle + subtitle, scrolls with the page)
+  and three sections. Each section has a serif title (Daily / Weekly / All-Time) with the
+  timeframe's TokenCount and prompt count right next to it, then one row of FactCards (tiles with
+  an ImpactBadge). All cards share one inner structure and stretch to the row's height (min
+  200px), so badges, numbers, footers and watermarks line up. Variation is only in the column
+  widths: Daily `1.5fr 1fr 1fr` (first card `--wide`, slightly larger sentence), Weekly three
+  equal columns, All-Time `1fr 1fr 1.5fr` (last card wide). Inside, the text is top-anchored: the multiplier stands alone, then (16px below) the phrase and the sentence as one tight group.
+  The raw numbers ("You used" / "This takes") sit in a small `--surface` box over the bottom-right
+  corner (absolute, no reserved space). It fades in on hover only (always shown on touch screens)
+  and may cover the sentence while shown. Below 1240px every card gets its own
+  row. A card reads as one line of plain language: the
+  multiplier (`~2.4×`, `45%`), a short phrase (`as much energy as`, `of the water for`) and one
+  sentence (`shortCopy`, the technical `equivalent` as its hover title). The benchmark's SVG isn't
+  boxed: it is a watermark in the top right, inside the card (18px inset, a fixed 120px in every
+  card so they line up, one neutral `--watermark` tint for every KPI, `z-index: -1` inside the
+  card's own stacking context). The phrase keeps clear of it, the sentence starts below
+  it. No
+  background blobs, colored borders or horizontal rules; the card footer is set apart by padding
+  only.
+- **Scrollbars:** thin everywhere, `--scrollbar` thumb on a transparent track (`:root` in
+  `base.css`, the modal body opts in with `scrollbar-width: thin`).
+- **No uppercase labels:** small labels (modal subheadings, card qualifiers) are sentence case,
+  never `text-transform: uppercase` or letter-spaced.
 
 ## motion
+
+**Page open:** tiles fade and lift in one after another (`tile-enter` in `components.css`, 380ms,
+10px lift): the Dashboard's three cards, the FactCards, the History summary strip and the
+HistoryRows. Each tile's `--enter-index` delays it by 45ms per step, capped at 12. The water and
+CO2 cards set theirs in CSS, FactCards and HistoryRows get it as a prop (`enterIndex`), and
+History rows restart the count with every loaded page, so "Load more" rows come in right away.
+Only mounting plays it, so a new filter or timeframe doesn't replay it for tiles that stay.
+Reduced motion turns it off.
 
 The Dashboard cards animate with CSS only (keyframes in `components.css`). The components set
 custom properties, and every animation derives from them:
@@ -181,10 +261,10 @@ Bundled with the extension (no network request, works offline) through the
 both pages get them. esbuild puts the font files into `fonts/` at the extension root, shared by
 popup and app page. The variables are defined on `:root` in `base.css`. Always use the variable.
 
-| Variable       | Font                                  | npm package                                            | Weights             | Use                                                                      |
-| -------------- | ------------------------------------- | ------------------------------------------------------ | ------------------- | ------------------------------------------------------------------------ |
-| `--font-sans`  | Inter Variable (fallback `system-ui`) | `@fontsource-variable/inter` (`opsz.css`)              | 100–900, opsz 14–32 | all text (`body`)                                                        |
-| `--font-serif` | Libre Baskerville (fallback Georgia)  | `@fontsource/libre-baskerville` (`400.css`, `700.css`) | 400, 700            | headline numbers and titles (`.total-value`, `.page-title`, card values) |
+| Variable       | Font                                  | npm package                                            | Weights             | Use                                                                  |
+| -------------- | ------------------------------------- | ------------------------------------------------------ | ------------------- | -------------------------------------------------------------------- |
+| `--font-sans`  | Inter Variable (fallback `system-ui`) | `@fontsource-variable/inter` (`opsz.css`)              | 100–900, opsz 14–32 | all text (`body`)                                                    |
+| `--font-serif` | Libre Baskerville (fallback Georgia)  | `@fontsource/libre-baskerville` (`400.css`, `700.css`) | 400, 700            | headline numbers and titles (TokenCount, `.page-title`, card values) |
 
 All script subsets are packaged (~450 KB), but each `@font-face` has a `unicode-range`, so the
 browser only loads the Latin files it needs (~110 KB, from disk). A new weight is one more
@@ -198,7 +278,7 @@ browser only loads the Latin files it needs (~110 KB, from disk). A new weight i
 
 | Field / route | Icon                | Used in                                           |
 | ------------- | ------------------- | ------------------------------------------------- |
-| totalTokens   | `Coins`             | `total.component.tsx`                             |
+| totalTokens   | `Coins`             | `total.component.tsx` (in `--tokens`)             |
 | model         | `Cpu`               | (not shown yet)                                   |
 | latencyMs     | `Timer`             | (not shown yet)                                   |
 | input         | `MessageSquare`     | `token-category.helpers.ts`                       |
@@ -216,6 +296,7 @@ browser only loads the Latin files it needs (~110 KB, from disk). A new weight i
 | Tips          | `Lightbulb`         | `app-routes.ts`                                   |
 | History page  | `Clock`             | `app-routes.ts`, `history.page.tsx` (empty state) |
 | sort          | `ArrowDownUp`       | `sort-picker.component.tsx`                       |
+| select arrow  | `ChevronDown`       | `sort-picker.component.tsx`                       |
 | prev / next   | `ChevronLeft/Right` | `prompt-detail-modal.component.tsx`               |
 | close         | `X`                 | `prompt-detail-modal.component.tsx`               |
 | open chat     | `ExternalLink`      | `prompt-detail-modal.component.tsx`               |

@@ -278,6 +278,19 @@ export interface DashboardConfig {
 export interface HistoryConfig {
   /** Prompts per `GET_PROMPT_HISTORY` page, i.e. per "Load more" click. */
   pageSize: number;
+  /**
+   * TokenBar in a HistoryRow: categories below this share of the prompt's total merge into one
+   * "Other" segment, as soon as at least two of them are that small. The modal shows all six.
+   */
+  otherSegmentShare: number;
+}
+
+export interface FactsConfig {
+  /**
+   * How long one random pick of benchmarks stays on the Facts page. The pick is seeded by the
+   * current interval, so reopening the page within it shows the same facts.
+   */
+  shuffleIntervalMinutes: number;
 }
 
 export interface UiConfig {
@@ -291,6 +304,7 @@ export interface UiConfig {
   };
   dashboard: DashboardConfig;
   history: HistoryConfig;
+  facts: FactsConfig;
 }
 
 export interface WaisterConfig {

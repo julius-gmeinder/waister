@@ -6,7 +6,7 @@
  */
 
 import { Coins } from 'lucide-react';
-import { formatCount } from '../format.helpers';
+import { TokenCount } from './token-count.component';
 
 interface TotalProps {
   /** `undefined` while loading. */
@@ -17,8 +17,7 @@ export function Total({ totalTokens }: TotalProps) {
   return (
     <div className="total">
       <Coins />
-      <span className="total-value">{formatCount(totalTokens)}</span>
-      <span>tokens</span>
+      <TokenCount value={totalTokens} size="large" />
     </div>
   );
 }

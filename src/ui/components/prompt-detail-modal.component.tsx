@@ -7,21 +7,11 @@
  * Docs: docs/modules.md#ui
  */
 
-import {
-  ChevronLeft,
-  ChevronRight,
-  Droplet,
-  ExternalLink,
-  Factory,
-  X,
-  Zap,
-  type LucideIcon,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, X } from 'lucide-react';
 import { useEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react';
 import type { PromptRecordDto } from '../../dto/prompt-record.dto';
 import {
   formatCo2,
-  formatCount,
   formatDateTime,
   formatDuration,
   formatEffort,
@@ -31,7 +21,10 @@ import {
   formatWater,
   type Quantity,
 } from '../format.helpers';
+import { ImpactBadge, type ImpactKind } from './impact-badge.component';
+import { ProviderIcon } from './provider-icon.component';
 import { TokenBar } from './token-bar.component';
+import { TokenCount } from './token-count.component';
 import { TOKEN_CATEGORIES, type TokenCategory } from './token-category.helpers';
 
 interface PromptDetailModalProps {
@@ -75,16 +68,15 @@ function LegendGroup({
     <div className="prompt-detail-legend-group">
       <h3 className="prompt-detail-subheading">{title}</h3>
       <ul className="prompt-detail-legend">
-        {categories.map(({ field, label, icon: Icon, hidden }) => (
+        {categories.map(({ field, label, hidden }) => (
           <li key={field} className="prompt-detail-legend-row">
             <span
               className={`prompt-detail-swatch token-bar-segment--${field}${hidden ? ' token-bar-segment--hidden' : ''}`}
               aria-hidden="true"
             />
-            <Icon aria-hidden="true" />
             <span className="prompt-detail-legend-label">{label}</span>
             <span className="prompt-detail-legend-value">
-              {formatCount(record.breakdown[field])}
+              <TokenCount value={record.breakdown[field]} unit={false} />
             </span>
             <span className="prompt-detail-legend-share">
               {share(record.breakdown[field], record.totalTokens)}
@@ -96,23 +88,10 @@ function LegendGroup({
   );
 }
 
-function ImpactTile({
-  tone,
-  label,
-  quantity,
-  icon: Icon,
-}: {
-  tone: 'power' | 'water' | 'co2';
-  label: string;
-  quantity: Quantity;
-  icon: LucideIcon;
-}) {
+function ImpactTile({ kind, quantity }: { kind: ImpactKind; quantity: Quantity }) {
   return (
-    <div className={`prompt-detail-impact prompt-detail-impact--${tone}`}>
-      <span className="prompt-detail-impact-label">
-        <Icon aria-hidden="true" />
-        {label}
-      </span>
+    <div className={`prompt-detail-impact prompt-detail-impact--${kind}`}>
+      <ImpactBadge kind={kind} />
       <span className="prompt-detail-impact-value">
         {quantity.value}
         <span className="prompt-detail-impact-unit"> {quantity.unit}</span>
@@ -198,7 +177,7 @@ export function PromptDetailModal({
           <header className="prompt-detail-header">
             <div className="prompt-detail-heading">
               <h2 id="prompt-detail-title" className="prompt-detail-title">
-                <span className="prompt-detail-provider">{formatProvider(record.provider)}</span>
+                <ProviderIcon provider={record.provider} />
                 {formatModel(record.model)}
               </h2>
               <p className="prompt-detail-date">{formatDateTime(record.capturedAt)}</p>
@@ -240,16 +219,7 @@ export function PromptDetailModal({
 
           <section className="prompt-detail-section" aria-label="Tokens">
             <p className="prompt-detail-total">
-              <span className="prompt-detail-total-value">{formatCount(record.totalTokens)}</span>
-              <span className="prompt-detail-total-unit">tokens</span>
-              {record.approximate && (
-                <span
-                  className="prompt-detail-badge"
-                  title="A heuristic tokenizer or a fallback model profile was used"
-                >
-                  ≈ approximate
-                </span>
-              )}
+              <TokenCount value={record.totalTokens} size="hero" approximate={record.approximate} />
             </p>
             <TokenBar breakdown={record.breakdown} size="thick" />
             <div className="prompt-detail-legends">
@@ -260,24 +230,9 @@ export function PromptDetailModal({
 
           <section className="prompt-detail-section" aria-label="Impact">
             <div className="prompt-detail-impacts">
-              <ImpactTile
-                tone="power"
-                label="Energy"
-                quantity={formatEnergy(record.impact.energyWh)}
-                icon={Zap}
-              />
-              <ImpactTile
-                tone="water"
-                label="Water"
-                quantity={formatWater(record.impact.waterMl)}
-                icon={Droplet}
-              />
-              <ImpactTile
-                tone="co2"
-                label="CO2"
-                quantity={formatCo2(record.impact.co2Grams)}
-                icon={Factory}
-              />
+              <ImpactTile kind="power" quantity={formatEnergy(record.impact.energyWh)} />
+              <ImpactTile kind="water" quantity={formatWater(record.impact.waterMl)} />
+              <ImpactTile kind="co2" quantity={formatCo2(record.impact.co2Grams)} />
             </div>
           </section>
 

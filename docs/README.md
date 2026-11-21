@@ -12,7 +12,7 @@ All project documentation lives in this folder.
 | [pipeline.md](pipeline.md)                   | The estimation pipeline step by step, and how the single number is built |
 | [dto.md](dto.md)                             | Field reference for all DTOs                                             |
 | [build-and-tooling.md](build-and-tooling.md) | Build scripts, TypeScript, ESLint (layer import rules), formatting       |
-| [styling.md](styling.md)                     | Logos, color variables, fonts and icons of the popup and app page        |
+| [styling.md](styling.md)                     | Look of the popup and app page: colors, fonts, icons, layout, motion     |
 | [decisions/](#architecture-decision-records) | Architecture decision records (ADRs)                                     |
 
 Using and debugging the extension in Chrome and Firefox: root [README.md](../README.md).
@@ -38,5 +38,6 @@ _Superseded by NNNN_ instead.
 | 0011 | [Full-page app page with hash routes, ui/ split per surface](decisions/0011-app-page.md)                 | Accepted                            |
 | 0012 | [All tunable values in one shared config.json](decisions/0012-central-config.md)                         | Accepted                            |
 | 0013 | [Markdown reconstruction, attachments, artifacts and tool calls](decisions/0013-rich-message-content.md) | Accepted                            |
-| 0014 | [Dashboard page with timeframes and animated impact cards](decisions/0014-dashboard-page.md)             | Accepted                            |
-| 0015 | [History page with paged prompt list and detail modal](decisions/0015-history-page.md)                   | Accepted                            |
+| 0014 | [Dashboard page with timeframes and animated impact cards](decisions/0014-dashboard-page.md)             | Accepted, card look by 0016         |
+| 0015 | [History page with paged prompt list and detail modal](decisions/0015-history-page.md)                   | Accepted, row details by 0016       |
+| 0016 | [One UI look: shared tile, token, badge and chip components](decisions/0016-unified-ui-look.md)          | Accepted                            |

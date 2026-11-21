@@ -40,12 +40,6 @@
   font-size: 15px;
 }
 
-.dashboard-subtitle-value {
-  color: var(--contrast);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
 .dashboard-cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -60,8 +54,9 @@
   }
 }
 
-/* History: title, timeframe chips, provider chips + sort, summary strip, then the prompts in day
-   groups (sticky day headers) or as one ranking. */
+/* History: title, one controls row (timeframe + provider chips side by side, sort on the right),
+   summary strip, then the prompts in day groups (sticky day headers) or as one ranking. Groups
+   and rows part by whitespace, never by lines. */
 .history {
   display: grid;
   gap: 16px;
@@ -77,26 +72,51 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 12px 24px;
 }
 
-/* Flat strip in --bg, no border: it summarizes, it isn't a card. */
-.history-summary {
+/* The wider column gap keeps the two chip groups apart without a divider. */
+.history-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px 24px;
-  margin: 4px 0 0;
-  padding: 12px 16px;
-  border-radius: 10px;
-  background: var(--bg);
-  color: var(--text-muted);
+  gap: 8px 28px;
+}
+
+/* The summary strip sits on the HistoryRow's columns: the row's time + model columns
+   collapse into the first one, then impact (auto) and the total (150px, same as the row), with the
+   row's 16px side padding and 20px column gap. So impact and tokens line up with every row. Day
+   headers only name the day: the summary and the rows carry the figures. */
+.history-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 150px;
+  align-items: center;
+  column-gap: 20px;
+}
+
+.history-summary-impact,
+.history-summary-tokens {
+  justify-self: end;
+}
+
+.history-summary-tokens {
   font-size: 15px;
 }
 
-.history-summary-value {
-  color: var(--contrast);
+/* Flat strip in --bg like a row, but not clickable: it summarizes. First in the page-open
+   stagger (tile-enter, components.css), the rows follow. */
+.history-summary {
+  animation: tile-enter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  margin: 4px 0 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
+.history-summary-count {
+  color: var(--text);
+  font-size: 15px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -110,16 +130,27 @@
   opacity: 0.55;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .history-summary {
+    animation: none;
+  }
+}
+
 .history-days,
 .history-list {
+  display: grid;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .history-days {
-  display: grid;
-  gap: 24px;
+  gap: 36px;
+}
+
+/* The gap between the --bg row tiles is what separates the rows. */
+.history-list {
+  gap: 8px;
 }
 
 .history-day-header {
@@ -129,26 +160,38 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 16px;
+  gap: 4px 12px;
   margin: 0;
-  padding: 10px 12px 8px;
-  border-bottom: 1px solid var(--border);
+  padding: 20px 16px 14px;
   background: var(--surface);
-  color: var(--contrast);
-  font-size: 16px;
+  font-size: inherit;
+  font-weight: 400;
 }
 
 .history-day-label {
+  color: var(--contrast);
   font-family: var(--font-serif);
+  font-size: 16px;
   font-weight: 700;
 }
 
-.history-day-total {
+.history-day-count {
   color: var(--text-muted);
   font-size: 13px;
-  font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+/* Rows stack below 760px, so the summary stops pretending to have columns too. */
+@media (max-width: 760px) {
+  .history-summary {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 6px;
+  }
+
+  .history-summary-impact,
+  .history-summary-tokens {
+    justify-self: start;
+  }
 }
 
 .history-empty {
@@ -209,11 +252,9 @@ body:has(.prompt-detail[open]) {
   overflow: hidden;
 }
 
-/* Facts Page: ambient radial KPI orbs + header with tactile Shuffle button + 3 distinct
-   asymmetric glassmorphic bento compositions (Daily, Weekly, All-Time). */
+/* Facts Page: title + subtitle, then one row of fact cards per section (Daily, Weekly,
+   All-Time). */
 .facts-page {
-  position: relative;
-  isolation: isolate;
   display: flex;
   flex-direction: column;
   gap: 32px;
@@ -221,67 +262,7 @@ body:has(.prompt-detail[open]) {
   padding-bottom: 40px;
 }
 
-.facts-ambient {
-  position: absolute;
-  inset: -16px -24px 0;
-  z-index: -1;
-  pointer-events: none;
-  overflow: hidden;
-  border-radius: 28px;
-}
-
-.facts-orb {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(64px);
-  opacity: 0.42;
-}
-
-.facts-orb--power {
-  top: 30px;
-  left: -40px;
-  width: 380px;
-  height: 340px;
-  background: radial-gradient(circle, var(--power-soft) 0%, var(--power) 55%, transparent 75%);
-}
-
-.facts-orb--water {
-  top: 32%;
-  right: -50px;
-  width: 420px;
-  height: 380px;
-  background: radial-gradient(circle, var(--water-soft) 0%, var(--water) 55%, transparent 75%);
-}
-
-.facts-orb--co2 {
-  bottom: 40px;
-  left: 18%;
-  width: 440px;
-  height: 340px;
-  background: radial-gradient(circle, var(--co2-soft) 0%, var(--co2) 55%, transparent 75%);
-}
-
 .facts-header {
-  position: sticky;
-  top: 16px;
-  z-index: 5;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 22px;
-  border-radius: 18px;
-  border: 1px solid var(--border);
-  background: linear-gradient(135deg, var(--glass-surface-top) 0%, var(--glass-surface-mid) 100%);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  box-shadow:
-    inset 0 1px 0 0 var(--glass-highlight-top),
-    0 8px 24px -8px var(--glass-shadow);
-}
-
-.facts-header-copy {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -297,72 +278,6 @@ body:has(.prompt-detail[open]) {
   font-size: 14px;
 }
 
-.facts-shuffle-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 18px;
-  border-radius: 999px;
-  border: 1px solid var(--accent-pressed);
-  background: var(--accent);
-  color: var(--text);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow:
-    inset 0 1px 0 0 var(--glass-highlight-top),
-    0 4px 14px -3px var(--glass-shadow);
-}
-
-.facts-shuffle-btn:hover {
-  background: var(--accent-hover);
-  transform: translateY(-1px);
-  box-shadow:
-    inset 0 1px 0 0 var(--glass-highlight-top),
-    0 6px 18px -3px var(--glass-shadow-hover);
-}
-
-.facts-shuffle-btn:active {
-  background: var(--accent-pressed);
-  transform: translateY(0);
-}
-
-.facts-shuffle-btn .lucide {
-  width: 17px;
-  height: 17px;
-  color: var(--contrast);
-}
-
-.facts-shuffle-btn--spinning .facts-shuffle-refresh {
-  animation: facts-spin 460ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.facts-shuffle-btn--spinning .facts-shuffle-dice {
-  animation: facts-dice-tilt 460ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes facts-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes facts-dice-tilt {
-  0%,
-  100% {
-    transform: rotate(0deg) scale(1);
-  }
-  40% {
-    transform: rotate(-18deg) scale(1.15);
-  }
-  75% {
-    transform: rotate(12deg) scale(1.05);
-  }
-}
-
 .facts-sections {
   display: flex;
   flex-direction: column;
@@ -375,32 +290,12 @@ body:has(.prompt-detail[open]) {
   gap: 14px;
 }
 
+/* Title with the timeframe's tokens and prompt count right next to it. */
 .facts-section-header {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 8px 16px;
-}
-
-.facts-section-title-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.facts-section-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--contrast);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  gap: 4px 14px;
 }
 
 .facts-section-title {
@@ -413,155 +308,37 @@ body:has(.prompt-detail[open]) {
 
 .facts-section-meta {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
-}
-
-.facts-section-usage {
-  font-weight: 600;
-  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 
-/* Section 1 (Daily): Asymmetric Hero Bento — 1 wider featured hero card (~58% width, spanning 2
-   rows) paired with 2 stacked/offset compact cards on the right. */
-.facts-grid--daily {
+/* Fact grids: every section is one row of equal-height cards with the same inner structure, so
+   badges, numbers, footers and watermarks line up across cards and sections. Variation comes from
+   the column widths only: Daily leads with a wide card, Weekly is even, All-Time ends wide. */
+.facts-grid {
   display: grid;
-  grid-template-columns: 1.38fr 1fr;
-  grid-template-rows: repeat(2, minmax(158px, auto));
-  gap: 18px;
   align-items: stretch;
+  gap: 18px;
 }
 
-.facts-grid--daily .fact-card:nth-child(1) {
-  grid-row: 1 / span 2;
-  padding: 28px 30px 24px;
+.facts-grid--daily {
+  grid-template-columns: 1.5fr 1fr 1fr;
 }
 
-.facts-grid--daily .fact-card:nth-child(2) {
-  margin-right: 12px;
-}
-
-.facts-grid--daily .fact-card:nth-child(3) {
-  margin-left: 12px;
-}
-
-/* Section 2 (Weekly): Asymmetric Staggered Trio — 3 varied-width/height cards with subtle
-   vertical staggering so they break out of a uniform row. */
 .facts-grid--weekly {
-  display: grid;
-  grid-template-columns: 1.2fr 0.92fr 1.08fr;
-  gap: 18px;
-  align-items: start;
-  padding-bottom: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.facts-grid--weekly .fact-card:nth-child(1) {
-  min-height: 215px;
-}
-
-.facts-grid--weekly .fact-card:nth-child(2) {
-  margin-top: 20px;
-  min-height: 235px;
-}
-
-.facts-grid--weekly .fact-card:nth-child(3) {
-  margin-top: 8px;
-  min-height: 200px;
-}
-
-/* Section 3 (All-Time): Dramatic Focal Panorama Ribbon + Asymmetric Split Pair below. */
 .facts-grid--allTime {
-  display: grid;
-  grid-template-columns: 0.9fr 1.25fr;
-  gap: 18px;
+  grid-template-columns: 1fr 1fr 1.5fr;
 }
 
-.facts-grid--allTime .fact-card:nth-child(1) {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 24px;
-  padding: 26px 30px;
-}
-
-.facts-grid--allTime .fact-card:nth-child(1) .fact-card-top {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.facts-grid--allTime .fact-card:nth-child(1) .fact-card-badges {
-  justify-content: flex-start;
-}
-
-.facts-grid--allTime .fact-card:nth-child(1) .fact-card-footer {
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  padding-top: 0;
-  padding-left: 22px;
-  border-top: 0;
-  border-left: 1px solid color-mix(in srgb, var(--fact-color) 22%, var(--border));
-}
-
-.facts-grid--allTime .fact-card:nth-child(1) .fact-card-readout-sep {
-  display: none;
-}
-
-.facts-grid--allTime .fact-card:nth-child(2) {
-  margin-top: 4px;
-}
-
-.facts-grid--allTime .fact-card:nth-child(3) {
-  margin-top: -6px;
-}
-
-/* Responsive degradation for narrower side panels, popups, or split windows. */
-@media (max-width: 1080px) {
+/* Below this the narrow cards get too tight for text next to the watermark: one card per row. */
+@media (max-width: 1240px) {
   .facts-grid--daily,
   .facts-grid--weekly,
   .facts-grid--allTime {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto;
-    padding-bottom: 0;
-  }
-
-  .facts-grid--daily .fact-card:nth-child(1) {
-    grid-row: auto;
-  }
-
-  .facts-grid--daily .fact-card:nth-child(2),
-  .facts-grid--daily .fact-card:nth-child(3),
-  .facts-grid--weekly .fact-card:nth-child(2),
-  .facts-grid--weekly .fact-card:nth-child(3),
-  .facts-grid--allTime .fact-card:nth-child(2),
-  .facts-grid--allTime .fact-card:nth-child(3) {
-    margin: 0;
-    min-height: 0;
-  }
-
-  .facts-grid--allTime .fact-card:nth-child(1) {
-    grid-template-columns: 1fr;
-  }
-
-  .facts-grid--allTime .fact-card:nth-child(1) .fact-card-top {
-    flex-direction: row;
-    justify-content: space-between;
-  }
-
-  .facts-grid--allTime .fact-card:nth-child(1) .fact-card-footer {
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-start;
-    padding-top: 12px;
-    padding-left: 0;
-    border-top: 1px solid color-mix(in srgb, var(--fact-color) 18%, var(--border));
-    border-left: 0;
-  }
-
-  .facts-grid--allTime .fact-card:nth-child(1) .fact-card-readout-sep {
-    display: inline;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
