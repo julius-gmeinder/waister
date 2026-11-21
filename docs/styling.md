@@ -277,6 +277,7 @@ custom properties, and every animation derives from them:
 | `--cloud-count`                                 | Co2Card   | clouds in the loop; each loops every count × `--puff` ≈ `cloudRiseMs`                             |
 | `--cloud-index`                                 | Co2Card   | start delay in `--puff`s: slot number plus a random head start                                    |
 | `--cloud-rise`, `--cloud-drift`, `--cloud-grow` | Co2Card   | where a cloud ends and how much it swells, re-rolled per loop with its stack                      |
+| `--bulge-rise`, `--bulge-w0` … `--bulge-w3`     | Co2Card   | the bulge's way up its stack and its width at four stops (shares of its widest size)              |
 
 - **TokenTotalCard coins** (Dashboard only, the `coins` prop; Analytics stays still): three
   coins per 4.8s cycle (`--coin-cycle`, delays `--coin-index` / `--coin-count`) pop out next to
@@ -288,9 +289,13 @@ custom properties, and every animation derives from them:
 - The periods come from `config.json` → `ui.dashboard` (via `dashboard.helpers.ts`). More CO2
   means more clouds at the same rise speed, not faster clouds. No usage means no smoke, no
   `--pulse` / `--drip` and an `--idle` modifier class that removes the animations.
-- Every cloud slot picks a random stack (chimney: small dirty puffs, cooling towers: wide light
-  steam) and a random rise, drift and size each time its loop restarts, so the stacks spew at
-  random while the overall rate stays usage-driven.
+- Every cloud slot picks a random stack (chimney: small puffs, cooling towers: wide billows, one
+  color for both) and a random rise, drift and size each time its loop restarts, so the stacks
+  spew at random while the overall rate stays usage-driven.
+- Before each cloud, a bulge travels up its stack (first 14% of the slot's loop) and pops at the
+  top as the cloud comes out. The walls are drawn twice around the bulges (thick outline under,
+  fill over), so a bulge only shows where it pushes the walls out. It is drawn at full size and
+  only scaled down, because a scaled-up animated layer renders blurry.
 - The stream, water glints, grass tufts, lily pad and chimney beacon move all the time
   (independent of usage). The pond level eases over 900ms
   when the timeframe changes.

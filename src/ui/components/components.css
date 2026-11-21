@@ -1038,9 +1038,13 @@
    means more clouds, not faster ones. A cloud rises to --cloud-rise, drifts with the wind to
    --cloud-drift, swells to --cloud-grow and fades. Linear between the keyframes: their spacing
    slows the rise. Stack, shape and these values are re-rolled per loop (Co2Card), only the timing
-   stays. */
+   stays. The first 14% of each loop belong to the slot's bulge (below): the cloud waits inside
+   the stack and comes out when the bulge pops at the top. */
 .co2-cloud {
   opacity: 0;
+  fill: var(--co2-soft);
+  stroke: var(--co2);
+  stroke-width: 1.2;
   stroke-linejoin: round;
   transform-box: fill-box;
   transform-origin: center;
@@ -1048,30 +1052,17 @@
   animation-delay: calc(var(--puff) * var(--cloud-index));
 }
 
-/* Chimney: small, dense, dirty puffs. */
-.co2-cloud--smoke {
-  fill: var(--co2-soft);
-  stroke: var(--co2);
-  stroke-width: 1.2;
-}
-
-/* Cooling towers: wide, light steam billows. */
-.co2-cloud--steam {
-  fill: var(--surface);
-  stroke: color-mix(in srgb, var(--co2) 40%, var(--surface));
-  stroke-width: 1.1;
-}
-
 @keyframes co2-cloud {
-  0% {
+  0%,
+  13% {
     opacity: 0;
     transform: translate(0, 0) scale(0.3);
   }
-  10% {
+  20% {
     opacity: 0.95;
     transform: translate(0, calc(var(--cloud-rise) * 0.14)) scale(calc(var(--cloud-grow) * 0.45));
   }
-  55% {
+  60% {
     opacity: 0.8;
     transform: translate(calc(var(--cloud-drift) * 0.4), calc(var(--cloud-rise) * 0.62))
       scale(calc(var(--cloud-grow) * 0.78));
@@ -1088,6 +1079,54 @@
   stroke: var(--co2);
   stroke-width: 1.5;
   stroke-linejoin: round;
+}
+
+/* Stack walls in two layers around the bulges. The fill covers the outline's inner half, so the
+   3px stroke shows as the usual 1.5px. */
+.co2-stack-outline {
+  fill: none;
+  stroke: var(--co2);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.co2-stack-body {
+  fill: var(--co2-soft);
+}
+
+/* The bulge: an ellipse (scaled by --bulge-w*, shares of its widest size) that travels up the stack in the first 14%
+   of its slot's loop, speeding up, pushing the walls out by a few units, and pops at the top as
+   the cloud comes out. It starts narrower than the walls, so it grows out of them. */
+.co2-bulge {
+  fill: var(--co2-soft);
+  stroke: var(--co2);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  animation: co2-bulge calc(var(--puff) * var(--cloud-count)) linear infinite;
+  animation-delay: calc(var(--puff) * var(--cloud-index));
+}
+
+@keyframes co2-bulge {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scaleX(var(--bulge-w0));
+  }
+  6% {
+    transform: translateY(calc(var(--bulge-rise) * 0.34)) scaleX(var(--bulge-w1));
+  }
+  10.5% {
+    transform: translateY(calc(var(--bulge-rise) * 0.68)) scaleX(var(--bulge-w2));
+  }
+  13.5% {
+    opacity: 1;
+    transform: translateY(var(--bulge-rise)) scaleX(var(--bulge-w3));
+  }
+  15%,
+  100% {
+    opacity: 0;
+    transform: translateY(var(--bulge-rise)) scaleX(calc(var(--bulge-w3) * 0.7));
+  }
 }
 
 .co2-tower-band,
@@ -1167,6 +1206,7 @@
   .water-lily,
   .co2-card-value,
   .co2-cloud,
+  .co2-bulge,
   .co2-beacon {
     animation: none;
   }

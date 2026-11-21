@@ -349,7 +349,7 @@ components/                           shared components (used by either surface)
   timeframe-picker.component.tsx      TimeframePicker (dashboard, history): one Chip per timeframe, optional `order`
   power-card.component.tsx            PowerCard (dashboard): energy, pulsing number, bolts from the number into a meshing gear train
   water-card.component.tsx            WaterCard (dashboard): water, drops arcing round end first from the number's left side into a pond that drains through a stream
-  co2-card.component.tsx              Co2Card (dashboard): CO2, a factory chimney and two cooling towers spewing smoke / steam at random
+  co2-card.component.tsx              Co2Card (dashboard): CO2, a factory chimney and two cooling towers spewing smoke at random, each cloud pushed up its stack as a bulge
   impact-fact.component.tsx           ImpactFact (dashboard): one fun fact under an impact card's scene (multiplier, phrase, shortCopy)
   provider-filter.component.tsx       ProviderFilter (history): "All apps" + one toggle Chip per chat app
   sort-picker.component.tsx           SortPicker (history): native select for the order, ChevronDown instead of the native arrow

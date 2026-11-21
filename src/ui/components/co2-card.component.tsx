@@ -1,9 +1,9 @@
 /**
- * Co2Card: CO2 emitted in the selected timeframe. A factory chimney puffs dirty smoke and two
- * cooling towers billow steam. Every cloud picks a random stack, size and drift on each loop, so
- * the stacks spew at random while the stream as a whole keeps the usage-driven rate, and every
- * puff sends a toxic haze off the number. The puff rate comes in as props, the motion itself is
- * CSS (`--puff`).
+ * Co2Card: CO2 emitted in the selected timeframe. A factory chimney puffs small clouds and two
+ * cooling towers wide ones, each pushed up its stack as a bulge that pops out at the top. Every
+ * cloud picks a random stack, size and drift on each loop, so the stacks spew at random while the
+ * stream as a whole keeps the usage-driven rate, and every puff sends a toxic haze off the number.
+ * The puff rate comes in as props, the motion itself is CSS (`--puff`).
  *
  * Context: app page
  * Docs: docs/modules.md#ui
@@ -26,6 +26,11 @@ interface Co2CardProps {
   fact: SelectedFactComparison | null;
 }
 
+interface Point {
+  x: number;
+  y: number;
+}
+
 // Scene geometry in viewBox units (240 × 170), ground at the same height as the other cards.
 const GROUND_Y = 160;
 
@@ -34,22 +39,91 @@ const HALL_PATH = `M22 ${GROUND_Y} V128 L42 116 V128 L62 116 V128 L82 116 V128 H
 const WINDOWS = [28, 48, 68];
 const CHIMNEY = { x: 88, width: 11, top: 50, base: 128 };
 
-/** Hyperbolic cooling tower: wide foot, waist about two thirds up, slight flare at the rim. */
-function towerPath(cx: number, top: number, foot: number, rim: number): string {
-  const height = GROUND_Y - top;
-  const waist = rim * 0.88;
-  return (
-    `M${cx - foot} ${GROUND_Y} ` +
-    `C${cx - foot * 0.7} ${GROUND_Y - height * 0.35} ${cx - waist} ${top + height * 0.3} ${cx - rim} ${top} ` +
-    `H${cx + rim} ` +
-    `C${cx + waist} ${top + height * 0.3} ${cx + foot * 0.7} ${GROUND_Y - height * 0.35} ${cx + foot} ${GROUND_Y} Z`
-  );
+interface Tower {
+  cx: number;
+  top: number;
+  foot: number;
+  rim: number;
 }
 
-const TOWERS = [
+const TOWERS: readonly Tower[] = [
   { cx: 152, top: 76, foot: 27, rim: 17 },
   { cx: 202, top: 98, foot: 21, rim: 13 },
 ];
+
+/**
+ * A tower's right flank as a cubic bezier, x as the distance from its center: wide foot, waist
+ * about two thirds up, slight flare at the rim (hyperbolic cooling tower).
+ */
+function towerFlank({ top, foot, rim }: Tower): [Point, Point, Point, Point] {
+  const height = GROUND_Y - top;
+  return [
+    { x: foot, y: GROUND_Y },
+    { x: foot * 0.7, y: GROUND_Y - height * 0.35 },
+    { x: rim * 0.88, y: top + height * 0.3 },
+    { x: rim, y: top },
+  ];
+}
+
+function towerPath(tower: Tower): string {
+  const { cx } = tower;
+  const [p0, p1, p2, p3] = towerFlank(tower);
+  return (
+    `M${cx - p0.x} ${p0.y} C${cx - p1.x} ${p1.y} ${cx - p2.x} ${p2.y} ${cx - p3.x} ${p3.y} ` +
+    `H${cx + p3.x} C${cx + p2.x} ${p2.y} ${cx + p1.x} ${p1.y} ${cx + p0.x} ${p0.y} Z`
+  );
+}
+
+/** Half-width of a tower at height `y` (the flank's y falls steadily, so bisect its t). */
+function towerHalfWidth(tower: Tower, y: number): number {
+  const [p0, p1, p2, p3] = towerFlank(tower);
+  const at = (t: number, k: 'x' | 'y') =>
+    (1 - t) ** 3 * p0[k] +
+    3 * (1 - t) ** 2 * t * p1[k] +
+    3 * (1 - t) * t ** 2 * p2[k] +
+    t ** 3 * p3[k];
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (at(mid, 'y') > y) lo = mid;
+    else hi = mid;
+  }
+  return at((lo + hi) / 2, 'x');
+}
+
+/**
+ * Where the bulge passes on its way up (share of the stack's height): it starts a little above
+ * the foot and pops out at the top, just before the cloud comes out.
+ */
+const BULGE_STOPS = [0.12, 0.42, 0.72, 1];
+
+interface Bulge {
+  /** Start height (y) and the way up to the top (negative). */
+  bottom: number;
+  rise: number;
+  /** Drawn at the widest stop and only scaled down: scaled-up animated layers render blurry. */
+  rx: number;
+  ry: number;
+  /** Ellipse half-width at each stop. The first one stays inside the walls, so it grows out. */
+  widths: readonly number[];
+}
+
+/**
+ * Bulge from `bottom` to `top` of a stack whose half-width at height y is `halfWidth(y)`,
+ * pushing the walls out by `push` (viewBox units).
+ */
+function bulgeFor(
+  bottom: number,
+  top: number,
+  ry: number,
+  push: number,
+  halfWidth: (y: number) => number,
+): Bulge {
+  const ys = BULGE_STOPS.map((stop) => bottom - (bottom - top) * stop);
+  const widths = ys.map((y, index) => halfWidth(y) + (index === 0 ? -1.5 : push));
+  return { bottom: ys[0]!, rise: top - ys[0]!, rx: Math.max(...widths), ry, widths };
+}
 
 type StackKind = 'smoke' | 'steam';
 
@@ -64,6 +138,7 @@ interface Stack {
   rise: number;
   /** Chance that a cloud picks this stack. */
   weight: number;
+  bulge: Bulge;
 }
 
 const STACKS: readonly Stack[] = [
@@ -74,20 +149,22 @@ const STACKS: readonly Stack[] = [
     spread: 1.5,
     rise: -48,
     weight: 0.4,
+    bulge: bulgeFor(CHIMNEY.base, CHIMNEY.top, 4.5, 3.5, () => CHIMNEY.width / 2),
   },
-  ...TOWERS.map(({ cx, top, rim }, index) => ({
+  ...TOWERS.map((tower, index) => ({
     kind: 'steam' as const,
-    x: cx,
-    y: top - 1,
-    spread: rim * 0.4,
+    x: tower.cx,
+    y: tower.top - 1,
+    spread: tower.rim * 0.4,
     rise: index === 0 ? -64 : -58,
     weight: index === 0 ? 0.33 : 0.27,
+    bulge: bulgeFor(GROUND_Y, tower.top, 7, 5.5, (y) => towerHalfWidth(tower, y)),
   })),
 ];
 
-/** Dense puff of three bumps around 0,0 (chimney smoke), flat bottom. */
+/** Small puff of three bumps around 0,0 (chimney), flat bottom. */
 const SMOKE_PATH = 'M-7 6 A5 5 0 0 1 -7 -4 A7 7 0 0 1 7 -3.9 A5 5 0 0 1 8 6 Z';
-/** Wide, soft billow of four bumps (cooling tower steam). */
+/** Wide billow of four bumps (cooling towers). */
 const STEAM_PATH =
   'M-12 6 A5 5 0 0 1 -11 -3 A6.5 6.5 0 0 1 -1 -7.5 A7 7 0 0 1 11 -3 A5.5 5.5 0 0 1 12 6 Z';
 
@@ -122,31 +199,34 @@ function randomPuff(): Puff {
   };
 }
 
-/**
- * One cloud slot. It re-rolls its stack and shape whenever its loop restarts (invisible at that
- * moment), without touching the animation itself, so its place in the stream stays.
- */
-function SmokeCloud({ index }: { index: number }) {
-  const [jitter] = useState(() => Math.random() * VARIATION.jitter);
-  const [puff, setPuff] = useState(randomPuff);
-  const { stack, shift, rise, drift, grow } = puff;
+/** One cloud slot: a fixed head start, and the puff it rolled for its current loop. */
+interface Slot {
+  jitter: number;
+  puff: Puff;
+}
 
+const newSlot = (): Slot => ({ jitter: Math.random() * VARIATION.jitter, puff: randomPuff() });
+
+/**
+ * The stacks' walls, drawn twice: a thick outline under the bulges, the fill over them. The fill
+ * hides the outline's inner half and every bit of a bulge inside the walls, so a bulge only shows
+ * where it pushes the walls out, and covers the outline there.
+ */
+function StackWalls({ layer }: { layer: 'outline' | 'body' }) {
+  const className = layer === 'outline' ? 'co2-stack-outline' : 'co2-stack-body';
   return (
-    <g transform={`translate(${(stack.x + shift).toFixed(1)} ${stack.y})`}>
-      <path
-        className={`co2-cloud co2-cloud--${stack.kind}`}
-        d={stack.kind === 'smoke' ? SMOKE_PATH : STEAM_PATH}
-        onAnimationIteration={() => setPuff(randomPuff())}
-        style={
-          {
-            '--cloud-index': index + jitter,
-            '--cloud-rise': `${rise.toFixed(1)}px`,
-            '--cloud-drift': `${drift.toFixed(1)}px`,
-            '--cloud-grow': grow.toFixed(2),
-          } as CSSProperties
-        }
+    <>
+      {TOWERS.map((tower) => (
+        <path key={tower.cx} className={className} d={towerPath(tower)} />
+      ))}
+      <rect
+        className={className}
+        x={CHIMNEY.x}
+        y={CHIMNEY.top}
+        width={CHIMNEY.width}
+        height={CHIMNEY.base - CHIMNEY.top}
       />
-    </g>
+    </>
   );
 }
 
@@ -156,7 +236,18 @@ export function Co2Card({ co2Grams, puffMs, cloudCount, fact }: Co2CardProps) {
   const style = idle
     ? undefined
     : ({ '--puff': `${puffMs}ms`, '--cloud-count': cloudCount } as CSSProperties);
-  const clouds = idle ? [] : Array.from({ length: cloudCount }, (_, index) => index);
+  const [slots, setSlots] = useState<Slot[]>(() => Array.from({ length: cloudCount }, newSlot));
+  // More CO2 (another timeframe) needs more slots; the existing ones keep their place.
+  if (slots.length < cloudCount) {
+    setSlots([...slots, ...Array.from({ length: cloudCount - slots.length }, newSlot)]);
+  }
+  const active = idle ? [] : slots.slice(0, cloudCount);
+  // A slot re-rolls its stack and shape when its loop restarts (cloud and bulge are invisible
+  // then), without touching the animation, so its place in the stream stays.
+  const reroll = (index: number) =>
+    setSlots((current) =>
+      current.map((slot, i) => (i === index ? { ...slot, puff: randomPuff() } : slot)),
+    );
 
   return (
     <article className={idle ? 'co2-card co2-card--idle' : 'co2-card'} style={style}>
@@ -170,12 +261,52 @@ export function Co2Card({ co2Grams, puffMs, cloudCount, fact }: Co2CardProps) {
         </p>
         <svg className="co2-card-scene" viewBox="0 0 240 170" aria-hidden="true">
           {/* Clouds first: they start inside the stacks and come out of the top. */}
-          {clouds.map((index) => (
-            <SmokeCloud key={index} index={index} />
+          {active.map(({ jitter, puff }, index) => (
+            <g
+              key={index}
+              transform={`translate(${(puff.stack.x + puff.shift).toFixed(1)} ${puff.stack.y})`}
+            >
+              <path
+                className={`co2-cloud co2-cloud--${puff.stack.kind}`}
+                d={puff.stack.kind === 'smoke' ? SMOKE_PATH : STEAM_PATH}
+                onAnimationIteration={() => reroll(index)}
+                style={
+                  {
+                    '--cloud-index': index + jitter,
+                    '--cloud-rise': `${puff.rise.toFixed(1)}px`,
+                    '--cloud-drift': `${puff.drift.toFixed(1)}px`,
+                    '--cloud-grow': puff.grow.toFixed(2),
+                  } as CSSProperties
+                }
+              />
+            </g>
           ))}
-          {TOWERS.map(({ cx, top, foot, rim }) => (
+          <StackWalls layer="outline" />
+          {/* Each slot's bulge shares its cloud's loop (same --cloud-index delay and duration). */}
+          {active.map(({ jitter, puff: { stack } }, index) => (
+            <g key={index} transform={`translate(${stack.x} ${stack.bulge.bottom.toFixed(1)})`}>
+              <ellipse
+                className="co2-bulge"
+                rx={stack.bulge.rx}
+                ry={stack.bulge.ry}
+                style={
+                  {
+                    '--cloud-index': index + jitter,
+                    '--bulge-rise': `${stack.bulge.rise.toFixed(1)}px`,
+                    ...Object.fromEntries(
+                      stack.bulge.widths.map((width, stop) => [
+                        `--bulge-w${stop}`,
+                        (width / stack.bulge.rx).toFixed(3),
+                      ]),
+                    ),
+                  } as CSSProperties
+                }
+              />
+            </g>
+          ))}
+          <StackWalls layer="body" />
+          {TOWERS.map(({ cx, top, rim }) => (
             <g key={cx}>
-              <path className="co2-tower" d={towerPath(cx, top, foot, rim)} />
               <ellipse className="co2-tower" cx={cx} cy={top} rx={rim} ry={2.6} />
               <path
                 className="co2-tower-band"
@@ -183,13 +314,6 @@ export function Co2Card({ co2Grams, puffMs, cloudCount, fact }: Co2CardProps) {
               />
             </g>
           ))}
-          <rect
-            className="co2-factory"
-            x={CHIMNEY.x}
-            y={CHIMNEY.top}
-            width={CHIMNEY.width}
-            height={CHIMNEY.base - CHIMNEY.top}
-          />
           <rect
             className="co2-factory"
             x={CHIMNEY.x - 2}
