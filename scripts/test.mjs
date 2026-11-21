@@ -29,6 +29,8 @@ const bundled = await esbuild.build({
       } from './src/services/prompt-store/record-validator';
       export * from './src/ui/app/pages/facts.helpers';
       export * from './src/ui/app/pages/analytics.helpers';
+      export * from './src/ui/app/pages/tips-catalog.helpers';
+      export * from './src/ui/app/pages/tips-recommender.helpers';
     `,
     resolveDir: process.cwd(),
     loader: 'ts',
@@ -89,6 +91,8 @@ const {
   resolveHumanColumnDecimals,
   WORK_TO_1K_WORDS_FACTOR,
   HOUR_MS,
+  TIPS_CATALOG,
+  recommendTips,
 } = mod;
 
 describe('1. Config & UI Gauge Max Values', () => {
@@ -1286,5 +1290,196 @@ describe('8. Workload-Normalized Model Comparison, Natural Equivalences & Reader
       querySelectorAll: (sel) => (sel === 'img' ? [zeroByZeroIcon, realUploadImg] : []),
     };
     assert.deepEqual(readAttachments([fakeUserTurnRoot], ''), ['image']);
+  });
+});
+
+describe('9. Tips Catalog & Personalized Recommender (TipsRecommender)', () => {
+  const NOW = 1_750_000_000_000;
+  const DAY = 24 * HOUR_MS;
+
+  function makeRecords(count, overridesFactory) {
+    return Array.from({ length: count }, (_, i) =>
+      makeTestPromptRecord({
+        id: `tip-rec-${i}`,
+        capturedAt: NOW - (i + 1) * HOUR_MS,
+        ...(typeof overridesFactory === 'function' ? overridesFactory(i) : overridesFactory),
+      }),
+    );
+  }
+
+  it('contains all 9 curated jargon-free tips with unique IDs and examples', () => {
+    assert.equal(TIPS_CATALOG.length, 9);
+    const ids = new Set(TIPS_CATALOG.map((t) => t.id));
+    assert.equal(ids.size, 9);
+    for (const tip of TIPS_CATALOG) {
+      assert.ok(tip.title.length > 0);
+      assert.ok(tip.summary.length > 0);
+      assert.ok(tip.example.insteadOf.length > 0);
+      assert.ok(tip.example.tryThis.length > 0);
+      // Primary card copy stays jargon-free
+      assert.ok(!/\b(tokens?|kv\s*cache|prefill)\b/i.test(tip.summary));
+    }
+  });
+
+  it('falls back gracefully to top starter tips when data is empty or sparse (< 3 messages)', () => {
+    const empty = recommendTips([], [], NOW);
+    assert.equal(empty.isStarterFallback, true);
+    assert.equal(empty.sectionTitle, 'Start here: highest-impact habits');
+    assert.equal(empty.items.length, 2);
+    assert.deepEqual(
+      empty.items.map((item) => item.tip.id),
+      ['start-fresh-chat', 'match-model-to-task'],
+    );
+    assert.ok(empty.items.every((item) => item.reason === null));
+
+    const sparse = recommendTips(makeRecords(2, {}), [], NOW);
+    assert.equal(sparse.isStarterFallback, true);
+    assert.equal(sparse.items.length, 2);
+    assert.ok(sparse.items.every((item) => item.reason === null));
+
+    // Widens to last 30 days when 7d has < 3 messages but 30d has >= 3
+    const olderBut30d = [10, 12, 15].map((daysAgo, i) =>
+      makeTestPromptRecord({
+        id: `old-${i}`,
+        capturedAt: NOW - daysAgo * DAY,
+        breakdown: {
+          input: 100,
+          output: 200,
+          history: 200,
+          thinking: 1800,
+          tools: 0,
+          overhead: 500,
+        },
+      }),
+    );
+    const widened = recommendTips(olderBut30d, [], NOW);
+    assert.equal(widened.isStarterFallback, false);
+    assert.equal(widened.windowLabel, 'last 30 days');
+    assert.equal(widened.items[0].tip.id, 'save-deep-thinking');
+    assert.ok(widened.items[0].reason.includes('last 30 days'));
+  });
+
+  it('selects the right personalized tip for dominant history, thinking, tools, output, and heavy model shares', () => {
+    // 1. Dominant history energy share
+    const historyRecords = makeRecords(4, {
+      breakdown: {
+        input: 100,
+        output: 200,
+        history: 14000,
+        thinking: 0,
+        tools: 0,
+        overhead: 1000,
+      },
+    });
+    const historyRec = recommendTips(historyRecords, [], NOW);
+    assert.equal(historyRec.isStarterFallback, false);
+    assert.equal(historyRec.items[0].tip.id, 'start-fresh-chat');
+    assert.ok(historyRec.items[0].reason.includes('Chat memory'));
+
+    // 2. Dominant thinking energy share
+    const thinkingRecords = makeRecords(4, {
+      breakdown: {
+        input: 200,
+        output: 300,
+        history: 200,
+        thinking: 2500,
+        tools: 0,
+        overhead: 1000,
+      },
+    });
+    const thinkingRec = recommendTips(thinkingRecords, [], NOW);
+    assert.equal(thinkingRec.items[0].tip.id, 'save-deep-thinking');
+    assert.ok(thinkingRec.items[0].reason.includes('AI reasoning'));
+
+    // 3. Dominant tools (search) energy share
+    const toolsRecords = makeRecords(4, {
+      breakdown: {
+        input: 100,
+        output: 200,
+        history: 200,
+        thinking: 0,
+        tools: 7000,
+        overhead: 1000,
+      },
+    });
+    const toolsRec = recommendTips(toolsRecords, [], NOW);
+    assert.equal(toolsRec.items[0].tip.id, 'use-regular-search');
+    assert.ok(toolsRec.items[0].reason.includes('Search & tools'));
+
+    // 4. Dominant output energy share
+    const outputRecords = makeRecords(4, {
+      breakdown: {
+        input: 120,
+        output: 1800,
+        history: 200,
+        thinking: 0,
+        tools: 0,
+        overhead: 800,
+      },
+    });
+    const outputRec = recommendTips(outputRecords, [], NOW);
+    assert.equal(outputRec.items[0].tip.id, 'ask-for-length-and-format');
+    assert.ok(outputRec.items[0].reason.includes('AI replies'));
+
+    // 5. Heavy flagship model share
+    const heavyModelRecords = makeRecords(4, {
+      provider: 'anthropic',
+      model: {
+        name: 'claude-opus',
+        version: '4.5',
+        thinkingEffort: 'none',
+        rawLabel: 'Claude Opus',
+      },
+      breakdown: {
+        input: 300,
+        output: 400,
+        history: 800,
+        thinking: 0,
+        tools: 0,
+        overhead: 2000,
+      },
+    });
+    const heavyRec = recommendTips(heavyModelRecords, [], NOW);
+    assert.equal(heavyRec.items[0].tip.id, 'match-model-to-task');
+    assert.ok(heavyRec.items[0].reason.includes('Heavy models'));
+  });
+
+  it('avoids duplicate recommendations and excludes already-adopted tips when other relevant tips exist', () => {
+    // Both thinking and heavy model fire strongly
+    const multiSignalRecords = makeRecords(5, {
+      provider: 'anthropic',
+      model: {
+        name: 'claude-fable',
+        version: '5',
+        thinkingEffort: 'high',
+        rawLabel: 'Claude Fable',
+      },
+      breakdown: {
+        input: 150,
+        output: 250,
+        history: 12000,
+        thinking: 2400,
+        tools: 0,
+        overhead: 2000,
+      },
+    });
+
+    const initial = recommendTips(multiSignalRecords, [], NOW);
+    assert.equal(initial.items.length, 2);
+    const initialIds = initial.items.map((item) => item.tip.id);
+    assert.equal(new Set(initialIds).size, 2);
+
+    // Adopting the #1 recommended tip promotes the next relevant un-adopted tip into featured slots
+    const topId = initialIds[0];
+    const afterAdopt = recommendTips(multiSignalRecords, [topId], NOW);
+    assert.equal(afterAdopt.items.length, 2);
+    assert.ok(!afterAdopt.items.some((item) => item.tip.id === topId));
+    assert.equal(new Set(afterAdopt.items.map((item) => item.tip.id)).size, 2);
+
+    // Adopting starter tips in sparse mode rotates to other un-adopted starter tips
+    const sparseAdopted = recommendTips([], ['start-fresh-chat'], NOW);
+    assert.equal(sparseAdopted.items.length, 2);
+    assert.ok(!sparseAdopted.items.some((item) => item.tip.id === 'start-fresh-chat'));
+    assert.equal(sparseAdopted.items[0].tip.id, 'match-model-to-task');
   });
 });

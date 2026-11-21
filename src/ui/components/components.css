@@ -359,7 +359,9 @@
 .chart-card,
 .analytics-kpi,
 .analytics-eco-banner,
-.analytics-legacy-notice {
+.analytics-legacy-notice,
+.featured-tip-card,
+.tip-card {
   position: relative;
   overflow: hidden;
   border-radius: 12px;
@@ -377,7 +379,9 @@
 .history-row,
 .chart-card,
 .analytics-kpi,
-.analytics-eco-banner {
+.analytics-eco-banner,
+.featured-tip-card,
+.tip-card {
   animation: tile-enter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: calc(min(var(--enter-index, 0), 12) * 45ms);
 }
@@ -1761,6 +1765,262 @@
   flex-direction: column;
 }
 
+/* CategoryFilterBar + FeaturedTipCard + TipCard (tips page): flat tiles matching the rest of the
+   app (--bg, 12px radius, no border/shadow), with the flush top-left corner tab (like ImpactBadge),
+   top-right --surface tag (like Analytics KPI delta) and borderless --surface example drawer. */
+.tips-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+
+.tips-hide-adopted {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tips-hide-adopted-checkbox {
+  margin: 0;
+  accent-color: var(--contrast-bright);
+  cursor: pointer;
+}
+
+/* Top padding clears the flush corner tab (.tip-impact-tab), matching .analytics-kpi / .fact-card. */
+.featured-tip-card,
+.tip-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 46px 24px 18px;
+  transition: opacity 160ms ease;
+}
+
+.tip-card--adopted {
+  opacity: 0.65;
+}
+
+.tip-card--adopted:hover,
+.tip-card--adopted:focus-within {
+  opacity: 1;
+}
+
+/* Flush top-left corner tab mirroring .impact-badge geometry and typography. */
+.tip-impact-tab {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 0 0 12px 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.tip-impact-tab .lucide {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+}
+
+.tip-impact-tab--high {
+  background: var(--power-soft);
+  color: var(--power-strong);
+}
+
+.tip-impact-tab--quick {
+  background: var(--co2-soft);
+  color: var(--co2-strong);
+}
+
+/* Top-right category tag level with the corner tab, mirroring .analytics-kpi-delta. */
+.tip-corner-tag {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.featured-tip-hook {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.featured-tip-hook .lucide {
+  width: 14px;
+  height: 14px;
+  color: var(--contrast-bright);
+}
+
+.tip-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Featured cards carry a serif title like ChartCard; grid cards use sans semibold like FactCard
+   copy so the page stays calm and scannable. */
+.featured-tip-title {
+  margin: 0;
+  color: var(--contrast);
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-wrap: pretty;
+}
+
+.tip-card-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+.tip-card-summary {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+/* Borderless --surface inset matching .fact-card-readout inside --bg tiles. */
+.tip-example-drawer {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--surface);
+  animation: tip-drawer-in 160ms ease-out;
+}
+
+@keyframes tip-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.tip-example-row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.tip-example-label {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tip-example-label--instead {
+  color: var(--text-muted);
+}
+
+.tip-example-label--try {
+  color: var(--contrast);
+}
+
+.tip-example-text {
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.tip-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+/* Negative left margin keeps the label text flush with the card title while preserving hover pill padding. */
+.tip-card-disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: -10px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.tip-card-chevron {
+  width: 14px;
+  height: 14px;
+  transition: transform 140ms ease;
+}
+
+.tip-card-chevron--open {
+  transform: rotate(180deg);
+}
+
+.tip-card-adopt {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.tip-card-adopt .lucide {
+  width: 14px;
+  height: 14px;
+  color: var(--contrast-bright);
+}
+
+@media (max-width: 560px) {
+  .tip-example-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .power-card,
   .water-card,
@@ -1769,17 +2029,25 @@
   .history-row,
   .chart-card,
   .analytics-kpi,
-  .analytics-eco-banner {
+  .analytics-eco-banner,
+  .featured-tip-card,
+  .tip-card,
+  .tip-example-drawer {
     animation: none;
+  }
+
+  .tip-card-chevron {
+    transition: none;
   }
 }
 
 /* Interaction states, shared by TabBar and Sidebar links, Chips (TimeframePicker,
    ProviderFilter, the Analytics filters and toggles), the SortPicker, HistoryRows, the History
-   "Load more" button, the PromptDetailModal's buttons, the InfoTooltip button and the Analytics
-   action buttons (docs/styling.md#interaction-states). Neutral items: --neutral-hover / --neutral-pressed. The
-   selected item (aria-current page, aria-pressed chip) is --accent with its own hover/pressed
-   steps. The selected rules come last, so they win over the neutral ones at equal specificity. */
+   "Load more" button, the PromptDetailModal's buttons, the InfoTooltip button, the Analytics
+   action buttons and the Tips controls (docs/styling.md#interaction-states). Neutral items:
+   --neutral-hover / --neutral-pressed. The selected item (aria-current page, aria-pressed chip or
+   adopt pill) is --accent with its own hover/pressed steps. The selected rules come last, so they
+   win over the neutral ones at equal specificity. */
 .tab-bar-link,
 .sidebar-link,
 .chip,
@@ -1789,7 +2057,10 @@
 .prompt-detail-icon-button,
 .prompt-detail-link,
 .info-tooltip-trigger,
-.analytics-action-btn {
+.analytics-action-btn,
+.tip-card-disclosure,
+.tip-card-adopt,
+.tips-empty-action {
   transition:
     background-color 120ms ease,
     border-color 120ms ease,
@@ -1805,7 +2076,10 @@
 .prompt-detail-icon-button:hover:enabled,
 .prompt-detail-link:hover,
 .info-tooltip-trigger:hover,
-.analytics-action-btn:hover:enabled {
+.analytics-action-btn:hover:enabled,
+.tip-card-disclosure:hover,
+.tip-card-adopt:hover,
+.tips-empty-action:hover {
   background: var(--neutral-hover);
   color: var(--text);
 }
@@ -1818,12 +2092,16 @@
 .prompt-detail-icon-button:active:enabled,
 .prompt-detail-link:active,
 .info-tooltip-trigger:active,
-.analytics-action-btn:active:enabled {
+.analytics-action-btn:active:enabled,
+.tip-card-disclosure:active,
+.tip-card-adopt:active,
+.tips-empty-action:active {
   background: var(--neutral-pressed);
 }
 
 .sidebar-link[aria-current='page'],
-.chip[aria-pressed='true'] {
+.chip[aria-pressed='true'],
+.tip-card-adopt[aria-pressed='true'] {
   background: var(--accent);
   color: var(--text);
 }
@@ -1842,17 +2120,20 @@
   color: var(--contrast-bright);
 }
 
-.chip[aria-pressed='true'] {
+.chip[aria-pressed='true'],
+.tip-card-adopt[aria-pressed='true'] {
   border-color: var(--accent-pressed);
 }
 
 .sidebar-link[aria-current='page']:hover,
-.chip[aria-pressed='true']:hover {
+.chip[aria-pressed='true']:hover,
+.tip-card-adopt[aria-pressed='true']:hover {
   background: var(--accent-hover);
 }
 
 .sidebar-link[aria-current='page']:active,
-.chip[aria-pressed='true']:active {
+.chip[aria-pressed='true']:active,
+.tip-card-adopt[aria-pressed='true']:active {
   background: var(--accent-pressed);
 }
 
@@ -1866,7 +2147,10 @@
 .prompt-detail-icon-button:focus-visible,
 .prompt-detail-link:focus-visible,
 .info-tooltip-trigger:focus-visible,
-.analytics-action-btn:focus-visible {
+.analytics-action-btn:focus-visible,
+.tip-card-disclosure:focus-visible,
+.tip-card-adopt:focus-visible,
+.tips-empty-action:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }

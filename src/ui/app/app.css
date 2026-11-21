@@ -1188,3 +1188,163 @@ body:has(.prompt-detail[open]) {
     grid-template-columns: 1fr;
   }
 }
+
+/* Tips Page: matches Facts / Analytics spacing and flat tile rhythm. */
+.tips-page {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 1200px;
+  padding-bottom: 40px;
+}
+
+.tips-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+
+.tips-header-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tips-header-copy .page-title {
+  margin: 0;
+}
+
+.tips-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Flat --bg summary pill (no border, --contrast-bright icon) matching Waister's tile look. */
+.tips-progress-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tips-progress-pill .lucide {
+  width: 15px;
+  height: 15px;
+  color: var(--contrast-bright);
+}
+
+.tips-progress-count {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tips-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tips-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+}
+
+.tips-section-title {
+  margin: 0;
+  color: var(--contrast);
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.tips-section-meta {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Equal-column 2-col grids matching .analytics-model-grid (12px gap); align-items: start keeps
+   sibling cards steady when one expands. */
+.tips-featured-grid,
+.tips-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+.tips-featured-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tips-empty {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 48px 20px;
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.tips-empty .lucide {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 8px;
+  color: var(--contrast-bright);
+}
+
+.tips-empty-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.tips-empty-text {
+  margin: 0;
+  font-size: 13px;
+}
+
+.tips-empty-action {
+  margin-top: 10px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.tips-footer {
+  padding-top: 8px;
+}
+
+.tips-footer-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 1080px) {
+  .tips-featured-grid,
+  .tips-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

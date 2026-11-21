@@ -7,15 +7,8 @@
  * Docs: docs/modules.md#ui
  */
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-  type ComponentType,
-} from 'react';
-import { parseRouteHash, type AppRouteId } from '../app-routes';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { parseRouteHash } from '../app-routes';
 import { Sidebar } from '../components/sidebar.component';
 import { DEFAULT_HISTORY_VIEW, type HistoryView } from '../history.helpers';
 import { DEFAULT_TIMEFRAME, timeframeSinceMs, type TimeframeId } from '../timeframe.helpers';
@@ -31,14 +24,6 @@ import { DashboardPage } from './pages/dashboard.page';
 import { FactsPage } from './pages/facts.page';
 import { HistoryPage } from './pages/history.page';
 import { TipsPage } from './pages/tips.page';
-
-/** Pages without props. Dashboard, Analytics, History and Facts receive fetched data from here. */
-const PAGES: Record<
-  Exclude<AppRouteId, 'dashboard' | 'analytics' | 'history' | 'facts'>,
-  ComponentType
-> = {
-  tips: TipsPage,
-};
 
 function subscribeToHash(onChange: () => void): () => void {
   window.addEventListener('hashchange', onChange);
@@ -98,8 +83,7 @@ export function App() {
   } else if (route.id === 'facts') {
     page = <FactsPage summaries={factsSummaries} />;
   } else {
-    const Page = PAGES[route.id];
-    page = <Page />;
+    page = <TipsPage records={records} />;
   }
 
   return (

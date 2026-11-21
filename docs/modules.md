@@ -316,8 +316,10 @@ esbuild entry ([ADR 0011](decisions/0011-app-page.md)):
   [ADR 0015](decisions/0015-history-page.md)). The Facts page compares the Today / Last week / All
   time impact with everyday benchmarks (seeded hourly pick). Analytics breaks the saved prompts
   down by metric (energy, water, CO₂, tokens) and timeframe: KPI tiles, where the impact goes,
-  model share and comparison, chat memory over time, one eco-insight, export and reset. Tips is
-  an empty placeholder for now. All pages share one look (tiles, TokenCount, ImpactBadge, Chips;
+  model share and comparison, chat memory over time, one eco-insight, export and reset. Tips
+  curates nine jargon-free everyday habits with personalized recommendations from recent usage,
+  category filters, expandable before/after examples, and persisted habit adoption checkmarks. All
+  pages share one look (tiles, TokenCount, ImpactBadge, Chips;
   [ADR 0016](decisions/0016-unified-ui-look.md), [styling.md](styling.md)).
 
 Neither surface talks to the estimation pipeline.
@@ -358,6 +360,9 @@ components/                           shared components (used by either surface)
   fact-card.component.tsx             FactCard (facts): benchmark tile, ImpactBadge, multiplier + plain phrase, one-sentence fact, SVG watermark top right
   chart-card.component.tsx            ChartCard (analytics): tile with serif title + InfoTooltip, one-line insight, optional header action (chips, legend)
   info-tooltip.component.tsx          InfoTooltip (analytics): quiet ⓘ button, explanation popover on hover, focus or click
+  category-filter-bar.component.tsx   CategoryFilterBar (tips): category ChipGroup + "Hide adopted" checkbox toggle
+  featured-tip-card.component.tsx     FeaturedTipCard (tips): personalized or starter hero tile with data-backed hook, expandable example drawer, and adopt toggle
+  tip-card.component.tsx              TipCard (tips): compact habit tile with impact/category pills, expandable before/after example drawer, and adopt toggle
 popup/
   popup.html                          <div id="root">, loads index.js + index.css
   popup.css                           popup layout only (full-window card, `.popup-period` line)
@@ -373,7 +378,9 @@ app/
     analytics.helpers.ts              aggregateAnalytics(records, metric, timeframe, …) → view models (KPIs, breakdown, donut, comparison, series, eco-insight), CSV / JSON export
     facts.page.tsx                    FactsPage: Daily, Weekly and All-Time everyday perspective benchmarks, seeded per shuffle interval
     facts.helpers.ts                  shuffleFactsBoard, factsShuffleSeed + seededRandom (ui.facts), smart-window filtering (0.25..15), multiplier & raw KPI formatting
-    tips.page.tsx                     TipsPage (empty)
+    tips.page.tsx                     TipsPage: personalized hero tips, category filter bar, 2-column habit grid with expandable before/after examples, persisted adoption count
+    tips-catalog.helpers.ts           TIPS_CATALOG (9 jargon-free everyday habits), categories, impact labels, and lookup helpers
+    tips-recommender.helpers.ts       recommendTips (7d/30d personalized scoring + <3 starter fallback) and localStorage persistence for adopted tip IDs
     history.page.tsx                  HistoryPage: filter row (timeframe + providers, sort), summary strip, day groups or ranking, "Load more", PromptDetailModal
 ```
 
