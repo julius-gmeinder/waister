@@ -21,6 +21,7 @@ the tokens and saves every prompt to a SQLite database, and the popup reads that
 │  handlers/estimation.handler.ts    handleEstimation(ChatCaptureDto)       │
 │     ├─ services/tokenizer/         visible tokens                         │
 │     ├─ services/estimation/        hidden tokens → TokenEstimateDto       │
+│     ├─ services/conversion/        tokens → energy, water, CO2 impact     │
 │     └─ services/prompt-store/      + UUID + URL → PromptRecordDto, INSERT │
 │                                                                           │
 │  services/prompt-store/            SQLite WASM (in memory, IndexedDB      │

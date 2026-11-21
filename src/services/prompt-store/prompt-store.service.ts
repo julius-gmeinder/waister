@@ -83,7 +83,10 @@ const SELECT_USAGE_SUMMARY = `
     COALESCE(SUM(output_tokens), 0)   AS output,
     COALESCE(SUM(thinking_tokens), 0) AS thinking,
     COALESCE(SUM(tool_tokens), 0)     AS tools,
-    COALESCE(SUM(overhead_tokens), 0) AS overhead
+    COALESCE(SUM(overhead_tokens), 0) AS overhead,
+    COALESCE(SUM(energy_wh), 0)       AS energyWh,
+    COALESCE(SUM(water_ml), 0)        AS waterMl,
+    COALESCE(SUM(co2_grams), 0)       AS co2Grams
   FROM prompts
   WHERE captured_at >= $sinceMs
 `;
@@ -134,7 +137,10 @@ export async function savePromptRecord(record: PromptRecordDto): Promise<void> {
 export async function getUsageSummary(sinceMs: number): Promise<UsageSummaryDto> {
   const db = await getDatabase(applySchema);
   const row = db.selectObject(SELECT_USAGE_SUMMARY, { $sinceMs: sinceMs }) ?? {};
-  const num = (value: SqlValue | undefined): number => Number(value ?? 0);
+  const num = (value: SqlValue | undefined): number => {
+    const parsed = Number(value ?? 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
 
   return {
     sinceMs,
@@ -147,6 +153,11 @@ export async function getUsageSummary(sinceMs: number): Promise<UsageSummaryDto>
       thinking: num(row.thinking),
       tools: num(row.tools),
       overhead: num(row.overhead),
+    },
+    impact: {
+      energyWh: num(row.energyWh),
+      waterMl: num(row.waterMl),
+      co2Grams: num(row.co2Grams),
     },
   };
 }

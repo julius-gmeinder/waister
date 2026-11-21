@@ -48,7 +48,7 @@ as a `PromptRecordDto`.
 | ------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `totalTokens` | `number`              | **The single token total:** sum of all breakdown fields (`input + history + output + thinking + tools + overhead`) |
 | `breakdown`   | `TokenBreakdown`      | `{ input, history, output, thinking, tools, overhead }` (see [pipeline.md](pipeline.md#thinking-vs-overhead))      |
-| `impact`      | `EnvironmentalImpact` | `{ energyWh, waterMl, co2Grams }` from `config/config.json`. Saved, but not shown in the popup                     |
+| `impact`      | `EnvironmentalImpact` | `{ energyWh, waterMl, co2Grams }` from `ConversionService` (`config/config.json`)                                  |
 | `provider`    | `Provider`            | Echoed from the capture                                                                                            |
 | `model`       | `ModelInfo`           | Echoed from the capture                                                                                            |
 | `timings`     | object                | `{ latencyMs, thinkingTimeMs }` echoed from the capture                                                            |
@@ -74,9 +74,10 @@ No chat text (`userInput`, `response`, `chatHistory`) is saved.
 `src/dto/usage-summary.dto.ts`. Built by `getUsageSummary(sinceMs)` in the PromptStoreService,
 shown by the popup. Response of `GET_USAGE_SUMMARY`.
 
-| Field         | Type             | Description                                          |
-| ------------- | ---------------- | ---------------------------------------------------- |
-| `sinceMs`     | `number`         | Start of the window (epoch ms, inclusive)            |
-| `promptCount` | `number`         | Number of saved prompts with `capturedAt >= sinceMs` |
-| `totalTokens` | `number`         | Sum of their `totalTokens`                           |
-| `breakdown`   | `TokenBreakdown` | Sum of each breakdown field                          |
+| Field         | Type                  | Description                                                 |
+| ------------- | --------------------- | ----------------------------------------------------------- |
+| `sinceMs`     | `number`              | Start of the window (epoch ms, inclusive)                   |
+| `promptCount` | `number`              | Number of saved prompts with `capturedAt >= sinceMs`        |
+| `totalTokens` | `number`              | Sum of their `totalTokens`                                  |
+| `breakdown`   | `TokenBreakdown`      | Sum of each breakdown field                                 |
+| `impact`      | `EnvironmentalImpact` | Sum of `energyWh`, `waterMl` and `co2Grams` over the window |

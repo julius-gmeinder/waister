@@ -197,6 +197,10 @@
     }
   },
   "ui": {
-    "usageWindowHours": 24
+    "usageWindowHours": 24,
+    "tachoMax": {
+      "energyWh": 10,
+      "waterMl": 50
+    }
   }
 }

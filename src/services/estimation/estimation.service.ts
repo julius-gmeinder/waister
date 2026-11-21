@@ -1,7 +1,8 @@
 /**
  * EstimationService: estimates the hidden tokens (thinking, tools, overhead) and assembles the
  * `TokenEstimateDto`.
- * Visible counts are passed in by the handler, so services don't call each other.
+ * Visible counts are passed in by the handler, and environmental impact is populated afterwards by
+ * the ConversionService, so services don't call each other.
  *
  * Context: background
  * Docs: docs/modules.md#estimation-service, docs/pipeline.md
@@ -9,7 +10,6 @@
 
 import type {
   ChatCaptureDto,
-  ModelInfo,
   Provider,
   ThinkingEffort,
   ToolCallKind,
@@ -21,7 +21,13 @@ import type {
 } from '../../dto/token-estimate.dto';
 import { ESTIMATION_CONFIG, resolveModelProfile } from './model-profiles';
 
-const { thinking: THINKING, impact: IMPACT, tools: TOOLS } = ESTIMATION_CONFIG;
+const { thinking: THINKING, tools: TOOLS } = ESTIMATION_CONFIG;
+
+const EMPTY_IMPACT: EnvironmentalImpact = {
+  energyWh: 0,
+  waterMl: 0,
+  co2Grams: 0,
+};
 
 export type VisibleTokenCounts = Pick<TokenBreakdown, 'input' | 'history' | 'output'> & {
   approximate: boolean;
@@ -74,28 +80,6 @@ export function estimateHiddenTokens(capture: ChatCaptureDto): HiddenTokenEstima
   };
 }
 
-const ROUNDING_FACTOR = 10 ** IMPACT.roundingDecimals;
-
-function roundMetric(value: number): number {
-  return Math.round(value * ROUNDING_FACTOR) / ROUNDING_FACTOR;
-}
-
-/** Energy (Wh), water (mL) and CO2 (g) for `totalTokens`. Saved, but not displayed. */
-export function calculateEnvironmentalImpact(
-  totalTokens: number,
-  provider: Provider,
-  model: ModelInfo,
-): EnvironmentalImpact {
-  const profile = resolveModelProfile(provider, model);
-  const scale = Math.max(0, totalTokens) / IMPACT.perTokensUnit;
-
-  return {
-    energyWh: roundMetric(scale * profile.energyWhPer1M),
-    waterMl: roundMetric(scale * profile.waterMlPer1M),
-    co2Grams: roundMetric(scale * profile.co2GramsPer1M),
-  };
-}
-
 export function buildTokenEstimateDto(
   capture: ChatCaptureDto,
   visible: VisibleTokenCounts,
@@ -120,7 +104,7 @@ export function buildTokenEstimateDto(
   return {
     totalTokens,
     breakdown,
-    impact: calculateEnvironmentalImpact(totalTokens, capture.provider, capture.model),
+    impact: EMPTY_IMPACT,
     provider: capture.provider,
     model: capture.model,
     timings: {

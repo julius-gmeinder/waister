@@ -225,6 +225,11 @@ export interface CaptureConfig {
 export interface UiConfig {
   /** Time window of the popup's usage summary. */
   usageWindowHours: number;
+  /** Full-scale values (100% arc fill) for the popup's energy and water tachos. */
+  tachoMax: {
+    energyWh: number;
+    waterMl: number;
+  };
 }
 
 export interface WaisterConfig {

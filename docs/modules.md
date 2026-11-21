@@ -179,11 +179,11 @@ The detection timings (settle, text-stable, check delay, poll, stale prompt) com
 right order and return a result. They hold no domain logic of their own (no tokenizing, no
 estimation formulas).
 
-| File                    | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `message.handler.ts`    | Routes each `chrome.runtime` message by `type` to the matching handler: `ESTIMATE_PROMPT` → EstimationHandler, `GET_USAGE_SUMMARY` → UsageHandler. Returns `undefined` for an unknown type, so `background.entry.ts` answers `false` and doesn't keep the channel open.                                                                                                                                                                                                                   |
-| `estimation.handler.ts` | **EstimationHandler**: `ChatCaptureDto` → `PromptRecordDto`. Gets visible counts from the TokenizerService and hidden counts from the EstimationService, has the EstimationService build the `TokenEstimateDto` (`totalTokens`), then has the PromptStoreService add a UUID + the conversation URL and save the row. `normalizeCaptureDto` first trims the text, clamps negative times, drops attachment and tool kinds it doesn't know (they count 0) and throws on an unknown provider. |
-| `usage.handler.ts`      | **UsageHandler**: `handleGetUsageSummary(sinceMs)` → `UsageSummaryDto`, read straight from the PromptStoreService. No link to the estimation pipeline.                                                                                                                                                                                                                                                                                                                                    |
+| File                    | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `message.handler.ts`    | Routes each `chrome.runtime` message by `type` to the matching handler: `ESTIMATE_PROMPT` → EstimationHandler, `GET_USAGE_SUMMARY` → UsageHandler. Returns `undefined` for an unknown type, so `background.entry.ts` answers `false` and doesn't keep the channel open.                                                                                                                                                                                                                                                                                                                    |
+| `estimation.handler.ts` | **EstimationHandler**: `ChatCaptureDto` → `PromptRecordDto`. Gets visible counts from the TokenizerService and hidden counts from the EstimationService, has the EstimationService build the `TokenEstimateDto` (`totalTokens`), delegates to the ConversionService (`convertTokensToImpact`) to compute energy/water/CO2 impact, then has the PromptStoreService add a UUID + the conversation URL and save the row. `normalizeCaptureDto` first trims the text, clamps negative times, drops attachment and tool kinds it doesn't know (they count 0) and throws on an unknown provider. |
+| `usage.handler.ts`      | **UsageHandler**: `handleGetUsageSummary(sinceMs)` → `UsageSummaryDto`, read straight from the PromptStoreService. No link to the estimation pipeline.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 Style: plain exported functions (no classes). Services are imported directly. Pipeline details:
 [pipeline.md](pipeline.md).
@@ -198,11 +198,12 @@ May import: `services/`, `dto/`, `messages/`. Must not import: `readers/`, `ui/`
 plain exported functions with a `*.service.ts` facade. Other files in the same folder are
 internal to that service.
 
-| Folder          | Service                                     | Job                                                          |
-| --------------- | ------------------------------------------- | ------------------------------------------------------------ |
-| `tokenizer/`    | [TokenizerService](#tokenizer-service)      | Counts the tokens of all **visible** text in the DTO         |
-| `estimation/`   | [EstimationService](#estimation-service)    | Estimates **hidden** tokens (thinking, system/tool overhead) |
-| `prompt-store/` | [PromptStoreService](#prompt-store-service) | Saves every prompt to SQLite and answers the popup's queries |
+| Folder          | Service                                     | Job                                                                    |
+| --------------- | ------------------------------------------- | ---------------------------------------------------------------------- |
+| `tokenizer/`    | [TokenizerService](#tokenizer-service)      | Counts the tokens of all **visible** text in the DTO                   |
+| `estimation/`   | [EstimationService](#estimation-service)    | Estimates **hidden** tokens (thinking, system/tool overhead)           |
+| `conversion/`   | [ConversionService](#conversion-service)    | Converts `totalTokens` into energy (Wh), water (mL) and CO2 (g) impact |
+| `prompt-store/` | [PromptStoreService](#prompt-store-service) | Saves every prompt to SQLite and answers the popup's queries           |
 
 Rules:
 
@@ -251,13 +252,21 @@ All rates and constants come from [`config.json`](#config) → `estimation`.
 - `totalTokens` = input + history + output + thinking + tools + overhead. The handler passes the visible
   counts in, so the services don't call each other.
 
-It also computes an environmental `impact` (`energyWh`, `waterMl`, `co2Grams`) from the same
-per-model entry. That value stays in the background and is **not shown** in the popup.
+| File                    | Role                                                                                                                                         |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `estimation.service.ts` | `estimateHiddenTokens(capture)`, `estimateThinkingTokens(...)`, `estimateToolTokens(...)`, `buildTokenEstimateDto(capture, visible, hidden)` |
+| `model-profiles.ts`     | Internal. `ESTIMATION_CONFIG` (the typed `estimation` section) and `resolveModelProfile(provider, model)` → family rates or provider default |
 
-| File                    | Role                                                                                                                                                   |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `estimation.service.ts` | `estimateHiddenTokens(capture)`, `estimateThinkingTokens(...)`, `buildTokenEstimateDto(capture, visible, hidden)`, `calculateEnvironmentalImpact(...)` |
-| `model-profiles.ts`     | Internal. `ESTIMATION_CONFIG` (the typed `estimation` section) and `resolveModelProfile(provider, model)` → family rates or provider default           |
+### Conversion service
+
+`src/services/conversion/`: converts the estimated `totalTokens` of a prompt into environmental
+`impact` (`energyWh`, `waterMl`, `co2Grams`) using the per-model rates and impact unit/rounding in
+[`config.json`](#config) → `estimation.models` and `estimation.impact`. Called by the
+EstimationHandler right after `buildTokenEstimateDto`.
+
+| File                    | Role                                                                                                                                                 |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `conversion.service.ts` | `convertTokensToImpact(estimateDto)` → `TokenEstimateDto` with `impact` populated, plus `calculateEnvironmentalImpact(totalTokens, provider, model)` |
 
 ### Prompt store service
 
@@ -294,8 +303,9 @@ esbuild entry ([ADR 0011](decisions/0011-app-page.md)):
 
 - **Popup** (`ui/popup/`, toolbar button): the dashboard. When opened, it asks the database for
   the last 24 hours (`GET_USAGE_SUMMARY { sinceMs: now − 24 h }`) and shows the summed
-  `totalTokens`, the breakdown (input, history, output, thinking, tools, overhead) and the prompt
-  count. A tab bar at the bottom opens the app page.
+  `totalTokens`, the breakdown (input, history, output, thinking, tools, overhead), the
+  accumulated energy (Wh) and water (mL) tachos, and the prompt count. A tab bar at the bottom
+  opens the app page.
 - **App page** (`ui/app/`, a full browser tab at `app/index.html`): a sidebar plus one page per
   route (Analytics, Facts, Tips, History). The pages are empty placeholders for now.
 
@@ -304,13 +314,14 @@ Neither surface talks to the estimation pipeline. The layout is deliberately pla
 ```
 base.css                              shared: fonts, color/font tokens, element defaults
 app-routes.ts                         shared: APP_ROUTES (id, label, icon), hash ↔ route, extension URLs
-format.helpers.ts                     shared: formatCount (locale number, en dash while loading)
+format.helpers.ts                     shared: formatCount, formatMetric (locale number, en dash while loading)
 components/                           shared components (used by either surface)
   components.css                      styles of all components, one block each
   header.component.tsx                Header: full logo, centered (/logo/waister-full.svg), popup and app page
   total.component.tsx                 Total: icon + summed token count (a <div>)
   breakdown.component.tsx             Breakdown: the six rows (order, labels, icons)
   breakdown-row.component.tsx         BreakdownRow: icon, label, count of one part
+  tacho.component.tsx                 ImpactTachos: two semi-circular tacho gauges for energy (Wh) and water (mL)
   tab-bar.component.tsx               TabBar (popup): one tab per route, opens it in a new browser tab
   sidebar.component.tsx               Sidebar (app page): logo + one hash link per route
 popup/
@@ -421,9 +432,9 @@ The field list, units and calibration notes live in `config.types.ts`, not here.
 | Section                            | Used by                              | What it holds                                                                                         |
 | ---------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------- |
 | `estimation.thinking`              | EstimationService                    | thinking baseline, token cap (`maxTokens`), effort multipliers                                        |
-| `estimation.impact`                | EstimationService                    | unit and rounding of the energy / water / CO2 rates                                                   |
+| `estimation.impact`                | ConversionService                    | unit and rounding of the energy / water / CO2 rates                                                   |
 | `estimation.tools`                 | EstimationService                    | per-provider hidden tokens per tool call (`search`, `code`, `other`)                                  |
-| `estimation.models.<provider>`     | EstimationService                    | `default` + `families.<family>`: system prompt size, thinking speed, impact rates                     |
+| `estimation.models.<provider>`     | EstimationService, ConversionService | `default` + `families.<family>`: system prompt size, thinking speed, impact rates                     |
 | `tokenizer.<provider>`             | TokenizerService                     | heuristic parameters, turn framing, attachment estimates                                              |
 | `tokenizer.whitespace`             | TokenizerService                     | tokens per newline run and indentation run (`newlineRunTokens`, `indentRunTokens`, `indentMinSpaces`) |
 | `capture.timings`                  | dom-capture strategy, Claude adapter | turn-detection timings                                                                                |
@@ -431,7 +442,7 @@ The field list, units and calibration notes live in `config.types.ts`, not here.
 | `capture.effortInference`          | site adapters                        | effort when thinking is detected / per family default                                                 |
 | `capture.models.claude`, `.gemini` | site adapters                        | `fallbackName`, `families` (name → label keywords), `thinkingKeywords`                                |
 | `capture.models.chatgpt`           | ChatGPT adapter                      | `effortWords`, `slug.*` and `label.*` (regex sources for the model slug and picker label)             |
-| `ui`                               | PopupApp                             | `usageWindowHours`                                                                                    |
+| `ui`                               | PopupApp, ImpactTachos               | `usageWindowHours`, `tachoMax` (`energyWh`, `waterMl`)                                                |
 
 - **Import by section:** `import { capture } from '../../config/config.json'`. esbuild
   tree-shakes JSON per top-level key, so each bundle only contains the sections it reads.

@@ -36,6 +36,7 @@ content:     readers/  (sites/ = WHERE, strategies/ = WHEN) → ChatCaptureDto
 background:  handlers/estimation.handler (EstimationHandler)
                  ├─ services/tokenizer   (TokenizerService, one COUNTERS table)
                  ├─ services/estimation  (EstimationService + model-profiles)
+                 ├─ services/conversion  (ConversionService: tokens → energy, water, CO2)
                  └─ services/prompt-store (SQLite WASM, snapshot in IndexedDB) ← PromptRecordDto
              handlers/usage.handler → services/prompt-store → UsageSummaryDto
 popup:       ui/popup/  (React, dashboard)  ← GET_USAGE_SUMMARY (reads only the database)
@@ -87,12 +88,12 @@ All docs live in `docs/` only. Start at `docs/README.md`. The per-module referen
 
 ## Status
 
-Pipeline implemented end to end (readers → handler → tokenizer/estimation services → SQLite
-prompt store). The popup (React + TSX, [ADR 0010](docs/decisions/0010-react-popup.md)) reads
-the database and shows the last 24h of token usage (total, breakdown, prompt count). Its tab bar
-opens the full-page app page ([ADR 0011](docs/decisions/0011-app-page.md)), whose four pages
-(Analytics, Facts, Tips, History) are empty placeholders so far. The UI is deliberately plain for
-now. The energy/water `impact` is saved per prompt but not displayed. `npm run check` and
+Pipeline implemented end to end (readers → handler → tokenizer/estimation/conversion services →
+SQLite prompt store). The popup (React + TSX, [ADR 0010](docs/decisions/0010-react-popup.md)) reads
+the database and shows the last 24h of token usage (total, breakdown, accumulated energy & water
+tachos, prompt count). Its tab bar opens the full-page app page
+([ADR 0011](docs/decisions/0011-app-page.md)), whose four pages (Analytics, Facts, Tips, History)
+are empty placeholders so far. The UI is deliberately plain for now. `npm run check` and
 `npm run build` pass.
 
 ## Commands

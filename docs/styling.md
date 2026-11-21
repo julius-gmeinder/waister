@@ -116,6 +116,8 @@ browser only loads the Latin files it needs (~110 KB, from disk). A new weight i
 | thinking      | `Brain`             | `breakdown.component.tsx` |
 | tools         | `Wrench`            | `breakdown.component.tsx` |
 | overhead      | `Settings2`         | `breakdown.component.tsx` |
+| energyWh      | `Zap`               | `tacho.component.tsx`     |
+| waterMl       | `Droplet`           | `tacho.component.tsx`     |
 | Analytics     | `ChartColumn`       | `app-routes.ts`           |
 | Facts         | `BookOpen`          | `app-routes.ts`           |
 | Tips          | `Lightbulb`         | `app-routes.ts`           |

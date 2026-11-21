@@ -13,14 +13,15 @@ import type {
   ToolCallKind,
 } from '../dto/chat-capture.dto';
 import type { PromptRecordDto } from '../dto/prompt-record.dto';
-import {
-  createPromptRecord,
-  savePromptRecord,
-} from '../services/prompt-store/prompt-store.service';
+import { convertTokensToImpact } from '../services/conversion/conversion.service';
 import {
   buildTokenEstimateDto,
   estimateHiddenTokens,
 } from '../services/estimation/estimation.service';
+import {
+  createPromptRecord,
+  savePromptRecord,
+} from '../services/prompt-store/prompt-store.service';
 import { countVisibleTokens } from '../services/tokenizer/tokenizer.service';
 
 // Record types keep these in step with the unions: a new kind fails the typecheck until listed.
@@ -78,7 +79,8 @@ export async function handleEstimation(captureDto: ChatCaptureDto): Promise<Prom
   const cleanedCapture = normalizeCaptureDto(captureDto);
   const visible = countVisibleTokens(cleanedCapture);
   const hidden = estimateHiddenTokens(cleanedCapture);
-  const estimateDto = buildTokenEstimateDto(cleanedCapture, visible, hidden);
+  const tokenEstimateDto = buildTokenEstimateDto(cleanedCapture, visible, hidden);
+  const estimateDto = convertTokensToImpact(tokenEstimateDto);
 
   const record = createPromptRecord(cleanedCapture, estimateDto);
   await savePromptRecord(record);

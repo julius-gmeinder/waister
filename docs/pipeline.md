@@ -5,9 +5,10 @@ estimated total token usage of that prompt, and save it to the database.
 
 ```
 Reader ──ChatCaptureDto──▶ EstimationHandler ──▶ TokenizerService   (visible)
-                                    │         └─▶ EstimationService  (hidden)
+                                    │         ├─▶ EstimationService  (hidden)
+                                    │         └─▶ ConversionService  (energy, water, CO2)
                                     ▼
-                           TokenEstimateDto { totalTokens, breakdown }
+                           TokenEstimateDto { totalTokens, breakdown, impact }
                                     │ + UUID + conversationUrl
                                     ▼
                            PromptStoreService ──INSERT──▶ SQLite `prompts`
@@ -104,8 +105,13 @@ Both `thinking` and `overhead` are **hidden tokens** (they are processed or gene
 Unknown models fall back to the provider default and set `approximate: true`.
 `buildTokenEstimateDto` sums `totalTokens = input + history + output + thinking + tools + overhead`.
 
-**Background only, not displayed:** the service also attaches an environmental `impact` from
-the same `config.json` model entry (`energyWhPer1M`, `waterMlPer1M`, `co2GramsPer1M` per 1,000,000 tokens):
+## 4. ConversionService: environmental impact
+
+`services/conversion/conversion.service.ts`. Entry points: `convertTokensToImpact(estimateDto)`,
+`calculateEnvironmentalImpact(totalTokens, provider, model)`.
+
+Takes the `TokenEstimateDto` from `EstimationService` and converts `totalTokens` into energy,
+water and CO2 using the model's rates in `config.json` (`estimation.models`, `estimation.impact`):
 
 ```
 scale     = totalTokens / 1_000_000
@@ -114,10 +120,10 @@ waterMl   = scale × profile.waterMlPer1M
 co2Grams  = scale × profile.co2GramsPer1M
 ```
 
-Assembles the final [`TokenEstimateDto`](dto.md#tokenestimatedto) containing `totalTokens`,
-`breakdown`, `impact` (`energyWh`, `waterMl`, `co2Grams`), `provider`, `model`, and `timings`.
+Returns the updated [`TokenEstimateDto`](dto.md#tokenestimatedto) with `impact` (`energyWh`,
+`waterMl`, `co2Grams`) populated.
 
-## 4. EstimationHandler: high-level orchestration
+## 5. EstimationHandler: high-level orchestration
 
 `handlers/estimation.handler.ts`
 
@@ -126,11 +132,12 @@ Assembles the final [`TokenEstimateDto`](dto.md#tokenestimatedto) containing `to
    unknown provider.
 2. `countVisibleTokens(cleanedCapture)` (TokenizerService) counts input, history, output.
 3. `estimateHiddenTokens(cleanedCapture)` (EstimationService) estimates thinking, tools and overhead.
-4. `buildTokenEstimateDto(cleanedCapture, visible, hidden)` sums `totalTokens` and builds the DTO.
-5. `createPromptRecord(cleanedCapture, estimateDto)` (PromptStoreService) adds a random UUID
+4. `buildTokenEstimateDto(cleanedCapture, visible, hidden)` (EstimationService) sums `totalTokens` and builds the DTO.
+5. `convertTokensToImpact(tokenEstimateDto)` (ConversionService) calculates `energyWh`, `waterMl` and `co2Grams` and attaches `impact`.
+6. `createPromptRecord(cleanedCapture, estimateDto)` (PromptStoreService) adds a random UUID
    and the conversation URL, and `savePromptRecord(record)` inserts it into SQLite.
 
-## 5. PromptStoreService: saving
+## 6. PromptStoreService: saving
 
 `services/prompt-store/`. One row per prompt in the `prompts` table: id, conversation URL,
 `captured_at`, provider, model (name, version, thinking effort, raw label), the six breakdown
@@ -138,12 +145,12 @@ counts, `total_tokens`, latency, thinking time, `approximate` and the impact. **
 The database lives in memory, and a snapshot of it is written to IndexedDB after every insert and
 restored when the service worker starts.
 
-## 6. Popup
+## 7. Popup
 
 When opened, `PopupApp` (`ui/popup/popup.app.tsx`) sends `GET_USAGE_SUMMARY { sinceMs: now − 24 h }`.
 `handlers/usage.handler.ts` passes it to `getUsageSummary(sinceMs)`, which sums all rows with
-`captured_at >= sinceMs`. The popup shows the summed `totalTokens`, the breakdown and the prompt
-count. It has no link to the estimation pipeline.
+`captured_at >= sinceMs`. The popup shows the summed `totalTokens`, the breakdown, the accumulated
+energy (Wh) and water (mL) tachos, and the prompt count. It has no link to the estimation pipeline.
 
 ## Open questions
 

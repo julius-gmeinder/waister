@@ -5,7 +5,7 @@
  * Docs: docs/modules.md#dtos, docs/dto.md
  */
 
-import type { TokenBreakdown } from './token-estimate.dto';
+import type { EnvironmentalImpact, TokenBreakdown } from './token-estimate.dto';
 
 export interface UsageSummaryDto {
   /** Window start, epoch ms, inclusive. */
@@ -13,4 +13,5 @@ export interface UsageSummaryDto {
   promptCount: number;
   totalTokens: number;
   breakdown: TokenBreakdown;
+  impact: EnvironmentalImpact;
 }
