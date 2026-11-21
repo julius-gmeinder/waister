@@ -224,7 +224,12 @@ export function observeTurns(
 }
 
 export function buildChatCaptureDto(adapter: SiteAdapter, timings: TurnTimings): ChatCaptureDto {
-  const thinkingTimeMs = Math.max(0, timings.tStreamStart - timings.t0);
+  const defaultThinkingMs = Math.max(0, timings.tStreamStart - timings.t0);
+  const thinkingTimeMs = Math.max(
+    0,
+    adapter.consumeThinkingTimeMs?.(timings.t0, timings.tStreamStart, timings.t1) ??
+      defaultThinkingMs,
+  );
   const latencyMs = Math.max(0, timings.t1 - timings.t0);
 
   return {
