@@ -1,5 +1,5 @@
 /**
- * DashboardPage: tokens, energy and water of the selected timeframe. The App root owns the
+ * DashboardPage: tokens, energy, water and CO2 of the selected timeframe. The App root owns the
  * timeframe and the fetched summary, this page only renders them.
  *
  * Context: app page
@@ -7,6 +7,7 @@
  */
 
 import { useMemo } from 'react';
+import { Co2Card } from '../../components/co2-card.component';
 import { PageTitle } from '../../components/page-title.component';
 import { PowerCard } from '../../components/power-card.component';
 import { TimeframePicker } from '../../components/timeframe-picker.component';
@@ -48,6 +49,11 @@ export function DashboardPage({ timeframe, onTimeframeChange, summary }: Dashboa
           waterMl={summary?.impact.waterMl}
           dripMs={animation.dripMs}
           poolFill={animation.poolFill}
+        />
+        <Co2Card
+          co2Grams={summary?.impact.co2Grams}
+          puffMs={animation.puffMs}
+          cloudCount={animation.cloudCount}
         />
       </div>
     </section>

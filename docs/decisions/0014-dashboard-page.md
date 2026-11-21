@@ -31,7 +31,8 @@ period, and makes the numbers tangible instead of abstract.
   properties. Glow, bolts, sparks and gear steps all derive from the same `--pulse`, so they stay
   in sync when it changes. SVG scenes are inline in the components (gear outlines are generated
   once at module load). `prefers-reduced-motion: reduce` stops all of it.
-- **Accent colors** `--power*` (electric orange) and `--water*` (coral-reef sky blue) in
+- **Accent colors** `--power*` (electric orange), `--water*` (coral-reef sky blue) and, added
+  later with the third card (Co2Card, a factory puffing clouds), `--co2*` (dirty toxic green) in
   `base.css`, each with base, `-strong` (text), `-soft` (fills) and `-tint` (card background).
 - **Cards are an exception to the flat layout:** the two impact cards have a 1px border and
   rounded corners. Everything else stays flat.

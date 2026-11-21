@@ -243,12 +243,14 @@
     "usageWindowHours": 24,
     "tachoMax": {
       "energyWh": 30,
-      "waterMl": 105
+      "waterMl": 105,
+      "co2Grams": 10
     },
     "dashboard": {
       "busyDay": {
         "energyWh": 400,
-        "waterMl": 1400
+        "waterMl": 1400,
+        "co2Grams": 120
       },
       "intensityExponent": 0.5,
       "pulseMs": {
@@ -259,6 +261,11 @@
         "slowest": 4000,
         "fastest": 700
       },
+      "puffMs": {
+        "slowest": 4000,
+        "fastest": 1000
+      },
+      "cloudRiseMs": 4800,
       "poolFill": {
         "min": 0.15,
         "max": 0.6

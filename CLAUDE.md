@@ -91,11 +91,11 @@ All docs live in `docs/` only. Start at `docs/README.md`. The per-module referen
 
 Pipeline implemented end to end (readers → handler → tokenizer/estimation/conversion services →
 SQLite prompt store). The popup (React + TSX, [ADR 0010](docs/decisions/0010-react-popup.md)) reads
-the database and shows the last 24h of token usage (total, breakdown, accumulated energy & water
-tachos, prompt count). Its tab bar opens the full-page app page
+the database and shows the last 24h of token usage (total, breakdown, accumulated energy, water &
+CO2 tachos, prompt count). Its tab bar opens the full-page app page
 ([ADR 0011](docs/decisions/0011-app-page.md)). Its default page, the Dashboard
-([ADR 0014](docs/decisions/0014-dashboard-page.md)), shows tokens plus the energy/water `impact`
-for a chosen timeframe in two animated cards (CSS + inline SVG). The other four pages (Analytics,
+([ADR 0014](docs/decisions/0014-dashboard-page.md)), shows tokens plus the energy/water/CO2 `impact`
+for a chosen timeframe in three animated cards (CSS + inline SVG). The other four pages (Analytics,
 Facts, Tips, History) are empty placeholders so far. `npm run check` and
 `npm run build` pass.
 

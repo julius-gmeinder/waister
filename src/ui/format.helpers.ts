@@ -26,7 +26,7 @@ function formatMeasure(n: number): string {
   return n.toLocaleString(undefined, { maximumFractionDigits: decimals });
 }
 
-/** Switches to the 1000× unit from 1000 on (Wh → kWh, mL → L). */
+/** Switches to the 1000× unit from 1000 on (Wh → kWh, mL → L, g → kg). */
 function formatScaled(n: number | undefined, unit: string, bigUnit: string): Quantity {
   if (n === undefined) return { value: LOADING, unit };
   if (n >= 1000) return { value: formatMeasure(n / 1000), unit: bigUnit };
@@ -39,6 +39,10 @@ export function formatEnergy(wh?: number): Quantity {
 
 export function formatWater(ml?: number): Quantity {
   return formatScaled(ml, 'mL', 'L');
+}
+
+export function formatCo2(grams?: number): Quantity {
+  return formatScaled(grams, 'g', 'kg');
 }
 
 /** Locale-formatted float metric (Wh, mL), or an en dash while the value is still loading. */

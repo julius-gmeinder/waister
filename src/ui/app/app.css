@@ -23,11 +23,11 @@
   color: var(--text-muted);
 }
 
-/* Dashboard: title, picker, subtitle, then the two impact cards side by side. */
+/* Dashboard: title, picker, subtitle, then the three impact cards side by side. */
 .dashboard {
   display: grid;
   gap: 16px;
-  max-width: 1040px;
+  max-width: 1200px;
 }
 
 .dashboard .page-title {
@@ -48,13 +48,13 @@
 
 .dashboard-cards {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
   margin-top: 8px;
 }
 
-/* Too narrow for two scenes next to each other: stack the cards. */
-@media (max-width: 860px) {
+/* Too narrow for three scenes next to each other: stack the cards. */
+@media (max-width: 1080px) {
   .dashboard-cards {
     grid-template-columns: 1fr;
   }

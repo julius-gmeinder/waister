@@ -27,7 +27,8 @@ function normalizeSummary(summary: Partial<UsageSummaryResponse>): UsageSummaryD
   if (
     summary.impact &&
     typeof summary.impact.energyWh === 'number' &&
-    typeof summary.impact.waterMl === 'number'
+    typeof summary.impact.waterMl === 'number' &&
+    typeof summary.impact.co2Grams === 'number'
   ) {
     return { ...base, ...windowFields };
   }

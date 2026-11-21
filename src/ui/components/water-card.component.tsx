@@ -1,6 +1,6 @@
 /**
  * WaterCard: water used in the selected timeframe. Drops fall from the number into a swaying
- * pool. Drip rate and pool level come in as props, the motion itself is CSS (`--drip`).
+ * pool, and the number wobbles like liquid as each drop tears off. Drip rate and pool level come in as props, the motion itself is CSS (`--drip`).
  *
  * Context: app page
  * Docs: docs/modules.md#ui

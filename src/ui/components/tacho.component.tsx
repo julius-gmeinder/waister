@@ -1,18 +1,19 @@
 /**
- * ImpactTachos: two simple semi-circular tacho gauges for accumulated energy (Wh) and water (mL).
+ * ImpactTachos: three simple semi-circular tacho gauges for accumulated energy (Wh), water (mL)
+ * and CO2 (g).
  *
  * Context: popup
  * Docs: docs/modules.md#ui
  */
 
-import { Droplet, Zap, type LucideIcon } from 'lucide-react';
+import { Droplet, Factory, Zap, type LucideIcon } from 'lucide-react';
 import { ui } from '../../config/config.json';
 import type { EnvironmentalImpact } from '../../dto/token-estimate.dto';
 import { formatMetric } from '../format.helpers';
 
 interface TachoProps {
-  /** Accent color set (`--power*` / `--water*`) of the arc, track, icon and number. */
-  tone: 'power' | 'water';
+  /** Accent color set (`--power*` / `--water*` / `--co2*`) of the arc, track, icon and number. */
+  tone: 'power' | 'water' | 'co2';
   icon: LucideIcon;
   label: string;
   unit: string;
@@ -73,6 +74,14 @@ export function ImpactTachos({ impact }: ImpactTachosProps) {
         unit="mL"
         value={impact?.waterMl}
         max={ui.tachoMax.waterMl}
+      />
+      <Tacho
+        tone="co2"
+        icon={Factory}
+        label="CO₂"
+        unit="g"
+        value={impact?.co2Grams}
+        max={ui.tachoMax.co2Grams}
       />
     </div>
   );

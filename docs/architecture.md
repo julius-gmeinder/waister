@@ -39,7 +39,7 @@ the tokens and saves every prompt to a SQLite database, and the popup reads that
                                                      chrome.tabs.create   │
 ┌─ app page (full browser tab, app/index.html#/<route>) ──────────────────▼─┐
 │  ui/app/app.app.tsx (React)        Sidebar + Dashboard (tokens, energy,   │
-│                                    water per timeframe) · Analytics ·     │
+│                                    water, CO2 per timeframe) · Analytics ·│
 │                                    Facts · Tips · History (empty for now) │
 └───────────────────────────────────────────────────────────────────────────┘
 ```

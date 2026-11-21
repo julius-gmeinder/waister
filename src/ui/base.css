@@ -28,9 +28,9 @@
   --text: #1c1917;
   --text-muted: #57534e;
 
-  /* Impact accents (dashboard cards): electric orange for energy, coral-reef sky blue for water.
-     Each has a base (strokes, glow), -strong (text, ≥ 3:1 on white), -soft (fills) and -tint
-     (card background). Docs: docs/styling.md#colors */
+  /* Impact accents (dashboard cards): electric orange for energy, coral-reef sky blue for water,
+     dirty toxic green for CO2. Each has a base (strokes, glow), -strong (text, ≥ 3:1 on white),
+     -soft (fills) and -tint (card background). Docs: docs/styling.md#colors */
   --power: #ff7a1a;
   --power-strong: #d95a00;
   --power-soft: #ffe4cc;
@@ -39,6 +39,10 @@
   --water-strong: #0b84b0;
   --water-soft: #c9ecf8;
   --water-tint: #f1fafd;
+  --co2: #a3c41c;
+  --co2-strong: #5a7d00;
+  --co2-soft: #e6f0b4;
+  --co2-tint: #f8fbe8;
 }
 
 body {

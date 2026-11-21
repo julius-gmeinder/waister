@@ -40,14 +40,16 @@ const GEAR_8 = gearPath(8, 26.5, 18.5, 6);
 const GEAR_6 = gearPath(6, 21, 13, 4.5);
 
 /**
- * Centers are one pitch-radius sum apart. `base` turns each gear so a tooth faces the other
- * gear's gap. `step` is one tooth per pulse (45° = 360/8), which keeps the loop seamless. Meshed
- * gears turn the other way, the 6-tooth one by 45 × 8/6 = 60°.
+ * The big gears rest on the shared ground line (y ≈ 160 of the 240 × 170 scene, like the basin
+ * and the factory), so the three dashboard scenes line up. Centers are one pitch-radius sum apart.
+ * `base` turns each gear so a tooth faces the other gear's gap. `step` is one tooth per pulse
+ * (45° = 360/8), which keeps the loop seamless. Meshed gears turn the other way, the 6-tooth one
+ * by 45 × 8/6 = 60°.
  */
 const GEARS = [
-  { x: 108, y: 104, d: GEAR_8, base: 0, step: 45 },
-  { x: 152, y: 104, d: GEAR_8, base: 22.5, step: -45 },
-  { x: 83.25, y: 74.51, d: GEAR_6, base: 26.67, step: -60 },
+  { x: 108, y: 133.5, d: GEAR_8, base: 0, step: 45 },
+  { x: 152, y: 133.5, d: GEAR_8, base: 22.5, step: -45 },
+  { x: 83.25, y: 104.01, d: GEAR_6, base: 26.67, step: -60 },
 ];
 
 /**
@@ -55,9 +57,9 @@ const GEARS = [
  * flashes). They take turns, one per pulse.
  */
 const BOLTS = [
-  { points: '92,0 82,14 91,20 80,34 86,40 83,52', tip: { x: 83, y: 52 } },
-  { points: '134,0 124,22 136,30 122,52 130,60 126,84', tip: { x: 126, y: 84 } },
-  { points: '176,0 166,18 178,26 164,48 172,56 162,80', tip: { x: 162, y: 80 } },
+  { points: '92,0 82,22 91,31 80,53 86,63 83,81.5', tip: { x: 83, y: 81.5 } },
+  { points: '134,0 124,30 136,41 122,70 130,81 126,113.5', tip: { x: 126, y: 113.5 } },
+  { points: '176,0 166,25 178,36 164,66 172,77 162,109.5', tip: { x: 162, y: 109.5 } },
 ];
 
 export function PowerCard({ energyWh, pulseMs }: PowerCardProps) {
@@ -75,7 +77,7 @@ export function PowerCard({ energyWh, pulseMs }: PowerCardProps) {
         {value}
         <span className="power-card-unit">{unit}</span>
       </p>
-      <svg className="power-card-scene" viewBox="0 0 240 140" aria-hidden="true">
+      <svg className="power-card-scene" viewBox="0 0 240 170" aria-hidden="true">
         {GEARS.map(({ x, y, d, base, step }) => (
           <g key={`${x},${y}`} transform={`translate(${x} ${y}) rotate(${base})`}>
             <g className="power-gear" style={{ '--gear-step': `${step}deg` } as CSSProperties}>

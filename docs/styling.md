@@ -49,8 +49,9 @@ the hex value.
 
 ### impact accents
 
-For everything that shows energy or water: the Dashboard's impact cards and the popup's tachos
-(`.tacho--power` / `.tacho--water` map them onto `--tacho-color` / `-strong` / `-soft`). Each
+For everything that shows energy, water or CO2: the Dashboard's impact cards and the popup's
+tachos (`.tacho--power` / `.tacho--water` / `.tacho--co2` map them onto `--tacho-color` /
+`-strong` / `-soft`). Each
 accent has four steps.
 
 | Variable         | Value     | Use                                                                  |
@@ -63,6 +64,10 @@ accent has four steps.
 | `--water-strong` | `#0B84B0` | water numbers, ripple                                                |
 | `--water-soft`   | `#C9ECF8` | back wave, tacho track                                               |
 | `--water-tint`   | `#F1FAFD` | bottom of the WaterCard background gradient                          |
+| `--co2`          | `#A3C41C` | toxic lime green: factory and cloud strokes, windows, icons, arc     |
+| `--co2-strong`   | `#5A7D00` | CO2 numbers                                                          |
+| `--co2-soft`     | `#E6F0B4` | factory and cloud fill, tacho track                                  |
+| `--co2-tint`     | `#F8FBE8` | bottom of the Co2Card background gradient                            |
 
 ### interaction states
 
@@ -90,31 +95,38 @@ Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `b
 (`base.css`).
 
 - **Popup:** `.popup` fills the whole popup window (padding 10px on top and 16px elsewhere).
-  Inside: Header, Total, period line, Breakdown, TabBar. The tab bar has no divider. 8px of extra
+  Inside: Header, Total, period line, Breakdown, ImpactTachos (three columns), TabBar. Every tab
+  is 68px wide (fits "Dashboard"), spare width goes between them. The tab bar has no divider. 8px of extra
   top margin (on top of the 12px gap) sets it apart from the breakdown.
 - **App page:** `.app` is a grid: the Sidebar (240px, `--bg`, full height, sticky) on the left,
   and the content (`.app-content`, `--surface`, padding 32px 40px) on the right. No border
   between them. Only the background color separates them.
 - **Dashboard:** `.dashboard` stacks PageTitle, TimeframePicker, the token subtitle and
-  `.dashboard-cards` (two equal columns, one column below 860px). The PowerCard and WaterCard
-  are the one exception to "no floating cards": 1px `--border`, 12px radius, a
+  `.dashboard-cards` (three equal columns, one column below 1080px). The PowerCard, WaterCard
+  and Co2Card are the one exception to "no floating cards": 1px `--border`, 12px radius, a
   `--surface` → `-tint` gradient. Each card centers its label, the serif number (40px) and an
-  inline SVG scene (max 320px wide, 28px of whitespace above it).
+  inline SVG scene (max 320px wide, 28px of whitespace above it). All scenes share one viewBox
+  (240 × 170) and ground line (y ≈ 160: gear bottoms, basin floor, factory floor), so they line
+  up side by side.
 
 ## motion
 
 The Dashboard cards animate with CSS only (keyframes in `components.css`). The components set
 custom properties, and every animation derives from them:
 
-| Property      | Set by    | Drives                                                                                 |
-| ------------- | --------- | -------------------------------------------------------------------------------------- |
-| `--pulse`     | PowerCard | number glow, gear step (one tooth per pulse), bolts (3 bolts take turns over 3 pulses) |
-| `--drip`      | WaterCard | drop (swell, stretch, fall) and ripple                                                 |
-| `--drop-fall` | WaterCard | fall distance from the number to the pool surface, follows the fill level              |
-| `--gear-step` | PowerCard | per gear: 45° / −45° / −60°, so meshed teeth stay in each other's gaps                 |
+| Property                        | Set by    | Drives                                                                                     |
+| ------------------------------- | --------- | ------------------------------------------------------------------------------------------ |
+| `--pulse`                       | PowerCard | number glow, gear step (one tooth per pulse), bolts (3 bolts take turns over 3 pulses)     |
+| `--drip`                        | WaterCard | number wobble (sags, snaps back on release), drop (swell, stretch, fall), ripple           |
+| `--drop-fall`                   | WaterCard | fall distance from the number to the pool surface, follows the fill level                  |
+| `--gear-step`                   | PowerCard | per gear: 45° / −45° / −60°, so meshed teeth stay in each other's gaps                     |
+| `--puff`                        | Co2Card   | number haze (lime glow rising off it), time between two clouds (delay per `--cloud-index`) |
+| `--cloud-count`                 | Co2Card   | clouds in the loop; each loops every count × `--puff` ≈ `cloudRiseMs`                      |
+| `--cloud-rise`, `--cloud-drift` | Co2Card   | per chimney: where a cloud ends (up, and right with the wind)                              |
 
-- The periods come from `config.json` → `ui.dashboard` (via `dashboard.helpers.ts`). No usage
-  means no `--pulse` / `--drip` and an `--idle` modifier class that removes the animations.
+- The periods come from `config.json` → `ui.dashboard` (via `dashboard.helpers.ts`). More CO2
+  means more clouds at the same rise speed, not faster clouds. No usage means no smoke, no
+  `--pulse` / `--drip` and an `--idle` modifier class that removes the animations.
 - The pool sways all the time (3.6s / 5.2s, independent of usage). The level eases over 900ms
   when the timeframe changes.
 - `prefers-reduced-motion: reduce` stops every animation and hides the drop. The values and the
@@ -161,6 +173,7 @@ browser only loads the Latin files it needs (~110 KB, from disk). A new weight i
 | overhead      | `Settings2`         | `breakdown.component.tsx`                         |
 | energyWh      | `Zap`               | `tacho.component.tsx`, `power-card.component.tsx` |
 | waterMl       | `Droplet`           | `tacho.component.tsx`, `water-card.component.tsx` |
+| co2Grams      | `Factory`           | `tacho.component.tsx`, `co2-card.component.tsx`   |
 | Dashboard     | `LayoutDashboard`   | `app-routes.ts`                                   |
 | Analytics     | `ChartColumn`       | `app-routes.ts`                                   |
 | Facts         | `BookOpen`          | `app-routes.ts`                                   |

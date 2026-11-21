@@ -250,21 +250,25 @@ export interface AnimationPeriodRange {
 
 /**
  * Dashboard animations. Intensity = ((usage ÷ active days) ÷ `busyDay`) ^ `intensityExponent`,
- * clamped to 0..1, separately for energy and water. Active days = from the oldest prompt in the
- * timeframe until now, at least 1. 0 usage = no pulse / drip.
+ * clamped to 0..1, separately for energy, water and CO2. Active days = from the oldest prompt in
+ * the timeframe until now, at least 1. 0 usage = no pulse / drip / puff.
  *
  * Assumptions: `busyDay` is about 1M tokens a day (e.g. 50 prompts with 20k tokens of context
- * each) at the default rates of ~400 Wh / ~1400 mL per 1M tokens. The exponent < 1 lifts low
+ * each) at the default rates of ~400 Wh / ~1400 mL / ~120 g CO2 (vendor average) per 1M tokens. The exponent < 1 lifts low
  * usage, so a light day still visibly moves.
  */
 export interface DashboardConfig {
   /** Usage per day that counts as intensity 1 (fastest pulse / drip, fullest pool). */
-  busyDay: { energyWh: number; waterMl: number };
+  busyDay: { energyWh: number; waterMl: number; co2Grams: number };
   intensityExponent: number;
   /** Time between two power pulses (one lightning strike + gear step each). */
   pulseMs: AnimationPeriodRange;
   /** Time between two water drops. */
   dripMs: AnimationPeriodRange;
+  /** Time between two smoke clouds from the factory chimneys. */
+  puffMs: AnimationPeriodRange;
+  /** Time one cloud takes from the chimney to fading out (constant, only the frequency changes). */
+  cloudRiseMs: number;
   /** Pool fill level, as a fraction of the basin height, at intensity 0 and 1. */
   poolFill: { min: number; max: number };
 }
@@ -272,10 +276,11 @@ export interface DashboardConfig {
 export interface UiConfig {
   /** Time window of the popup's usage summary. */
   usageWindowHours: number;
-  /** Full-scale values (100% arc fill) for the popup's energy and water tachos. */
+  /** Full-scale values (100% arc fill) for the popup's energy, water and CO2 tachos. */
   tachoMax: {
     energyWh: number;
     waterMl: number;
+    co2Grams: number;
   };
   dashboard: DashboardConfig;
 }

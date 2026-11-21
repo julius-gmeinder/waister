@@ -305,20 +305,20 @@ esbuild entry ([ADR 0011](decisions/0011-app-page.md)):
 - **Popup** (`ui/popup/`, toolbar button): the dashboard. When opened, it asks the database for
   the last 24 hours (`GET_USAGE_SUMMARY { sinceMs: now − 24 h }`) and shows the summed
   `totalTokens`, the breakdown (input, history, output, thinking, tools, overhead), the
-  accumulated energy (Wh) and water (mL) tachos, and the prompt count. A tab bar at the bottom
+  accumulated energy (Wh), water (mL) and CO2 (g) tachos, and the prompt count. A tab bar at the bottom
   opens the app page.
 - **App page** (`ui/app/`, a full browser tab at `app/index.html`): a sidebar plus one page per
   route (Dashboard, Analytics, Facts, Tips, History). The Dashboard
-  ([ADR 0014](decisions/0014-dashboard-page.md)) shows tokens, energy and water for a chosen
+  ([ADR 0014](decisions/0014-dashboard-page.md)) shows tokens, energy, water and CO2 for a chosen
   timeframe. The other pages are empty placeholders for now.
 
 Neither surface talks to the estimation pipeline.
 
 ```
-base.css                              shared: fonts, color/font tokens (incl. --power* / --water*), element defaults
+base.css                              shared: fonts, color/font tokens (incl. --power* / --water* / --co2*), element defaults
 app-routes.ts                         shared: APP_ROUTES (id, label, icon), hash ↔ route, extension URLs
 usage-api.ts                          shared: fetchUsageSummary(sinceMs) + useUsageSummary hook (roots only), fills fields a stale worker lacks
-format.helpers.ts                     shared: formatCount, formatMetric (tachos), formatEnergy / formatWater (auto-scaled Quantity, cards)
+format.helpers.ts                     shared: formatCount, formatMetric (tachos), formatEnergy / formatWater / formatCo2 (auto-scaled Quantity, cards)
 timeframe.helpers.ts                  app page: TIMEFRAMES (Today, Last week, Last 30 days, All time), timeframeSinceMs
 components/                           shared components (used by either surface)
   components.css                      styles of all components, one block each
@@ -326,13 +326,14 @@ components/                           shared components (used by either surface)
   total.component.tsx                 Total: icon + summed token count (a <div>)
   breakdown.component.tsx             Breakdown: the six rows (order, labels, icons)
   breakdown-row.component.tsx         BreakdownRow: icon, label, count of one part
-  tacho.component.tsx                 ImpactTachos: two semi-circular tacho gauges for energy (Wh) and water (mL)
-  tab-bar.component.tsx               TabBar (popup): one tab per route, opens it in a new browser tab
+  tacho.component.tsx                 ImpactTachos: three semi-circular tacho gauges for energy (Wh), water (mL), CO2 (g)
+  tab-bar.component.tsx               TabBar (popup): one fixed-width tab per route, opens it in a new browser tab
   sidebar.component.tsx               Sidebar (app page): logo + one hash link per route
   page-title.component.tsx            PageTitle (app page): serif headline of every page
   timeframe-picker.component.tsx      TimeframePicker (dashboard): one chip per timeframe (aria-pressed)
   power-card.component.tsx            PowerCard (dashboard): energy, pulsing number, lightning + gears scene
   water-card.component.tsx            WaterCard (dashboard): water, drops falling into a swaying pool
+  co2-card.component.tsx              Co2Card (dashboard): CO2, a small factory puffing rising, fading clouds
 popup/
   popup.html                          <div id="root">, loads index.js + index.css
   popup.css                           popup layout only (full-window card, `.popup-period` line)
@@ -342,8 +343,8 @@ app/
   app.css                             app page layout only (flat sidebar + content grid, dashboard grid)
   app.app.tsx                         App: reads the hash route, holds the timeframe, fetches the summary, renders Sidebar + the page
   pages/
-    dashboard.page.tsx                DashboardPage: title, picker, token subtitle, PowerCard + WaterCard
-    dashboard.helpers.ts              dashboardAnimation(summary): pulse / drip period + pool fill from config
+    dashboard.page.tsx                DashboardPage: title, picker, token subtitle, PowerCard + WaterCard + Co2Card
+    dashboard.helpers.ts              dashboardAnimation(summary): pulse / drip / puff period, pool fill, cloud count from config
     analytics.page.tsx                AnalyticsPage (empty)
     facts.page.tsx                    FactsPage (empty)
     tips.page.tsx                     TipsPage (empty)
@@ -450,21 +451,21 @@ TypeScript changes are needed.
 
 The field list, units and calibration notes live in `config.types.ts`, not here. Sections:
 
-| Section                            | Used by                              | What it holds                                                                                         |
-| ---------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `estimation.thinking`              | EstimationService                    | thinking baseline, token cap (`maxTokens`), effort multipliers                                        |
-| `estimation.impact`                | ConversionService                    | unit, rounding, per-category energy profile, KV-cache multiplier, water/Wh, vendor CO2/Wh             |
-| `estimation.tools`                 | EstimationService                    | per-provider hidden tokens per tool call (`search`, `code`, `other`)                                  |
-| `estimation.models.<provider>`     | EstimationService, ConversionService | `default` + `families.<family>`: system prompt size, thinking speed, base `energyWhPer1M`             |
-| `tokenizer.<provider>`             | TokenizerService                     | heuristic parameters, turn framing, attachment estimates                                              |
-| `tokenizer.whitespace`             | TokenizerService                     | tokens per newline run and indentation run (`newlineRunTokens`, `indentRunTokens`, `indentMinSpaces`) |
-| `capture.timings`                  | dom-capture strategy, Claude adapter | turn-detection timings                                                                                |
-| `capture.attachments`              | DOM content reader                   | `maxIconPx`: images up to this size are icons, not attachments                                        |
-| `capture.effortInference`          | site adapters                        | effort when thinking is detected / per family default                                                 |
-| `capture.models.claude`, `.gemini` | site adapters                        | `fallbackName`, `families` (name → label keywords), `thinkingKeywords`                                |
-| `capture.models.chatgpt`           | ChatGPT adapter                      | `families`, `effortWords`, `slug.*` and `label.*` (regex sources for the model slug and picker label) |
-| `ui`                               | PopupApp, ImpactTachos               | `usageWindowHours`, `tachoMax` (`energyWh`, `waterMl`)                                                |
-| `ui.dashboard`                     | Dashboard (`dashboard.helpers.ts`)   | `busyDay` (Wh / mL per day = intensity 1), `intensityExponent`, `pulseMs`, `dripMs`, `poolFill`       |
+| Section                            | Used by                              | What it holds                                                                                                                |
+| ---------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `estimation.thinking`              | EstimationService                    | thinking baseline, token cap (`maxTokens`), effort multipliers                                                               |
+| `estimation.impact`                | ConversionService                    | unit, rounding, per-category energy profile, KV-cache multiplier, water/Wh, vendor CO2/Wh                                    |
+| `estimation.tools`                 | EstimationService                    | per-provider hidden tokens per tool call (`search`, `code`, `other`)                                                         |
+| `estimation.models.<provider>`     | EstimationService, ConversionService | `default` + `families.<family>`: system prompt size, thinking speed, base `energyWhPer1M`                                    |
+| `tokenizer.<provider>`             | TokenizerService                     | heuristic parameters, turn framing, attachment estimates                                                                     |
+| `tokenizer.whitespace`             | TokenizerService                     | tokens per newline run and indentation run (`newlineRunTokens`, `indentRunTokens`, `indentMinSpaces`)                        |
+| `capture.timings`                  | dom-capture strategy, Claude adapter | turn-detection timings                                                                                                       |
+| `capture.attachments`              | DOM content reader                   | `maxIconPx`: images up to this size are icons, not attachments                                                               |
+| `capture.effortInference`          | site adapters                        | effort when thinking is detected / per family default                                                                        |
+| `capture.models.claude`, `.gemini` | site adapters                        | `fallbackName`, `families` (name → label keywords), `thinkingKeywords`                                                       |
+| `capture.models.chatgpt`           | ChatGPT adapter                      | `families`, `effortWords`, `slug.*` and `label.*` (regex sources for the model slug and picker label)                        |
+| `ui`                               | PopupApp, ImpactTachos               | `usageWindowHours`, `tachoMax` (`energyWh`, `waterMl`, `co2Grams`)                                                           |
+| `ui.dashboard`                     | Dashboard (`dashboard.helpers.ts`)   | `busyDay` (Wh / mL / g per day = intensity 1), `intensityExponent`, `pulseMs`, `dripMs`, `puffMs`, `cloudRiseMs`, `poolFill` |
 
 - **Import by section:** `import { capture } from '../../config/config.json'`. esbuild
   tree-shakes JSON per top-level key, so each bundle only contains the sections it reads.
