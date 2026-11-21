@@ -1,11 +1,14 @@
 /* Colors: docs/styling.md */
 :root {
-  --bg: #fffbeb;
-  --surface: #fff6cc;
+  --bg: #fbf8ee;
+  --surface: #ffffff;
+  --border: #efe8cf;
   --accent: #fde100;
-  --contrast: #4f46e5;
-  --contrast-dark: #2e2a8c;
+  --accent-hover: #f0d400;
+  --contrast: #2e2a8c;
+  --contrast-bright: #4f46e5;
   --text: #1c1917;
+  --text-muted: #57534e;
 }
 
 body {
@@ -37,13 +40,13 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--contrast-dark);
+  color: var(--contrast);
 }
 
 .total .lucide {
   width: 24px;
   height: 24px;
-  color: var(--contrast);
+  color: var(--contrast-bright);
 }
 
 .total-value {
@@ -55,7 +58,7 @@ body {
 .period {
   margin: -8px 0 0;
   font-size: 12px;
-  opacity: 0.7;
+  color: var(--text-muted);
 }
 
 .breakdown {
@@ -65,6 +68,7 @@ body {
   padding: 8px;
   list-style: none;
   background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
 }
 
@@ -76,7 +80,7 @@ body {
 }
 
 .breakdown li .lucide {
-  color: var(--contrast);
+  color: var(--contrast-bright);
 }
 
 .breakdown [data-field] {

@@ -7,12 +7,20 @@
 
 ## colors
 
-- bg: #FFFBEB
-- surface: #FFF6CC
-- accent: #FDE100
-- contrast: #4F46E5
-- contrast-dark: 2E2A8C
-- text: #1C1917
+Defined as CSS variables on `:root` in `src/ui/popup/popup.css`. Always use the variable, never
+the hex value.
+
+| Variable            | Value     | Use                                                       |
+| ------------------- | --------- | --------------------------------------------------------- |
+| `--bg`              | `#FBF8EE` | page background (`body`)                                  |
+| `--surface`         | `#FFFFFF` | cards and panels on top of `--bg` (`.breakdown`)          |
+| `--border`          | `#EFE8CF` | 1px border around surfaces                                |
+| `--accent`          | `#FDE100` | brand yellow: highlights and primary buttons (unused yet) |
+| `--accent-hover`    | `#F0D400` | hover state of `--accent` elements (unused yet)           |
+| `--contrast`        | `#2E2A8C` | emphasized text (total token count)                       |
+| `--contrast-bright` | `#4F46E5` | icons                                                     |
+| `--text`            | `#1C1917` | body text                                                 |
+| `--text-muted`      | `#57534E` | secondary text (period line, captions)                    |
 
 ## icons
 
