@@ -19,7 +19,20 @@
  * Docs: docs/modules.md#site-adapters
  */
 
-import type { ChatTurn, ModelInfo, ThinkingEffort } from '../../dto/chat-capture.dto';
+import type {
+  AttachmentKind,
+  ChatTurn,
+  ModelInfo,
+  ThinkingEffort,
+  ToolCallKind,
+} from '../../dto/chat-capture.dto';
+import {
+  domToMarkdown,
+  readArtifactText,
+  readAttachments,
+  readToolCalls,
+  type ToolSelectors,
+} from '../dom-content.reader';
 import type { SiteAdapter } from './site-adapter.types';
 
 export const CHATGPT_SELECTORS = {
@@ -56,7 +69,29 @@ export const CHATGPT_SELECTORS = {
     '[data-testid="model-switcher-dropdown-button"], button[aria-label*="Model selector"], [data-model-selection-label], button[aria-label="Select ChatGPT model"]',
   thinkingBadge:
     '[data-testid*="thought"], [aria-label*="Thinking"], [aria-label*="Reason"], form[data-chatgpt-composer] button[aria-pressed="true"]',
+  /** Inside a message but not model output: role headings, action rows, placeholders, cards. */
+  messageChrome:
+    '[data-response-starting], [data-assistant-placeholder-slot], [data-message-attribution], h4[data-conversation-role], [data-message-actions], .turn-action-controls, [role="status"], [data-testid*="canvas"], [data-testid*="textdoc"]',
+  /** Ancestor of a user role node that also holds its attachments. */
+  userTurnContainer:
+    '[data-chatgpt-search-unit-key], li[data-message-role], [data-message-author-role]',
+  /** File / pasted-content cards in a user turn (UNVERIFIED on the live site). */
+  attachmentTile: '[data-testid*="file"], [data-testid*="attachment"], [class*="file-tile"]',
+  /** Canvas card inside the answer (UNVERIFIED on the live site). */
+  artifactCard: '[data-testid*="canvas"], [data-testid*="textdoc"], [id^="textdoc-message"]',
+  /** Canvas side panel with the document (UNVERIFIED on the live site). */
+  artifactPanel:
+    '[data-testid="canvas-panel"], [data-testid*="textdoc-editor"], section[data-testid*="canvas"] .ProseMirror',
 } as const;
+
+/** UNVERIFIED on the live site except `utm_source=chatgpt.com` on cited links. */
+const CHATGPT_TOOLS: ToolSelectors = {
+  search: '[data-testid*="web-search"], [data-testid="search-results"]',
+  code: '[data-testid*="code-interpreter"], [data-testid*="execution-output"]',
+  other: '',
+  searchEvidence:
+    'a[href*="utm_source=chatgpt.com"], [data-testid*="citation"], [data-testid*="webpage-citation"]',
+};
 
 type Role = 'user' | 'assistant';
 
@@ -116,24 +151,33 @@ function outermostMatches(turn: GptTurn, selector: string): Element[] {
   });
 }
 
-function joinText(elements: Element[]): string {
+function joinMarkdown(elements: Element[], preserveLineBreaks = false): string {
   return elements
-    .map((el) => extractCleanText(el))
+    .map((el) => domToMarkdown(el, { skip: CHATGPT_SELECTORS.messageChrome, preserveLineBreaks }))
     .filter(Boolean)
-    .join('\n');
+    .join('\n\n');
 }
 
 /** '' while the model is still thinking. */
 function markdownText(turn: GptTurn): string {
-  return joinText(outermostMatches(turn, CHATGPT_SELECTORS.assistantMarkdown));
+  return joinMarkdown(outermostMatches(turn, CHATGPT_SELECTORS.assistantMarkdown));
 }
 
 function turnText(turn: GptTurn): string {
-  const preferred =
-    turn.role === 'assistant'
-      ? markdownText(turn)
-      : joinText(outermostMatches(turn, CHATGPT_SELECTORS.userBubble));
-  return preferred || joinText(turn.nodes);
+  if (turn.role === 'assistant') {
+    return markdownText(turn) || joinMarkdown(turn.nodes);
+  }
+  return (
+    joinMarkdown(outermostMatches(turn, CHATGPT_SELECTORS.userBubble), true) ||
+    joinMarkdown(turn.nodes, true)
+  );
+}
+
+function turnAttachments(turn: GptTurn): AttachmentKind[] {
+  const containers = new Set(
+    turn.nodes.map((node) => node.closest(CHATGPT_SELECTORS.userTurnContainer) ?? node),
+  );
+  return readAttachments([...containers], CHATGPT_SELECTORS.attachmentTile);
 }
 
 function effortFromWords(lower: string): ThinkingEffort | null {
@@ -248,9 +292,31 @@ export const chatgptSite: SiteAdapter = {
     return latest ? turnText(latest) : '';
   },
 
+  readUserAttachments(): AttachmentKind[] {
+    const userTurns = readTurns().filter((turn) => turn.role === 'user');
+    const latest = userTurns[userTurns.length - 1];
+    return latest ? turnAttachments(latest) : [];
+  },
+
   readResponse(): string {
     const turn = latestAssistantTurn();
     return turn ? turnText(turn) : '';
+  },
+
+  readArtifactText(): string {
+    const turn = latestAssistantTurn();
+    return turn
+      ? readArtifactText(
+          turn.nodes,
+          CHATGPT_SELECTORS.artifactCard,
+          CHATGPT_SELECTORS.artifactPanel,
+        )
+      : '';
+  },
+
+  readToolCalls(): ToolCallKind[] {
+    const turn = latestAssistantTurn();
+    return turn ? readToolCalls(turn.nodes, CHATGPT_TOOLS) : [];
   },
 
   readHistory(): ChatTurn[] {
@@ -260,10 +326,12 @@ export const chatgptSite: SiteAdapter = {
     turns.forEach((turn, i) => {
       if (turn.role === 'user') lastUser = i;
     });
-    return turns
-      .slice(0, Math.max(0, lastUser))
-      .map((turn) => ({ role: turn.role, text: turnText(turn) }))
-      .filter((turn) => turn.text);
+    return turns.slice(0, Math.max(0, lastUser)).flatMap((turn): ChatTurn[] => {
+      const text = turnText(turn);
+      const attachments = turn.role === 'user' ? turnAttachments(turn) : [];
+      if (!text && attachments.length === 0) return [];
+      return [{ role: turn.role, text, ...(attachments.length ? { attachments } : {}) }];
+    });
   },
 
   isGenerating(): boolean {

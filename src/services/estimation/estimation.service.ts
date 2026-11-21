@@ -12,6 +12,7 @@ import type {
   ModelInfo,
   Provider,
   ThinkingEffort,
+  ToolCallKind,
 } from '../../dto/chat-capture.dto';
 import type {
   EnvironmentalImpact,
@@ -24,13 +25,14 @@ import {
   resolveHiddenTokenProfile,
   THINKING_BASELINE_MS,
   THINKING_EFFORT_MULTIPLIERS,
+  TOOL_CALL_TOKENS,
 } from './model-profiles';
 
 export type VisibleTokenCounts = Pick<TokenBreakdown, 'input' | 'history' | 'output'> & {
   approximate: boolean;
 };
 
-export type HiddenTokenEstimate = Pick<TokenBreakdown, 'thinking' | 'overhead'> & {
+export type HiddenTokenEstimate = Pick<TokenBreakdown, 'thinking' | 'tools' | 'overhead'> & {
   /** False if the model was unknown and a provider default profile was used. */
   exactModelMatch: boolean;
 };
@@ -48,6 +50,12 @@ export function estimateThinkingTokens(
   return Math.round(effectiveMs * tokensPerMsThinking * effortMultiplier);
 }
 
+/** Tool tokens: sum of `TOOL_CALL_TOKENS[provider][kind]` over all detected calls. */
+export function estimateToolTokens(toolCalls: readonly ToolCallKind[], provider: Provider): number {
+  const rates = TOOL_CALL_TOKENS[provider];
+  return toolCalls.reduce((sum, kind) => sum + rates[kind], 0);
+}
+
 export function estimateHiddenTokens(capture: ChatCaptureDto): HiddenTokenEstimate {
   const profile = resolveHiddenTokenProfile(capture.provider, capture.model);
   return {
@@ -56,6 +64,7 @@ export function estimateHiddenTokens(capture: ChatCaptureDto): HiddenTokenEstima
       profile.tokensPerMsThinking,
       capture.model.thinkingEffort,
     ),
+    tools: estimateToolTokens(capture.toolCalls, capture.provider),
     overhead: profile.systemPromptTokens,
     exactModelMatch: profile.exactModelMatch,
   };
@@ -93,6 +102,7 @@ export function buildTokenEstimateDto(
     history: visible.history,
     output: visible.output,
     thinking: hidden.thinking,
+    tools: hidden.tools,
     overhead: hidden.overhead,
   };
   const totalTokens =
@@ -100,6 +110,7 @@ export function buildTokenEstimateDto(
     breakdown.history +
     breakdown.output +
     breakdown.thinking +
+    breakdown.tools +
     breakdown.overhead;
 
   return {

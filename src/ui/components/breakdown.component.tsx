@@ -1,5 +1,5 @@
 /**
- * Breakdown: one row per part of totalTokens (input, history, output, thinking, overhead).
+ * Breakdown: one row per part of totalTokens (input, history, output, thinking, tools, overhead).
  *
  * Context: popup
  * Docs: docs/modules.md#ui
@@ -11,6 +11,7 @@ import {
   MessageSquare,
   MessageSquareText,
   Settings2,
+  Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import type { TokenBreakdown } from '../../dto/token-estimate.dto';
@@ -22,6 +23,7 @@ const ROWS: { field: keyof TokenBreakdown; label: string; icon: LucideIcon }[] =
   { field: 'history', label: 'History', icon: History },
   { field: 'output', label: 'Output', icon: MessageSquareText },
   { field: 'thinking', label: 'Thinking', icon: Brain },
+  { field: 'tools', label: 'Tools', icon: Wrench },
   { field: 'overhead', label: 'Overhead', icon: Settings2 },
 ];
 

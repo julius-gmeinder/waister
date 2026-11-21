@@ -1,11 +1,12 @@
 {
-  "description": "Per-provider chat-template framing tokens added to every visible turn (input and each history turn).",
+  "description": "Per-provider chat-template framing tokens added to every visible turn (input and each history turn), and fixed per-attachment token estimates (image: one typical ~1000 px upload; file: placeholder for an average document / pasted-content card whose text isn't visible).",
   "defaults": {
-    "turnFramingTokens": 4
+    "turnFramingTokens": 4,
+    "attachmentTokens": { "image": 800, "file": 1500 }
   },
   "providers": {
-    "openai": { "turnFramingTokens": 4 },
-    "anthropic": { "turnFramingTokens": 5 },
-    "google": { "turnFramingTokens": 4 }
+    "openai": { "turnFramingTokens": 4, "attachmentTokens": { "image": 765, "file": 1500 } },
+    "anthropic": { "turnFramingTokens": 5, "attachmentTokens": { "image": 1600, "file": 1500 } },
+    "google": { "turnFramingTokens": 4, "attachmentTokens": { "image": 258, "file": 1500 } }
   }
 }

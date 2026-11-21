@@ -28,8 +28,14 @@ let sqlitePromise: Promise<Sqlite> | undefined;
 /** Serializes writes so snapshots reach IndexedDB in the same order as the writes. */
 let writeQueue: Promise<unknown> = Promise.resolve();
 
+/**
+ * Runs on every start, so it must be idempotent: a SQL string (`CREATE TABLE IF NOT EXISTS`) or a
+ * function that can also check the existing schema and migrate it.
+ */
+export type SchemaSetup = string | ((db: Database) => void);
+
 /** `schema` runs on every start, so it must be idempotent (`CREATE TABLE IF NOT EXISTS`). */
-export async function getDatabase(schema: string): Promise<Database> {
+export async function getDatabase(schema: SchemaSetup): Promise<Database> {
   sqlitePromise ??= openDatabase(schema).catch((err: unknown) => {
     sqlitePromise = undefined; // allow a retry on the next call
     throw err;
@@ -37,7 +43,7 @@ export async function getDatabase(schema: string): Promise<Database> {
   return (await sqlitePromise).db;
 }
 
-export function writeAndPersist<T>(schema: string, write: (db: Database) => T): Promise<T> {
+export function writeAndPersist<T>(schema: SchemaSetup, write: (db: Database) => T): Promise<T> {
   const run = writeQueue.then(async () => {
     const db = await getDatabase(schema);
     const result = write(db);
@@ -48,7 +54,7 @@ export function writeAndPersist<T>(schema: string, write: (db: Database) => T): 
   return run;
 }
 
-async function openDatabase(schema: string): Promise<Sqlite> {
+async function openDatabase(schema: SchemaSetup): Promise<Sqlite> {
   const [sqlite3, snapshot] = await Promise.all([sqlite3InitModule(), loadSnapshot()]);
   const db = new sqlite3.oo1.DB(':memory:', 'c');
 
@@ -68,7 +74,11 @@ async function openDatabase(schema: string): Promise<Sqlite> {
     );
   }
 
-  db.exec(schema);
+  if (typeof schema === 'string') {
+    db.exec(schema);
+  } else {
+    schema(db);
+  }
   console.info(`[waister] sqlite ${sqlite3.version.libVersion} ready`);
   return { sqlite3, db };
 }

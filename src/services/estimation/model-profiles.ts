@@ -5,7 +5,7 @@
  * Docs: docs/modules.md#estimation-service
  */
 
-import type { ModelInfo, Provider, ThinkingEffort } from '../../dto/chat-capture.dto';
+import type { ModelInfo, Provider, ThinkingEffort, ToolCallKind } from '../../dto/chat-capture.dto';
 import energyLookup from './energy-lookup.json';
 
 export interface HiddenTokenRates {
@@ -60,6 +60,16 @@ export const THINKING_EFFORT_MULTIPLIERS: Record<ThinkingEffort, number> = {
 
 /** Subtracted from `thinkingTimeMs` so plain round-trip latency isn't counted as reasoning. */
 export const THINKING_BASELINE_MS = 250;
+
+/**
+ * Hidden tokens per tool call (rough placeholders): `search` = fetched result snippets fed back
+ * as input, `code` = generated code + execution output, `other` = arguments + a typical result.
+ */
+export const TOOL_CALL_TOKENS: Record<Provider, Record<ToolCallKind, number>> = {
+  openai: { search: 3000, code: 600, other: 800 },
+  anthropic: { search: 3000, code: 600, other: 800 },
+  google: { search: 2500, code: 600, other: 800 },
+};
 
 export function resolveHiddenTokenProfile(
   provider: Provider,

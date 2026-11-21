@@ -9,7 +9,20 @@
  * Docs: docs/modules.md#site-adapters
  */
 
-import type { ChatTurn, ModelInfo, ThinkingEffort } from '../../dto/chat-capture.dto';
+import type {
+  AttachmentKind,
+  ChatTurn,
+  ModelInfo,
+  ThinkingEffort,
+  ToolCallKind,
+} from '../../dto/chat-capture.dto';
+import {
+  domToMarkdown,
+  readArtifactText,
+  readAttachments,
+  readToolCalls,
+  type ToolSelectors,
+} from '../dom-content.reader';
 import type { SiteAdapter } from './site-adapter.types';
 
 export const CLAUDE_SELECTORS = {
@@ -31,7 +44,33 @@ export const CLAUDE_SELECTORS = {
   /** Collapsible thinking/thought blocks inside an assistant turn that must not count as visible answer text. */
   thinkingBlock:
     '[data-testid*="thinking"], [aria-expanded][class*="thinking"], details[class*="thinking"], [class*="thinking-block"]',
+  /** Wrapper of one message, holding a user turn's attachment cards next to its text. */
+  turnContainer: '[data-test-render-count]',
+  /** File / image / pasted-content cards in a user turn (UNVERIFIED on the live site). */
+  attachmentTile: '[data-testid="file-thumbnail"], [data-testid*="attachment"]',
+  /** Artifact card inside the answer (UNVERIFIED on the live site). */
+  artifactCard: '[data-testid*="artifact"], .artifact-block-cell',
+  /** Artifact side panel with the document / code (UNVERIFIED on the live site). */
+  artifactPanel:
+    '#markdown-artifact, [data-testid="artifact-content"], [data-testid*="artifact-view"]',
+  /** Tool-use blocks (search, analysis) inside the answer (UNVERIFIED on the live site). */
+  toolBlock: '[data-testid*="tool-use"], [data-testid*="search"], [data-testid*="analysis"]',
 } as const;
+
+/** UNVERIFIED on the live site. */
+const CLAUDE_TOOLS: ToolSelectors = {
+  search: '[data-testid*="search"]',
+  code: '[data-testid*="analysis"], [data-testid*="repl"]',
+  other: '[data-testid*="tool-use"]:not([data-testid*="search"])',
+  searchEvidence: '[data-testid*="citation"], a[data-citation]',
+};
+
+/** Not model output: thinking drawers, tool blocks and artifact cards (counted separately). */
+const CLAUDE_MESSAGE_CHROME = [
+  CLAUDE_SELECTORS.thinkingBlock,
+  CLAUDE_SELECTORS.toolBlock,
+  CLAUDE_SELECTORS.artifactCard,
+].join(', ');
 
 /**
  * Pause threshold (ms) in visible response text while Claude is still generating before we infer
@@ -77,20 +116,32 @@ function extractCleanText(element: Element | null | undefined): string {
 }
 
 /**
- * Reads visible assistant text from a Claude response container while stripping any embedded
- * thinking blocks so thinking summaries do not trigger `isStreamingVisibleText()` early or mask
- * interleaved thinking pauses.
+ * Markdown of a Claude response without thinking blocks, tool blocks and artifact cards, so
+ * thinking summaries don't trigger `isStreamingVisibleText()` early or mask interleaved pauses.
  */
 function extractVisibleAssistantText(assistantEl: Element | null | undefined): string {
-  if (!assistantEl) return '';
-  if (assistantEl.querySelector(CLAUDE_SELECTORS.thinkingBlock) === null) {
-    return extractCleanText(assistantEl);
-  }
-  const clone = assistantEl.cloneNode(true) as Element;
-  for (const node of Array.from(clone.querySelectorAll(CLAUDE_SELECTORS.thinkingBlock))) {
-    node.remove();
-  }
-  return extractCleanText(clone);
+  return domToMarkdown(assistantEl, { skip: CLAUDE_MESSAGE_CHROME });
+}
+
+function extractUserText(userEl: Element | null | undefined): string {
+  return domToMarkdown(userEl, { preserveLineBreaks: true });
+}
+
+function userAttachments(userEl: Element | null | undefined): AttachmentKind[] {
+  if (!userEl) return [];
+  const container =
+    userEl.closest(CLAUDE_SELECTORS.turnContainer) ?? userEl.parentElement ?? userEl;
+  return readAttachments([container], CLAUDE_SELECTORS.attachmentTile);
+}
+
+function latestAssistantNode(): Element | undefined {
+  const assistantNodes = document.querySelectorAll(CLAUDE_SELECTORS.assistantMessage);
+  return assistantNodes[assistantNodes.length - 1];
+}
+
+function latestUserNode(): Element | undefined {
+  const userNodes = document.querySelectorAll(CLAUDE_SELECTORS.userMessage);
+  return userNodes[userNodes.length - 1];
 }
 
 /**
@@ -249,15 +300,27 @@ export const claudeSite: SiteAdapter = {
   },
 
   readUserInput(): string {
-    const userNodes = document.querySelectorAll(CLAUDE_SELECTORS.userMessage);
-    const latestUser = userNodes[userNodes.length - 1];
-    return extractCleanText(latestUser);
+    return extractUserText(latestUserNode());
+  },
+
+  readUserAttachments(): AttachmentKind[] {
+    return userAttachments(latestUserNode());
   },
 
   readResponse(): string {
-    const assistantNodes = document.querySelectorAll(CLAUDE_SELECTORS.assistantMessage);
-    const latestAssistant = assistantNodes[assistantNodes.length - 1];
-    return extractVisibleAssistantText(latestAssistant);
+    return extractVisibleAssistantText(latestAssistantNode());
+  },
+
+  readArtifactText(): string {
+    const latest = latestAssistantNode();
+    return latest
+      ? readArtifactText([latest], CLAUDE_SELECTORS.artifactCard, CLAUDE_SELECTORS.artifactPanel)
+      : '';
+  },
+
+  readToolCalls(): ToolCallKind[] {
+    const latest = latestAssistantNode();
+    return latest ? readToolCalls([latest], CLAUDE_TOOLS) : [];
   },
 
   readHistory(): ChatTurn[] {
@@ -267,9 +330,10 @@ export const claudeSite: SiteAdapter = {
     for (const node of nodes) {
       const isUser = node.matches(CLAUDE_SELECTORS.userMessage);
       const role: 'user' | 'assistant' = isUser ? 'user' : 'assistant';
-      const text = isUser ? extractCleanText(node) : extractVisibleAssistantText(node);
-      if (text) {
-        turns.push({ role, text });
+      const text = isUser ? extractUserText(node) : extractVisibleAssistantText(node);
+      const attachments = isUser ? userAttachments(node) : [];
+      if (text || attachments.length > 0) {
+        turns.push({ role, text, ...(attachments.length ? { attachments } : {}) });
       }
     }
 
@@ -287,16 +351,12 @@ export const claudeSite: SiteAdapter = {
     const hasStreamingAttr = document.querySelector(CLAUDE_SELECTORS.streamingContainer) !== null;
     const hasStopButton = document.querySelector(CLAUDE_SELECTORS.stopButton) !== null;
     const generating = hasStreamingAttr || hasStopButton;
-    const assistantNodes = document.querySelectorAll(CLAUDE_SELECTORS.assistantMessage);
-    const latestAssistant = assistantNodes[assistantNodes.length - 1];
-    claudeThinkingAggregator.tick(generating, extractVisibleAssistantText(latestAssistant));
+    claudeThinkingAggregator.tick(generating, extractVisibleAssistantText(latestAssistantNode()));
     return generating;
   },
 
   isStreamingVisibleText(): boolean {
-    const assistantNodes = document.querySelectorAll(CLAUDE_SELECTORS.assistantMessage);
-    const latestAssistant = assistantNodes[assistantNodes.length - 1];
-    return extractVisibleAssistantText(latestAssistant).length > 0;
+    return extractVisibleAssistantText(latestAssistantNode()).length > 0;
   },
 
   countUserMessages(): number {

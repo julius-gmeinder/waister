@@ -46,6 +46,7 @@ and produces one [`ChatCaptureDto`](dto.md#chatcapturedto). Nothing here tokeniz
 The content script stays thin and only sends plain text plus timing.
 
 ```
+dom-content.reader.ts                Shared DOM -> markdown serializer, attachment, tool-call and artifact readers
 sites/<site>.site.ts                 WHERE: DOM selectors, reads and state checks for one site
 strategies/dom-capture.strategy.ts   WHEN: one turn-detection loop for all sites, calculates latencyMs & thinkingTimeMs, builds ChatCaptureDto
 chat.reader.ts                       Re-exports the consolidated strategy facade
@@ -76,9 +77,12 @@ Contract (`site-adapter.types.ts`):
 | `provider`                 | `Provider`                                                                           |
 | `matches(host)`            | whether this adapter handles the page                                                |
 | `readModel()`              | `ModelInfo` (name, version, thinking effort; `unknown` if not visible)               |
-| `readUserInput()`          | text of the latest user message                                                      |
-| `readResponse()`           | text of the latest assistant message                                                 |
-| `readHistory()`            | `ChatTurn[]` of all earlier turns                                                    |
+| `readUserInput()`          | reconstructed markdown of the latest user message                                    |
+| `readUserAttachments()`    | `AttachmentKind[]` (`'image' \| 'file'`) on the latest user message                  |
+| `readResponse()`           | reconstructed markdown of the latest assistant message (UI chrome stripped)          |
+| `readArtifactText()`       | reconstructed markdown of an open artifact / canvas side panel (`''` if none)        |
+| `readToolCalls()`          | `ToolCallKind[]` (`'search' \| 'code' \| 'other'`) on the latest assistant message   |
+| `readHistory()`            | `ChatTurn[]` of all earlier turns (including user turn `attachments`)                |
 | `countUserMessages()`      | number of user messages in the DOM (a newly sent prompt raises it)                   |
 | `countResponses()`         | number of assistant responses in the DOM (a new response raises it)                  |
 | `isGenerating()`           | whether a response is currently streaming                                            |
@@ -106,6 +110,15 @@ Contract (`site-adapter.types.ts`):
    - **Active generation / streaming**: Checks for `button.send-button.stop` or a `stop` icon in the send button (locale-independent), `button[aria-label="Stop response"]` (English UI only), `model-response[is-streaming="true"]`, or a spinner inside `<model-response>`.
    - **Visible text**: the latest `<model-response>` has text inside `<message-content>` / `.model-response-text` (excluding `<model-thoughts>` drawers).
    - **Turns & model**: Reads `<user-query>` and `<model-response>` custom elements in document order, and reads the model label from `[data-test-id="bard-mode-menu-button"]` / `.input-area-switch-label`.
+
+### DOM content reader
+
+`src/readers/dom-content.reader.ts`: shared helpers used by all three site adapters ([ADR 0011](decisions/0011-rich-message-content.md)):
+
+- `domToMarkdown(root, options)`: walks a message DOM node, skips UI chrome (`button`, `svg`, `.sr-only`, `[aria-hidden="true"]`, plus site-specific chrome selectors), reconstructs markdown syntax (headings, bold/italic/strikethrough, ordered/unordered lists with nesting, blockquotes, pipe tables, `[label](url)` links, inline code, and fenced code blocks with language tags and preserved newlines/indentation), and extracts single TeX strings (`$...$` / `$$...$$`) from KaTeX/MathJax formulas.
+- `readAttachments(roots, fileSelector)`: detects `'image'` and `'file'` attachments on a user turn.
+- `readToolCalls(roots, selectors)`: detects `'search'`, `'code'` and `'other'` tool calls on the latest assistant turn.
+- `readArtifactText(roots, cardSelector, panelSelector)`: serializes the open artifact / canvas side panel when the latest answer contains an artifact card.
 
 ### Reader strategies
 
@@ -165,8 +178,7 @@ May import: `dto/`. Must not import: `handlers/`, `readers/`, `ui/`, `messages/`
 
 ### Tokenizer service
 
-`src/services/tokenizer/`: counts the **visible** tokens for `userInput`, `response` and each
-`chatHistory[]` turn. Per-turn framing tokens come from `tokenizer-lookup.json` in the same folder.
+`src/services/tokenizer/`: counts the **visible** tokens for `userInput` (plus `userAttachments`), `response` (plus `artifactText`) and each `chatHistory[]` turn (plus turn `attachments`). Per-turn framing tokens and per-attachment token estimates come from `tokenizer-lookup.json` in the same folder, and `countWhitespaceTokens` adds ~1 token per newline run and leading indentation run.
 Hidden tokens are not counted here (see [EstimationService](#estimation-service)).
 
 | File                     | Provider    | Role / Difference across sites                                                                                                                      |
@@ -183,10 +195,12 @@ Hidden tokens are not counted here (see [EstimationService](#estimation-service)
 
 - `thinking` = `max(0, thinkingTimeMs − 250) × tokensPerMsThinking × effortMultiplier[thinkingEffort]`
   (**hidden output**: internal reasoning / chain-of-thought tokens generated by the model before the visible answer starts streaming; scales dynamically with `thinkingTimeMs`).
+- `tools` = sum of `TOOL_CALL_TOKENS[provider][kind]` over `capture.toolCalls`
+  (**hidden tool context**: web search result snippets, code execution inputs/outputs, and other tool calls).
 - `overhead` = `systemPromptTokens` of the model
   (**hidden input**: the provider's invisible system prompt, safety/formatting instructions, and built-in tool definitions like web search, code execution, or canvas/artifacts sent with every turn; fixed per model profile).
 - See [pipeline.md — Thinking vs. Overhead](pipeline.md#thinking-vs-overhead) for a full comparison.
-- `totalTokens` = input + history + output + thinking + overhead. The handler passes the visible
+- `totalTokens` = input + history + output + thinking + tools + overhead. The handler passes the visible
   counts in, so the services don't call each other.
 
 It also computes an environmental `impact` (`energyWh`, `waterMl`, `co2Grams`) from
@@ -215,10 +229,9 @@ It also computes an environmental `impact` (`energyWh`, `waterMl`, `co2Grams`) f
   snapshots land in the same order as the inserts.
 - **Table `prompts`:** `id` (UUID, PK), `conversation_url`, `captured_at` (indexed), `provider`,
   `model_name`, `model_version`, `thinking_effort`, `model_raw_label`, `input_tokens`,
-  `history_tokens`, `output_tokens`, `thinking_tokens`, `overhead_tokens`, `total_tokens`,
+  `history_tokens`, `output_tokens`, `thinking_tokens`, `tool_tokens`, `overhead_tokens`, `total_tokens`,
   `latency_ms`, `thinking_time_ms`, `approximate` (0/1), `energy_wh`, `water_ml`, `co2_grams`.
-- The schema runs on every start and must stay idempotent (`IF NOT EXISTS`). A column change on
-  an existing table needs an `ALTER TABLE` migration.
+- The schema runs on every start (`applySchema`) and must stay idempotent (`CREATE TABLE IF NOT EXISTS` plus `pragma_table_info('prompts')` checks that run `ALTER TABLE` for columns in `ADDED_COLUMNS` such as `tool_tokens`).
 
 ---
 

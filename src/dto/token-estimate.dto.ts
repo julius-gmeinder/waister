@@ -16,6 +16,8 @@ export interface TokenBreakdown {
   output: number;
   /** Hidden reasoning tokens, estimated. */
   thinking: number;
+  /** Hidden tool-call tokens (search results, code + execution output), estimated per call. */
+  tools: number;
   /** Hidden system prompt and tool-definition tokens, estimated. */
   overhead: number;
 }
@@ -30,7 +32,7 @@ export interface EnvironmentalImpact {
 }
 
 export interface TokenEstimateDto {
-  /** input + history + output + thinking + overhead. */
+  /** input + history + output + thinking + tools + overhead. */
   totalTokens: number;
   breakdown: TokenBreakdown;
   impact: EnvironmentalImpact;

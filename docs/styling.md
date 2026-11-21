@@ -74,4 +74,5 @@ import in `popup.entry.tsx`.
 | history     | `History`           | `breakdown.component.tsx` |
 | output      | `MessageSquareText` | `breakdown.component.tsx` |
 | thinking    | `Brain`             | `breakdown.component.tsx` |
+| tools       | `Wrench`            | `breakdown.component.tsx` |
 | overhead    | `Settings2`         | `breakdown.component.tsx` |

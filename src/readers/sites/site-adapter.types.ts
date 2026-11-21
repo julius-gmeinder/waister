@@ -6,7 +6,13 @@
  * Docs: docs/modules.md#site-adapters
  */
 
-import type { ChatTurn, ModelInfo, Provider } from '../../dto/chat-capture.dto';
+import type {
+  AttachmentKind,
+  ChatTurn,
+  ModelInfo,
+  Provider,
+  ToolCallKind,
+} from '../../dto/chat-capture.dto';
 
 export interface SiteAdapter {
   readonly provider: Provider;
@@ -16,9 +22,20 @@ export interface SiteAdapter {
 
   readModel(): ModelInfo;
 
+  /** Markdown of the latest user message (see `domToMarkdown`). */
   readUserInput(): string;
 
+  /** Images / files attached to the latest user message. */
+  readUserAttachments(): AttachmentKind[];
+
+  /** Markdown of the latest answer, without UI chrome, thinking drawers and tool blocks. */
   readResponse(): string;
+
+  /** Markdown of the artifact / canvas side panel written by the latest answer, '' if none. */
+  readArtifactText(): string;
+
+  /** Tool calls (web search, code execution, …) visible in the latest answer. */
+  readToolCalls(): ToolCallKind[];
 
   /** Turns before the latest prompt and its answer, oldest first. */
   readHistory(): ChatTurn[];

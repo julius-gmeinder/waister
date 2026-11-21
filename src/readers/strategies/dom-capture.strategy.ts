@@ -241,7 +241,10 @@ export function buildChatCaptureDto(adapter: SiteAdapter, timings: TurnTimings):
     provider: adapter.provider,
     model: adapter.readModel(),
     userInput: adapter.readUserInput(),
+    userAttachments: adapter.readUserAttachments(),
     response: adapter.readResponse(),
+    artifactText: adapter.readArtifactText(),
+    toolCalls: adapter.readToolCalls(),
     chatHistory: adapter.readHistory(),
     latencyMs,
     thinkingTimeMs,
@@ -279,7 +282,7 @@ export function startDomCaptureStrategy(
 
   return observeTurns(adapter, (timings) => {
     const dto = buildChatCaptureDto(adapter, timings);
-    if (!dto.response && !dto.userInput) {
+    if (!dto.response && !dto.userInput && !dto.artifactText) {
       console.info(LOG_PREFIX, 'capture dropped: prompt and response text are empty', dto);
       return;
     }

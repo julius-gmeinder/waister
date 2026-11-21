@@ -69,21 +69,22 @@ questions (`countResponses()`, `isGenerating()`, `readResponse()`, …).
 `services/tokenizer/tokenizer.service.ts` + `services/tokenizer/tokenizer-lookup.json`
 (`turnFramingTokens` per provider). Entry point: `countVisibleTokens(capture)`.
 
-| Count     | Source                        | How it works & why sites differ                                                                                                                              |
-| --------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `input`   | `userInput`                   | Tokenized with the provider's tokenizer (`openai`, `anthropic`, or `google`) plus `turnFramingTokens` (4–5 control tokens wrapping the user turn).           |
-| `history` | every turn in `chatHistory[]` | Chat apps re-send the whole conversation as context on every prompt. Each turn is tokenized with the provider's tokenizer plus `turnFramingTokens` per turn. |
-| `output`  | `response`                    | Tokenized with the provider's tokenizer (OpenAI `o200k_base` ~4.0 chars/tok, Claude BPE ~3.7 chars/tok, Gemini SentencePiece ~4.1 chars/tok).                |
+| Count     | Source                         | How it works & why sites differ                                                                                                                                                                     |
+| --------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `input`   | `userInput`, `userAttachments` | Markdown tokenized with the provider's tokenizer + whitespace runs + per-attachment token estimates (`image`, `file`) + `turnFramingTokens` (4–5 control tokens wrapping the user turn).            |
+| `history` | every turn in `chatHistory[]`  | Chat apps re-send the whole conversation as context on every prompt. Each turn's reconstructed markdown and attachments are tokenized with the provider's tokenizer + `turnFramingTokens` per turn. |
+| `output`  | `response`, `artifactText`     | Reconstructed answer markdown + open Artifact/Canvas panel markdown tokenized with the provider's tokenizer + whitespace runs.                                                                      |
 
 ## 3. EstimationService: hidden tokens + DTO
 
 `services/estimation/estimation.service.ts` + `services/estimation/model-profiles.ts`.
 Entry points: `estimateHiddenTokens(capture)`, `buildTokenEstimateDto(capture, visible, hidden)`.
 
-| Count      | Source                             | How                                                                                     |
-| ---------- | ---------------------------------- | --------------------------------------------------------------------------------------- |
-| `thinking` | `thinkingTimeMs`, `thinkingEffort` | `max(0, thinkingTimeMs − 250) × tokensPerMsThinking × effortMultiplier[thinkingEffort]` |
-| `overhead` | model profile                      | `systemPromptTokens` of the provider/model (system prompt + tool definitions)           |
+| Count      | Source                             | How                                                                                      |
+| ---------- | ---------------------------------- | ---------------------------------------------------------------------------------------- |
+| `thinking` | `thinkingTimeMs`, `thinkingEffort` | `max(0, thinkingTimeMs − 250) × tokensPerMsThinking × effortMultiplier[thinkingEffort]`  |
+| `tools`    | `toolCalls[]`                      | Sum of `TOOL_CALL_TOKENS[provider][kind]` per detected `search`, `code`, or `other` call |
+| `overhead` | model profile                      | `systemPromptTokens` of the provider/model (system prompt + tool definitions)            |
 
 ### Thinking vs. Overhead
 

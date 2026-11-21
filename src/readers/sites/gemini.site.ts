@@ -6,7 +6,20 @@
  * Docs: docs/modules.md#site-adapters
  */
 
-import type { ChatTurn, ModelInfo, ThinkingEffort } from '../../dto/chat-capture.dto';
+import type {
+  AttachmentKind,
+  ChatTurn,
+  ModelInfo,
+  ThinkingEffort,
+  ToolCallKind,
+} from '../../dto/chat-capture.dto';
+import {
+  domToMarkdown,
+  readArtifactText,
+  readAttachments,
+  readToolCalls,
+  type ToolSelectors,
+} from '../dom-content.reader';
 import type { SiteAdapter } from './site-adapter.types';
 
 export const GEMINI_SELECTORS = {
@@ -22,11 +35,33 @@ export const GEMINI_SELECTORS = {
   assistantMessage:
     'model-response message-content, model-response .model-response-text, model-response',
   allTurns: 'user-query, model-response',
+  /** Answer text containers inside `<model-response>`. */
+  responseText: 'message-content, .model-response-text',
   modelSelector:
     '[data-test-id="bard-mode-menu-button"], .input-area-switch-label, button[aria-label*="mode"]',
   thinkingDrawer:
     'model-thoughts, [data-test-id="model-thoughts"], .thoughts-container, [data-test-id*="thought"]',
+  /** File / image cards in a user turn (UNVERIFIED on the live site). */
+  attachmentTile: 'user-query-file-preview, [class*="file-preview"], [data-test-id*="file"]',
+  /** Canvas chip inside the answer. */
+  artifactCard: 'immersive-entry-chip',
+  /** Canvas side panel with the document / code. */
+  artifactPanel: 'immersive-panel, [data-test-id="immersive-panel"]',
+  /** Inside the answer but not model output (code-block header, sources, canvas chip). */
+  messageChrome:
+    '.code-block-decoration, message-actions, sources-carousel-inline, source-footnote, sources-list, immersive-entry-chip, code-execution-result',
 } as const;
+
+/** UNVERIFIED on the live site. */
+const GEMINI_TOOLS: ToolSelectors = {
+  search: '',
+  code: 'code-execution-result, [data-test-id*="code-execution"]',
+  other: '',
+  searchEvidence:
+    'sources-carousel-inline, source-footnote, sources-list, .source-inline-chip, [data-test-id*="source"]',
+};
+
+const GEMINI_MESSAGE_CHROME = `${GEMINI_SELECTORS.thinkingDrawer}, ${GEMINI_SELECTORS.messageChrome}`;
 
 /** Parses selector labels like "2.5 Pro", "2.5 Flash", "2.0 Flash Thinking". */
 function parseGeminiModel(rawLabel: string, hasThinkingDrawer: boolean): ModelInfo {
@@ -63,33 +98,49 @@ function extractCleanText(element: Element | null | undefined): string {
   return (element.textContent ?? '').trim();
 }
 
-const GEMINI_THOUGHT_SELECTOR =
-  'model-thoughts, [data-test-id="model-thoughts"], .thoughts-container, [data-test-id*="thought"]';
-
 /**
  * Excludes the `<model-thoughts>` drawer so thinking summaries aren't counted as output and don't
  * trigger `tStreamStart` while the model is still thinking.
  */
 function extractGeminiResponseText(modelResponseEl: Element | null | undefined): string {
   if (!modelResponseEl) return '';
-  const candidates = Array.from(
-    modelResponseEl.querySelectorAll('message-content, .model-response-text'),
-  ).filter((el) => el.closest(GEMINI_THOUGHT_SELECTOR) === null);
+  const selector = GEMINI_SELECTORS.responseText;
+  // Outermost only: `.model-response-text` can sit inside `<message-content>`.
+  const candidates = Array.from(modelResponseEl.querySelectorAll(selector)).filter(
+    (el) =>
+      el.closest(GEMINI_SELECTORS.thinkingDrawer) === null &&
+      (el.parentElement?.closest(selector) ?? null) === null,
+  );
 
   if (candidates.length > 0) {
     return candidates
-      .map((el) => extractCleanText(el))
+      .map((el) => domToMarkdown(el, { skip: GEMINI_MESSAGE_CHROME }))
       .filter(Boolean)
-      .join('\n')
-      .trim();
+      .join('\n\n');
   }
 
   // No answer container yet but a thinking drawer: the visible answer hasn't started.
-  if (modelResponseEl.querySelector(GEMINI_THOUGHT_SELECTOR) !== null) {
+  if (modelResponseEl.querySelector(GEMINI_SELECTORS.thinkingDrawer) !== null) {
     return '';
   }
 
-  return extractCleanText(modelResponseEl);
+  return domToMarkdown(modelResponseEl, { skip: GEMINI_MESSAGE_CHROME });
+}
+
+function extractUserText(userQuery: Element): string {
+  return domToMarkdown(userQuery.querySelector('.query-text') ?? userQuery, {
+    skip: GEMINI_SELECTORS.attachmentTile,
+    preserveLineBreaks: true,
+  });
+}
+
+function userAttachments(userQuery: Element | undefined): AttachmentKind[] {
+  return userQuery ? readAttachments([userQuery], GEMINI_SELECTORS.attachmentTile) : [];
+}
+
+function latestOf(selector: string): Element | undefined {
+  const nodes = document.querySelectorAll(selector);
+  return nodes[nodes.length - 1];
 }
 
 export const geminiSite: SiteAdapter = {
@@ -116,17 +167,28 @@ export const geminiSite: SiteAdapter = {
   },
 
   readUserInput(): string {
-    const userQueries = document.querySelectorAll('user-query');
-    const latestUser = userQueries[userQueries.length - 1];
-    if (!latestUser) return '';
-    const queryText = latestUser.querySelector('.query-text') ?? latestUser;
-    return extractCleanText(queryText);
+    const latestUser = latestOf('user-query');
+    return latestUser ? extractUserText(latestUser) : '';
+  },
+
+  readUserAttachments(): AttachmentKind[] {
+    return userAttachments(latestOf('user-query'));
   },
 
   readResponse(): string {
-    const responses = document.querySelectorAll('model-response');
-    const latestResponse = responses[responses.length - 1];
-    return extractGeminiResponseText(latestResponse);
+    return extractGeminiResponseText(latestOf('model-response'));
+  },
+
+  readArtifactText(): string {
+    const latest = latestOf('model-response');
+    return latest
+      ? readArtifactText([latest], GEMINI_SELECTORS.artifactCard, GEMINI_SELECTORS.artifactPanel)
+      : '';
+  },
+
+  readToolCalls(): ToolCallKind[] {
+    const latest = latestOf('model-response');
+    return latest ? readToolCalls([latest], GEMINI_TOOLS) : [];
   },
 
   readHistory(): ChatTurn[] {
@@ -136,8 +198,11 @@ export const geminiSite: SiteAdapter = {
     for (const node of turnNodes) {
       const tagName = node.tagName.toLowerCase();
       if (tagName === 'user-query') {
-        const text = extractCleanText(node.querySelector('.query-text') ?? node);
-        if (text) turns.push({ role: 'user', text });
+        const text = extractUserText(node);
+        const attachments = userAttachments(node);
+        if (text || attachments.length > 0) {
+          turns.push({ role: 'user', text, ...(attachments.length ? { attachments } : {}) });
+        }
       } else if (tagName === 'model-response') {
         const text = extractGeminiResponseText(node);
         if (text) turns.push({ role: 'assistant', text });
@@ -162,9 +227,7 @@ export const geminiSite: SiteAdapter = {
   },
 
   isStreamingVisibleText(): boolean {
-    const responses = document.querySelectorAll('model-response');
-    const latestResponse = responses[responses.length - 1];
-    return extractGeminiResponseText(latestResponse).length > 0;
+    return extractGeminiResponseText(latestOf('model-response')).length > 0;
   },
 
   countUserMessages(): number {
