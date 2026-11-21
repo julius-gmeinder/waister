@@ -36,7 +36,10 @@ background:  handlers/estimation.handler (EstimationHandler)
                  ├─ services/estimation  (EstimationService + model-profiles)
                  └─ services/prompt-store (SQLite WASM, snapshot in IndexedDB) ← PromptRecordDto
              handlers/usage.handler → services/prompt-store → UsageSummaryDto
-popup:       ui/  (React + TSX: popup.app.tsx + components/)  ← GET_USAGE_SUMMARY (reads only the database)
+popup:       ui/popup/  (React, dashboard)  ← GET_USAGE_SUMMARY (reads only the database)
+                 │ tab bar → chrome.tabs.create
+app page:    ui/app/    (React, full tab, hash routes: analytics · facts · tips · history)
+             ui/components/ + ui/base.css + ui/app-routes.ts shared by both
 shared:      dto/, messages/
 entries/:    one esbuild entry per context, wiring only
 ```
@@ -47,16 +50,18 @@ All docs live in `docs/` only. Start at `docs/README.md`. The per-module referen
 ## Rules
 
 - **Respect context boundaries.** `readers/` = content only, `handlers/` + `services/` =
-  background only, `ui/` = popup only. Only `dto/` and `messages/` are shared. Allowed imports
+  background only, `ui/` = popup + app page only. Only `dto/` and `messages/` are shared. Allowed imports
   per layer are in `docs/architecture.md`. Never import background code into content/popup.
   Cross context only through `messages/`.
 - **Plain function modules, no classes.** Handlers orchestrate, services compute, DTOs are plain
   structured-clone-safe data. React components are function components too.
 - **File names:** kebab-case + role suffix (`*.entry.ts(x)`, `*.reader.ts`, `*.site.ts`,
   `*.strategy.ts`, `*.handler.ts`, `*.service.ts`, `*.tokenizer.ts`, `*.dto.ts`, `*.types.ts`,
-  `*.app.tsx`, `*.component.tsx`).
-- **Popup (React):** only `popup.app.tsx` fetches data. `components/` only render props. One
-  `popup.css` and colors only via the CSS variables in `docs/styling.md`.
+  `*.app.tsx`, `*.page.tsx`, `*.component.tsx`).
+- **UI (React):** only the `*.app.tsx` roots fetch data. `components/` only render props (and may
+  navigate). Routes only in `ui/app-routes.ts`. Shared styles in `base.css` / `components.css`,
+  surface layout in `popup.css` / `app.css`, colors only via the CSS variables
+  (`docs/styling.md`).
 - **Keep docs in sync:** when you add, move or change a module, update its section in
   `docs/modules.md` (and the `Docs:` anchor in the file header) and, if it affects them,
   `docs/architecture.md`, `docs/pipeline.md`, `docs/dto.md`. A structural decision gets a new
@@ -67,8 +72,10 @@ All docs live in `docs/` only. Start at `docs/README.md`. The per-module referen
 
 Pipeline implemented end to end (readers → handler → tokenizer/estimation services → SQLite
 prompt store). The popup (React + TSX, [ADR 0010](docs/decisions/0010-react-popup.md)) reads
-the database and shows the last 24h of token usage (total, breakdown, prompt count). The UI is
-deliberately plain for now. The energy/water `impact` is
+the database and shows the last 24h of token usage (total, breakdown, prompt count). Its tab bar
+opens the full-page app page ([ADR 0011](docs/decisions/0011-app-page.md)), whose four pages
+(Analytics, Facts, Tips, History) are empty placeholders so far. The UI is deliberately plain for
+now. The energy/water `impact` is
 saved per prompt but not displayed. `npm run build` works. `eslint.config.js` still targets the old
 per-context layout. The required changes are in `docs/build-and-tooling.md`.
 

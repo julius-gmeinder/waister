@@ -21,13 +21,15 @@ Then load `dist/waister/` into your browser as described below.
 
 ## Using the extension in the browser
 
-The extension is made of three parts, and each one is debugged in a different place:
+The extension is made of four parts, and each one is debugged in a different place (the app page
+like any web page: F12 in its tab):
 
 | Part           | Source                                                      | Runs in                                       |
 | -------------- | ----------------------------------------------------------- | --------------------------------------------- |
 | Background     | `src/entries/background.entry.ts`, `handlers/`, `services/` | Its own context (service worker / event page) |
 | Content script | `src/entries/content.entry.ts`, `readers/`                  | The supported chat sites (isolated world)     |
-| Popup          | `src/entries/popup.entry.tsx`, `ui/`                        | The toolbar popup, only while it is open      |
+| Popup          | `src/entries/popup.entry.tsx`, `ui/popup/`                  | The toolbar popup, only while it is open      |
+| App page       | `src/entries/app.entry.tsx`, `ui/app/`                      | A normal browser tab (`app/index.html#/…`)    |
 
 `console.log` output from each part shows up in **that part's** DevTools, not in a shared
 console. In `npm run dev` builds, inline source maps let you see and set breakpoints in the
@@ -161,7 +163,8 @@ src/
   readers/          content:    DOM → ChatCaptureDto (sites/ = where, strategies/ = when)
   handlers/         background: message routing, EstimationHandler, UsageHandler
   services/         background: tokenizer/, estimation/, prompt-store/ (SQLite)
-  ui/               popup:      React + TSX app, shows the last 24h of token usage
+  ui/               popup + app page (React + TSX): popup/ = 24h dashboard, app/ = full-page
+                                analytics · facts · tips · history, components/ = shared
   dto/              shared:     ChatCaptureDto, TokenEstimateDto, PromptRecordDto, UsageSummaryDto
   messages/         shared:     chrome.runtime message contracts
 docs/               architecture, pipeline, DTOs, build/tooling, ADRs
