@@ -1,19 +1,11 @@
 /**
- * Tokenizer for Anthropic models (Claude).
- *
- * Anthropic does not publish a public BPE vocabulary for Claude 3.5 / 3.7 / 4.x models.
- * Empirically, Claude's BPE tokenizer has a slightly smaller vocabulary than OpenAI's `o200k_base`,
- * averaging ~3.7 characters per token on English text and splitting compound words slightly more
- * aggressively (~3.8 chars per sub-token). Each turn in Claude's chat format also incurs ~5 role
- * framing tokens (`\n\nHuman:` / `\n\nAssistant:` or XML turn blocks).
+ * Heuristic Claude tokenizer. Anthropic publishes no vocabulary. Calibrated to ~3.7 chars/token on
+ * English, a bit denser than OpenAI's `o200k_base`.
  *
  * Context: background
  * Docs: docs/modules.md#tokenizer-service
  */
 
-/**
- * Estimates Claude token count for a single string using a Claude-calibrated BPE heuristic.
- */
 export function countAnthropicTextTokens(text: string): number {
   const trimmed = text.trim();
   if (!trimmed) return 0;

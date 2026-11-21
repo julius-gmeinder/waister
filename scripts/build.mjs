@@ -7,7 +7,6 @@ const firefox = process.argv.includes('--firefox');
 /** The unpacked extension. Load this folder in the browser. */
 const outdir = 'dist/waister';
 
-/** Files copied as-is into the extension folder ([source, destination]). */
 const staticFiles = [
   ['src/ui/popup/popup.html', 'popup/index.html'],
   ['src/ui/popup/popup.css', 'popup/index.css'],

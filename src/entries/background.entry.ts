@@ -1,6 +1,5 @@
 /**
- * Entry point of the background (esbuild -> background.js, ES module).
- * Only registers the runtime listeners and hands every message to handlers/message.handler.
+ * Background entry: registers the runtime listener and forwards messages to message.handler.
  *
  * Context: background (service worker)
  * Docs: docs/modules.md#entries
@@ -14,6 +13,6 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResp
     console.error('[waister]', message.type, 'failed', err);
     sendResponse({ error: String(err) });
   });
-  // Return true to keep the message channel open for the async handler response
+  // Keeps the channel open for the async sendResponse.
   return true;
 });

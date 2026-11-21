@@ -1,9 +1,6 @@
 /**
- * SiteAdapter for Gemini (gemini.google.com). Provider: google.
- *
- * Responsibility: Only knows Gemini's DOM (Angular custom elements like <user-query> and
- * <model-response>) and exposes selectors/reads.
- * Timing (when a prompt was sent / finished) lives in dom-capture.strategy.
+ * SiteAdapter for Gemini (gemini.google.com). Turns are Angular custom elements (`<user-query>`,
+ * `<model-response>`).
  *
  * Context: content script
  * Docs: docs/modules.md#site-adapters
@@ -12,43 +9,26 @@
 import type { ChatTurn, ModelInfo, ThinkingEffort } from '../../dto/chat-capture.dto';
 import type { SiteAdapter } from './site-adapter.types';
 
-/**
- * Centralized DOM selectors for Google Gemini (gemini.google.com).
- * Kept at the top of the file so UI updates only require selector adjustments here.
- */
 export const GEMINI_SELECTORS = {
-  /** Rich-textarea / Quill contenteditable prompt field in the Gemini input area. */
   promptInput: 'rich-textarea .ql-editor, div[contenteditable="true"][role="textbox"]',
-  /** Send message button in the composer (it turns into the stop button while generating). */
+  /** The same button turns into the stop button while generating, hence `:not(.stop)`. */
   sendButton: 'button.send-button:not(.stop), button[aria-label="Send message"]',
-  /**
-   * Stop button shown during generation. Matched by class/icon first because aria-labels are
-   * localized (e.g. German UI), the English labels are only a fallback.
-   */
+  /** Class/icon first: aria-labels are localized, the English ones are only a fallback. */
   stopButton:
     'button.send-button.stop, .send-button [fonticon="stop"], .send-button [data-mat-icon-name="stop"], button[aria-label="Stop response"], button[aria-label="Stop generating"]',
-  /** Loading / streaming state indicators on the active model-response custom element. */
   streamingIndicator:
     'model-response[is-streaming="true"], model-response .mat-mdc-progress-spinner, [data-test-id="streaming-indicator"]',
-  /** Custom element or class wrapping user prompts. */
   userMessage: 'user-query .query-text, user-query, .user-query-container',
-  /** Custom element or class wrapping Gemini model responses (excludes thought summary drawers). */
   assistantMessage:
     'model-response message-content, model-response .model-response-text, model-response',
-  /** Combined turn elements in conversation order. */
   allTurns: 'user-query, model-response',
-  /** Mode / model switcher button in the header or input bar (e.g. "2.5 Pro", "2.5 Flash"). */
   modelSelector:
     '[data-test-id="bard-mode-menu-button"], .input-area-switch-label, button[aria-label*="mode"]',
-  /** Expandable thinking drawer shown when Gemini is using a Thinking/Pro model. */
   thinkingDrawer:
     'model-thoughts, [data-test-id="model-thoughts"], .thoughts-container, [data-test-id*="thought"]',
 } as const;
 
-/**
- * Parses Gemini's raw model selector label (e.g. "2.5 Pro", "2.5 Flash", "2.0 Flash Thinking")
- * into normalized ModelInfo fields.
- */
+/** Parses selector labels like "2.5 Pro", "2.5 Flash", "2.0 Flash Thinking". */
 function parseGeminiModel(rawLabel: string, hasThinkingDrawer: boolean): ModelInfo {
   const cleaned = rawLabel.trim();
   const lower = cleaned.toLowerCase();
@@ -78,25 +58,17 @@ function parseGeminiModel(rawLabel: string, hasThinkingDrawer: boolean): ModelIn
   };
 }
 
-/**
- * Extracts trimmed text content from a DOM element.
- */
 function extractCleanText(element: Element | null | undefined): string {
   if (!element) return '';
   return (element.textContent ?? '').trim();
 }
 
-/**
- * Selector matching collapsible thought/reasoning containers inside a `<model-response>` that must
- * not be mistaken for the visible output text.
- */
 const GEMINI_THOUGHT_SELECTOR =
   'model-thoughts, [data-test-id="model-thoughts"], .thoughts-container, [data-test-id*="thought"]';
 
 /**
- * Reads the visible response text from a `<model-response>` element while excluding
- * any collapsible `<model-thoughts>` drawer so thinking summaries aren't double-counted as output
- * and don't prematurely trigger `tStreamStart` while the model is still thinking.
+ * Excludes the `<model-thoughts>` drawer so thinking summaries aren't counted as output and don't
+ * trigger `tStreamStart` while the model is still thinking.
  */
 function extractGeminiResponseText(modelResponseEl: Element | null | undefined): string {
   if (!modelResponseEl) return '';
@@ -112,8 +84,7 @@ function extractGeminiResponseText(modelResponseEl: Element | null | undefined):
       .trim();
   }
 
-  // No answer container rendered yet: if a thinking drawer is already present, visible answer
-  // streaming has not started yet.
+  // No answer container yet but a thinking drawer: the visible answer hasn't started.
   if (modelResponseEl.querySelector(GEMINI_THOUGHT_SELECTOR) !== null) {
     return '';
   }
@@ -121,9 +92,6 @@ function extractGeminiResponseText(modelResponseEl: Element | null | undefined):
   return extractCleanText(modelResponseEl);
 }
 
-/**
- * Gemini site adapter implementation.
- */
 export const geminiSite: SiteAdapter = {
   provider: 'google',
 
@@ -176,7 +144,7 @@ export const geminiSite: SiteAdapter = {
       }
     }
 
-    // Exclude the latest user prompt and latest assistant response
+    // The latest prompt and its answer (if rendered yet) are the capture, not history.
     if (turns.length >= 2 && turns[turns.length - 1]?.role === 'assistant') {
       return turns.slice(0, -2);
     }

@@ -1,9 +1,6 @@
 /**
- * PromptStoreService: saves every estimated prompt as one row in the SQLite `prompts` table and
- * answers usage queries for the popup. Metrics only, no chat text.
- *
- * API: `createPromptRecord(capture, estimate)`, `savePromptRecord(record)`,
- * `getUsageSummary(sinceMs)`. Persistence details are in `sqlite-database.ts`.
+ * PromptStoreService: one row per estimated prompt in the SQLite `prompts` table, plus usage
+ * queries for the popup. Metrics only, never chat text (ADR 0009).
  *
  * Context: background
  * Docs: docs/modules.md#prompt-store-service
@@ -16,7 +13,7 @@ import type { TokenEstimateDto } from '../../dto/token-estimate.dto';
 import type { UsageSummaryDto } from '../../dto/usage-summary.dto';
 import { getDatabase, writeAndPersist } from './sqlite-database';
 
-/** Schema, run on every start. Statements must stay idempotent. */
+/** Runs on every start, so statements must stay idempotent. */
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS prompts (
     id               TEXT PRIMARY KEY,
@@ -70,9 +67,6 @@ const SELECT_USAGE_SUMMARY = `
   WHERE captured_at >= $sinceMs
 `;
 
-/**
- * Builds the row for one estimated prompt: the estimate plus a new UUID and the conversation link.
- */
 export function createPromptRecord(
   capture: ChatCaptureDto,
   estimate: TokenEstimateDto,
@@ -84,7 +78,6 @@ export function createPromptRecord(
   };
 }
 
-/** Inserts `record` into the `prompts` table and persists the database. */
 export async function savePromptRecord(record: PromptRecordDto): Promise<void> {
   await writeAndPersist(SCHEMA, (db: Database) => {
     db.exec({
@@ -115,7 +108,7 @@ export async function savePromptRecord(record: PromptRecordDto): Promise<void> {
   });
 }
 
-/** Sums the token usage of all saved prompts captured at or after `sinceMs` (epoch ms). */
+/** `sinceMs` is epoch ms, inclusive. */
 export async function getUsageSummary(sinceMs: number): Promise<UsageSummaryDto> {
   const db = await getDatabase(SCHEMA);
   const row = db.selectObject(SELECT_USAGE_SUMMARY, { $sinceMs: sinceMs }) ?? {};

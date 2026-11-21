@@ -1,9 +1,9 @@
 /**
- * SQLite (WebAssembly) database of the PromptStoreService. Internal to `prompt-store/`.
+ * In-memory SQLite (WASM) database, persisted as IndexedDB snapshots. Internal to `prompt-store/`.
  *
- * The database lives in memory. MV3 service workers can't use the OPFS-backed VFSes (those need
- * a dedicated Worker) and are stopped after ~30 s idle, so every write is followed by a snapshot
- * of the whole database to IndexedDB, and `getDatabase()` restores it on the next start.
+ * MV3 service workers can't use the OPFS-backed VFSes (those need a dedicated Worker) and are
+ * stopped after ~30 s idle, so every write is followed by a snapshot of the whole database to
+ * IndexedDB, and `getDatabase()` restores it on the next start.
  * `sqlite3.wasm` is copied next to `background.js` by `scripts/build.mjs`; sqlite-wasm finds it
  * through `import.meta.url` (that's why the background bundle is ESM).
  *
@@ -28,10 +28,7 @@ let sqlitePromise: Promise<Sqlite> | undefined;
 /** Serializes writes so snapshots reach IndexedDB in the same order as the writes. */
 let writeQueue: Promise<unknown> = Promise.resolve();
 
-/**
- * Returns the shared database. On first use it initializes SQLite, restores the IndexedDB
- * snapshot and runs `schema` (which must be idempotent, e.g. `CREATE TABLE IF NOT EXISTS`).
- */
+/** `schema` runs on every start, so it must be idempotent (`CREATE TABLE IF NOT EXISTS`). */
 export async function getDatabase(schema: string): Promise<Database> {
   sqlitePromise ??= openDatabase(schema).catch((err: unknown) => {
     sqlitePromise = undefined; // allow a retry on the next call
@@ -40,10 +37,6 @@ export async function getDatabase(schema: string): Promise<Database> {
   return (await sqlitePromise).db;
 }
 
-/**
- * Runs `write` against the database and then saves a snapshot to IndexedDB. Writes run one after
- * another, so a later snapshot can never be overwritten by an earlier one.
- */
 export function writeAndPersist<T>(schema: string, write: (db: Database) => T): Promise<T> {
   const run = writeQueue.then(async () => {
     const db = await getDatabase(schema);
@@ -90,7 +83,6 @@ function loadSnapshot(): Promise<ArrayBuffer | undefined> {
   return idbRequest('readonly', (store) => store.get(SNAPSHOT_KEY) as IDBRequest<ArrayBuffer>);
 }
 
-/** Opens the IndexedDB database, runs one request on the snapshot store and closes it again. */
 function idbRequest<T>(
   mode: IDBTransactionMode,
   run: (store: IDBObjectStore) => IDBRequest<T>,

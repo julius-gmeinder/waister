@@ -1,20 +1,11 @@
 /**
- * Consolidated DOM Capture Strategy (`dom-capture.strategy.ts`).
+ * DOM capture strategy: one shared turn-detection loop on top of all site adapters, sending a
+ * `ChatCaptureDto` per finished prompt to the background (`ESTIMATE_PROMPT`).
  *
- * Owns the WHEN for all supported site adapters (`chatgpt.site.ts`, `claude.site.ts`,
- * `gemini.site.ts`). The adapters only answer DOM questions, this strategy runs one shared
- * turn-detection loop on top of them:
- *   1. Selects the active SiteAdapter for the current host.
- *   2. Watches the whole document (chat apps are SPAs and replace their containers on navigation)
- *      and the composer's Enter key / send button to detect the prompt send (`t0`), the first
- *      visible response text (`tStreamStart`) and the end of the response (`t1`).
- *   3. A response counts as finished once the site's "generating" indicator is gone and the
- *      response text has stopped changing. If the indicator was never seen (e.g. its selector
- *      doesn't match a localized UI), a longer text-stability window decides on its own.
- *   4. Calculates `thinkingTimeMs = tStreamStart - t0` and `latencyMs = t1 - t0`, reads the DOM
- *      texts (`userInput`, `response`, `chatHistory`, `model`) and builds a `ChatCaptureDto`.
- *   5. Forwards the `ChatCaptureDto` via `ESTIMATE_PROMPT` to `handleEstimation` in
- *      `src/handlers/estimation.handler.ts`.
+ * Watches the whole document because chat apps are SPAs that replace their containers on
+ * navigation. A response is finished once the site's "generating" indicator is gone and the text
+ * has stopped changing. If the indicator was never seen (e.g. its selector doesn't match a
+ * localized UI), a longer text-stability window decides on its own.
  *
  * Context: content script
  * Docs: docs/modules.md#reader-strategies, docs/pipeline.md
@@ -28,9 +19,6 @@ import { geminiSite } from '../sites/gemini.site';
 import type { SiteAdapter } from '../sites/site-adapter.types';
 import type { OnCaptureReady, ReaderStrategy, TurnTimings } from './reader-strategy.types';
 
-/**
- * Registry of all supported site adapters consolidated by this strategy.
- */
 export const SUPPORTED_SITES: readonly SiteAdapter[] = [chatgptSite, claudeSite, geminiSite];
 
 /** Quiet time after the generating indicator disappeared before a response counts as done. */
@@ -57,9 +45,6 @@ const WATCHED_ATTRIBUTES = [
 
 const LOG_PREFIX = '[waister]';
 
-/**
- * Finds the site adapter matching the current hostname (e.g. `chatgpt.com`, `claude.ai`, `gemini.google.com`).
- */
 export function resolveSiteAdapter(
   host: string = window.location.hostname,
   adapters: readonly SiteAdapter[] = SUPPORTED_SITES,
@@ -67,28 +52,22 @@ export function resolveSiteAdapter(
   return adapters.find((adapter) => adapter.matches(host)) ?? null;
 }
 
-/**
- * Text currently typed into a composer element (textarea or contenteditable).
- */
+/** Works for both textarea and contenteditable composers. */
 function readDraftText(element: Element): string {
   const text = element instanceof HTMLTextAreaElement ? element.value : element.textContent;
   return (text ?? '').trim();
 }
 
-/**
- * Watches the page through `adapter` and calls `onCompleted` with `{ t0, tStreamStart, t1 }`
- * once per finished prompt/response cycle. Returns a cleanup function.
- */
+/** Calls `onCompleted` once per finished prompt/response cycle. Returns a cleanup function. */
 export function observeTurns(
   adapter: SiteAdapter,
   onCompleted: (timings: TurnTimings) => void,
 ): () => void {
-  /** Prompt send time, null while no prompt is in flight. */
+  /** Null while no prompt is in flight. */
   let t0: number | null = null;
   let tStreamStart: number | null = null;
-  /** User prompt count before the current prompt. A higher count means a new prompt was sent. */
+  /** Counts before the current prompt: a higher count means a new prompt / its response exists. */
   let baselineUserCount = adapter.countUserMessages();
-  /** Response count before the current prompt. A higher count means its response exists. */
   let baselineCount = adapter.countResponses();
   let lastText = '';
   /** Last time the response text changed or the site showed its generating indicator. */
@@ -96,13 +75,9 @@ export function observeTurns(
   let sawGenerating = false;
   let timer: number | null = null;
   let timerDue = 0;
-  /** Last logged detection state, so only changes are logged (see `logState`). */
   let lastLoggedState = '';
 
-  /**
-   * Logs what the strategy currently detects while a prompt is in flight, once per change.
-   * Makes a stuck capture debuggable from the page console without reading the DOM by hand.
-   */
+  /** Logs detection state on change, so a stuck capture is debuggable from the page console. */
   const logState = (generating: boolean, userCount: number, count: number) => {
     const state =
       `generating=${generating} users=${userCount}/${baselineUserCount} ` +
@@ -157,7 +132,6 @@ export function observeTurns(
     const count = adapter.countResponses();
 
     if (t0 === null) {
-      // A new user message appeared together with a generating state or without a matching new response yet
       const userPromptJustAppeared =
         userCount > baselineUserCount && (generating || count <= baselineCount);
       if (!generating && !userPromptJustAppeared) {
@@ -249,14 +223,8 @@ export function observeTurns(
   };
 }
 
-/**
- * Consolidates the site adapter's DOM reads and timing markers (`t0`, `tStreamStart`, `t1`)
- * into a structured-clone-safe `ChatCaptureDto` once the response stream has finished.
- */
 export function buildChatCaptureDto(adapter: SiteAdapter, timings: TurnTimings): ChatCaptureDto {
-  // Delta between t(0) (user sent prompt) and start of visible stream -> thinking time
   const thinkingTimeMs = Math.max(0, timings.tStreamStart - timings.t0);
-  // Delta between t(0) (user sent prompt) and t(1) (response stream finished) -> total latency
   const latencyMs = Math.max(0, timings.t1 - timings.t0);
 
   return {
@@ -273,10 +241,6 @@ export function buildChatCaptureDto(adapter: SiteAdapter, timings: TurnTimings):
   };
 }
 
-/**
- * Sends the consolidated `ChatCaptureDto` across the MV3 runtime boundary (`ESTIMATE_PROMPT`)
- * so that `message.handler.ts` routes it directly into `handleEstimation` in `estimation.handler.ts`.
- */
 export function dispatchCaptureToEstimationHandler(dto: ChatCaptureDto): void {
   const message: EstimatePromptMessage = {
     type: 'ESTIMATE_PROMPT',
@@ -292,11 +256,6 @@ export function dispatchCaptureToEstimationHandler(dto: ChatCaptureDto): void {
   }
 }
 
-/**
- * Starts the consolidated DOM capture strategy on the current page.
- * Watches the page through the matching site adapter, consolidates each finished turn into a
- * `ChatCaptureDto`, and dispatches it to `estimation.handler.ts`.
- */
 export function startDomCaptureStrategy(
   onCapture: OnCaptureReady = dispatchCaptureToEstimationHandler,
   host: string = window.location.hostname,
@@ -310,7 +269,6 @@ export function startDomCaptureStrategy(
 
   return observeTurns(adapter, (timings) => {
     const dto = buildChatCaptureDto(adapter, timings);
-    // Only dispatch when the finished turn actually has text
     if (!dto.response && !dto.userInput) {
       console.info(LOG_PREFIX, 'capture dropped: prompt and response text are empty', dto);
       return;
@@ -320,9 +278,6 @@ export function startDomCaptureStrategy(
   });
 }
 
-/**
- * Object facade implementing `ReaderStrategy` for consumers that expect the strategy contract.
- */
 export const domCaptureStrategy: ReaderStrategy = {
   start: startDomCaptureStrategy,
 };

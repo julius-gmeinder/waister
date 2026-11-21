@@ -1,16 +1,7 @@
 /**
- * EstimationService: estimates the **hidden** tokens of a prompt and assembles the final
- * `TokenEstimateDto`.
- *
- *   - `thinking`: reasoning tokens inferred from `thinkingTimeMs`, the model's output speed
- *     (`tokensPerMsThinking`) and the `thinkingEffort` multiplier.
- *   - `overhead`: system prompt + tool definitions per model (`systemPromptTokens`).
- *
- * The per-model numbers live in `model-profiles.ts`. The visible counts (input, history, output)
- * come from TokenizerService. The handler passes them in, so services don't call each other.
- *
- * Also computes the environmental impact (energy-lookup.json). That stays in the background
- * and is not shown in the popup.
+ * EstimationService: estimates the hidden tokens (thinking, overhead) and assembles the
+ * `TokenEstimateDto`. Visible counts are passed in by the handler, so services don't call each
+ * other.
  *
  * Context: background
  * Docs: docs/modules.md#estimation-service, docs/pipeline.md
@@ -35,13 +26,10 @@ import {
   THINKING_EFFORT_MULTIPLIERS,
 } from './model-profiles';
 
-/** Visible token counts as produced by TokenizerService. */
 export type VisibleTokenCounts = Pick<TokenBreakdown, 'input' | 'history' | 'output'> & {
-  /** True if a heuristic (not the provider's exact) tokenizer was used. */
   approximate: boolean;
 };
 
-/** Hidden token estimate produced by `estimateHiddenTokens`. */
 export type HiddenTokenEstimate = Pick<TokenBreakdown, 'thinking' | 'overhead'> & {
   /** False if the model was unknown and a provider default profile was used. */
   exactModelMatch: boolean;
@@ -60,9 +48,6 @@ export function estimateThinkingTokens(
   return Math.round(effectiveMs * tokensPerMsThinking * effortMultiplier);
 }
 
-/**
- * Estimates the hidden tokens (thinking + overhead) for a capture from its model profile.
- */
 export function estimateHiddenTokens(capture: ChatCaptureDto): HiddenTokenEstimate {
   const profile = resolveHiddenTokenProfile(capture.provider, capture.model);
   return {
@@ -76,18 +61,12 @@ export function estimateHiddenTokens(capture: ChatCaptureDto): HiddenTokenEstima
   };
 }
 
-/**
- * Rounds a number to 4 decimal places so small single-prompt Wh / mL values remain readable.
- */
+/** 4 decimals, so tiny single-prompt Wh / mL values don't round to 0. */
 function roundMetric(value: number): number {
   return Math.round(value * 10000) / 10000;
 }
 
-/**
- * Calculates energy (Wh), water (mL), and carbon (gCO2e) usage for a given `totalTokens` count
- * by scaling the 1M-token lookup rate (`totalTokens / 1_000_000 * ratePer1M`).
- * Background only, not displayed.
- */
+/** Energy (Wh), water (mL) and CO2 (g) for `totalTokens`. Saved, but not displayed. */
 export function calculateEnvironmentalImpact(
   totalTokens: number,
   provider: Provider,
@@ -104,10 +83,6 @@ export function calculateEnvironmentalImpact(
   };
 }
 
-/**
- * Combines visible + hidden counts into the breakdown, sums `totalTokens`
- * (input + history + output + thinking + overhead) and builds the `TokenEstimateDto`.
- */
 export function buildTokenEstimateDto(
   capture: ChatCaptureDto,
   visible: VisibleTokenCounts,

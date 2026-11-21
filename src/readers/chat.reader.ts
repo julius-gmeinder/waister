@@ -1,7 +1,5 @@
 /**
- * ChatReader facade: delegates to `dom-capture.strategy.ts` which consolidates all site adapters
- * (WHERE) with the timing/stream-completion logic (WHEN) and builds one `ChatCaptureDto` per
- * finished prompt.
+ * ChatReader facade: re-exports the DOM capture strategy.
  *
  * Context: content script
  * Docs: docs/modules.md#readers, docs/dto.md

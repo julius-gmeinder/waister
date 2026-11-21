@@ -1,8 +1,5 @@
 /**
- * SiteAdapter for Claude (claude.ai). Provider: anthropic.
- *
- * Responsibility: Only knows Claude's DOM and exposes selectors/reads.
- * Timing (when a prompt was sent / finished) lives in dom-capture.strategy.
+ * SiteAdapter for Claude (claude.ai).
  *
  * Context: content script
  * Docs: docs/modules.md#site-adapters
@@ -11,40 +8,25 @@
 import type { ChatTurn, ModelInfo, ThinkingEffort } from '../../dto/chat-capture.dto';
 import type { SiteAdapter } from './site-adapter.types';
 
-/**
- * Centralized DOM selectors for Claude (claude.ai).
- * Kept at the top of the file so UI updates only require selector adjustments here.
- */
 export const CLAUDE_SELECTORS = {
-  /** ProseMirror contenteditable input box in the Claude composer. */
   promptInput: 'div.ProseMirror[contenteditable="true"], [data-testid="chat-input"]',
-  /** Send button in the Claude composer. */
   sendButton:
     'button[aria-label="Send Message"], button[aria-label="Send message"], button[aria-label*="Send"], fieldset button[type="button"]:last-of-type',
-  /** Stop button visible while Claude is streaming an answer. */
   stopButton:
     'button[aria-label="Stop Response"], button[aria-label="Stop response"], button[aria-label="Stop generating"], button[aria-label*="Stop"]',
-  /** Active streaming attribute placed on the streaming container by Claude's frontend. */
   streamingContainer: '[data-is-streaming="true"]',
-  /** User turn containers in the conversation list. */
   userMessage: '[data-testid="user-message"], .font-user-message',
-  /** Assistant turn containers in the conversation list. */
   assistantMessage:
     '.font-claude-message, .font-claude-response, [data-testid="assistant-message"]',
-  /** Combined selector matching user and assistant turns in document order. */
+  /** User and assistant turns in document order. */
   allTurns:
     '[data-testid="user-message"], .font-user-message, .font-claude-message, .font-claude-response, [data-testid="assistant-message"]',
-  /** Model selector dropdown trigger showing the active Claude model (e.g. "Claude 3.7 Sonnet"). */
   modelSelector: '[data-testid="model-selector-dropdown"], button[aria-label*="Model"]',
-  /** Extended thinking indicator / collapsible thought block in the UI. */
   extendedThinkingIndicator:
     '[data-testid*="thinking"], button[aria-label*="Extended thinking"], [aria-expanded][class*="thinking"]',
 } as const;
 
-/**
- * Parses Claude's raw model dropdown label (e.g. "Claude 3.7 Sonnet", "Claude 4.5 Sonnet")
- * into normalized ModelInfo fields.
- */
+/** Parses dropdown labels like "Claude 3.7 Sonnet", "Claude 4.5 Sonnet". */
 function parseClaudeModel(rawLabel: string, hasExtendedThinking: boolean): ModelInfo {
   const cleaned = rawLabel.trim();
   const lower = cleaned.toLowerCase();
@@ -76,17 +58,11 @@ function parseClaudeModel(rawLabel: string, hasExtendedThinking: boolean): Model
   };
 }
 
-/**
- * Extracts trimmed text content from a DOM element.
- */
 function extractCleanText(element: Element | null | undefined): string {
   if (!element) return '';
   return (element.textContent ?? '').trim();
 }
 
-/**
- * Claude site adapter implementation.
- */
 export const claudeSite: SiteAdapter = {
   provider: 'anthropic',
 
@@ -136,7 +112,7 @@ export const claudeSite: SiteAdapter = {
       }
     }
 
-    // Exclude the latest user prompt and latest assistant response
+    // The latest prompt and its answer (if rendered yet) are the capture, not history.
     if (turns.length >= 2 && turns[turns.length - 1]?.role === 'assistant') {
       return turns.slice(0, -2);
     }
