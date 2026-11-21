@@ -12,6 +12,7 @@ All project documentation lives in this folder.
 | [pipeline.md](pipeline.md)                   | The estimation pipeline step by step, and how the single number is built      |
 | [dto.md](dto.md)                             | Field reference for all DTOs                                                  |
 | [build-and-tooling.md](build-and-tooling.md) | Existing build scripts and configs, and what has to change for the new layout |
+| [styling.md](styling.md)                     | Logos, color variables and icons of the popup                                 |
 | [decisions/](#architecture-decision-records) | Architecture decision records (ADRs)                                          |
 
 Using and debugging the extension in Chrome and Firefox: root [README.md](../README.md).
@@ -33,3 +34,4 @@ _Superseded by NNNN_ instead.
 | 0007 | [Response as its own DTO field](decisions/0007-response-field.md)                                   | Accepted           |
 | 0008 | [Turn detection in the strategy](decisions/0008-turn-detection-in-strategy.md)                      | Accepted           |
 | 0009 | [Save every prompt to SQLite, popup reads only the database](decisions/0009-sqlite-prompt-store.md) | Accepted           |
+| 0010 | [Popup built with React + TSX components](decisions/0010-react-popup.md)                            | Accepted           |

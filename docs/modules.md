@@ -13,7 +13,7 @@ approximations, and the readers depend on each site's current DOM.
 | [`readers/`](#readers)   | Reads the chat page → `ChatCaptureDto` | content script       |
 | [`handlers/`](#handlers) | Orchestration (messages, estimation)   | background           |
 | [`services/`](#services) | Tokenizing, estimating, storing        | background           |
-| [`ui/`](#ui)             | Popup that shows the last 24h of usage | popup                |
+| [`ui/`](#ui)             | React popup, shows the last 24h usage  | popup                |
 | [`dto/`](#dtos)          | Data contracts between layers          | shared               |
 | [`messages/`](#messages) | `chrome.runtime` message contracts     | shared               |
 
@@ -24,11 +24,14 @@ approximations, and the readers depend on each site's current DOM.
 `src/entries/`: one file per runtime context. These are the esbuild entry points and contain
 **wiring only**: no logic, just "pick the parts, connect them, register listeners".
 
-| File                  | Bundle                  | Context    | Wires up                                     |
-| --------------------- | ----------------------- | ---------- | -------------------------------------------- |
-| `content.entry.ts`    | `content.js` (IIFE)     | content    | site adapter + reader strategy → chat reader |
-| `background.entry.ts` | `background.js` (ESM)   | background | `chrome.runtime.onMessage` → message handler |
-| `popup.entry.ts`      | `popup/index.js` (IIFE) | popup      | `ui/popup/popup.view`                        |
+| File                  | Bundle                  | Context    | Wires up                                        |
+| --------------------- | ----------------------- | ---------- | ----------------------------------------------- |
+| `content.entry.ts`    | `content.js` (IIFE)     | content    | site adapter + reader strategy → chat reader    |
+| `background.entry.ts` | `background.js` (ESM)   | background | `chrome.runtime.onMessage` → message handler    |
+| `popup.entry.tsx`     | `popup/index.js` (IIFE) | popup      | imports popup CSS + fonts, mounts `<PopupApp/>` |
+
+`css-imports.d.ts` is type-only: it declares `*.css` modules so that `tsc` accepts the CSS
+imports in `popup.entry.tsx` (TypeScript 6 checks side-effect imports).
 
 Why ESM for the background and IIFE for the others: see
 [build-and-tooling.md](build-and-tooling.md#scriptsbuildmjs). `scripts/build.mjs` still points at
@@ -221,32 +224,47 @@ It also computes an environmental `impact` (`energyWh`, `waterMl`, `co2Grams`) f
 
 ## UI
 
-`src/ui/` (popup): everything the user sees. For now that's just the toolbar popup.
+`src/ui/` (popup): the toolbar popup, a **React + TSX** app
+([ADR 0010](decisions/0010-react-popup.md)). `ui/` itself is the popup root. When opened, the
+popup asks the database for the last 24 hours (`GET_USAGE_SUMMARY { sinceMs: now − 24 h }`) and
+shows the summed `totalTokens`, the breakdown (input, history, output, thinking, overhead) and
+the prompt count. It never talks to the estimation pipeline. The layout is deliberately plain for
+now.
 
-May import: `dto/`, `messages/`. Must not import: `handlers/`, `services/`, `readers/`.
+```
+popup.html                            <div id="root">, loads index.js + index.css
+popup.css                             one stylesheet for all components (fonts: styling.md#fonts)
+popup.app.tsx                         PopupApp: fetches the summary, holds the state
+components/
+  header.component.tsx                Header: full logo, centered (/logo/waister-full.svg)
+  total.component.tsx                 Total: icon + summed token count
+  breakdown.component.tsx             Breakdown: the five rows (order, labels, icons)
+  breakdown-row.component.tsx         BreakdownRow: icon, label, count of one part
+```
 
-### Popup
+| File                     | Role                                                                    | Copied/bundled to                                                                     |
+| ------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `popup.html`             | Markup shell, only `#root`                                              | `popup/index.html`                                                                    |
+| `popup.css`              | Styles (plain class names, colors from [styling.md](styling.md#colors)) | bundled with the fonts into `popup/index.css` (imported by `entries/popup.entry.tsx`) |
+| `popup.app.tsx`          | `PopupApp`: sends `GET_USAGE_SUMMARY` in a `useEffect`, renders below   | bundled via `entries/popup.entry.tsx`                                                 |
+| `components/*.component` | Presentational components. They only render props and fetch nothing     | bundled via `entries/popup.entry.tsx`                                                 |
 
-`src/ui/popup/`: when opened, the popup asks the database for the last 24 hours
-(`GET_USAGE_SUMMARY { sinceMs: now − 24 h }`) and shows the summed `totalTokens`, the breakdown
-(input, history, output, thinking, overhead) and the prompt count. It never talks to the
-estimation pipeline. The layout is deliberately plain for now.
+- **State:** `PopupApp` holds one `UsageSummaryDto | null | undefined` (`undefined` = loading,
+  `null` = no answer from the background). Components get plain values and show `–` while a
+  value is `undefined`.
+- **Data flow:** only `popup.app.tsx` talks to `chrome.runtime`. Components never send
+  messages.
+- The popup only lives while it is open, so nothing persists between openings.
+- **Naming:** kebab-case file, PascalCase export (`breakdown-row.component.tsx` →
+  `BreakdownRow`). Function components only.
 
-| File            | Role                                   | Copied/bundled to                    |
-| --------------- | -------------------------------------- | ------------------------------------ |
-| `popup.html`    | Markup, loads `index.js` + `index.css` | `popup/index.html`                   |
-| `popup.css`     | Styles                                 | `popup/index.css`                    |
-| `popup.view.ts` | Fetches the 24h summary and renders it | bundled via `entries/popup.entry.ts` |
+**Icons** come from [lucide-react](https://lucide.dev/icons/): import the component
+(`import { Coins } from 'lucide-react'`) and render `<Coins />`. Only imported icons get bundled.
+Size and color are set in `popup.css` (`.lucide`), and icons inherit `currentColor`. The icon
+list is in [styling.md](styling.md#icons).
 
-The popup only lives while it is open, so it keeps no state of its own.
-
-**Icons** come from [lucide](https://lucide.dev/icons/) (npm `lucide`, bundled into
-`popup/index.js`). `popup.html` holds `<i data-lucide="name">` placeholders, and `popup.view.ts`
-replaces them with inline SVGs through `createIcons`. Only the icons listed in `POPUP_ICONS` in
-`popup.view.ts` get bundled, so a new icon has to be added in two places: imported and listed in
-`POPUP_ICONS` as `PascalCase`, and used in the HTML as `kebab-case`. Size and color are set in
-`popup.css` (`.lucide`), and icons inherit `currentColor`. The icon list is in
-[styling.md](styling.md#icons).
+May import: `dto/`, `messages/`, `react`, `react-dom`, `lucide-react`. Must not import:
+`handlers/`, `services/`, `readers/`.
 
 ---
 

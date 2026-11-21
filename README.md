@@ -27,7 +27,7 @@ The extension is made of three parts, and each one is debugged in a different pl
 | -------------- | ----------------------------------------------------------- | --------------------------------------------- |
 | Background     | `src/entries/background.entry.ts`, `handlers/`, `services/` | Its own context (service worker / event page) |
 | Content script | `src/entries/content.entry.ts`, `readers/`                  | The supported chat sites (isolated world)     |
-| Popup          | `src/entries/popup.entry.ts`, `ui/popup/`                   | The toolbar popup, only while it is open      |
+| Popup          | `src/entries/popup.entry.tsx`, `ui/`                        | The toolbar popup, only while it is open      |
 
 `console.log` output from each part shows up in **that part's** DevTools, not in a shared
 console. In `npm run dev` builds, inline source maps let you see and set breakpoints in the
@@ -161,7 +161,7 @@ src/
   readers/          content:    DOM → ChatCaptureDto (sites/ = where, strategies/ = when)
   handlers/         background: message routing, EstimationHandler, UsageHandler
   services/         background: tokenizer/, estimation/, prompt-store/ (SQLite)
-  ui/popup/         popup:      shows the last 24h of token usage
+  ui/               popup:      React + TSX app, shows the last 24h of token usage
   dto/              shared:     ChatCaptureDto, TokenEstimateDto, PromptRecordDto, UsageSummaryDto
   messages/         shared:     chrome.runtime message contracts
 docs/               architecture, pipeline, DTOs, build/tooling, ADRs
@@ -175,7 +175,7 @@ All documentation lives in [`docs/`](docs/README.md); per-module reference: [`do
 
 The browser draws the toolbar button, the extensions page and the store listing itself, so it
 takes the extension icon from `src/manifest.json` (`icons`, plus `action.default_icon` for the
-toolbar). This is separate from the lucide icons inside the popup.
+toolbar). This is separate from the lucide-react icons inside the popup.
 
 `public/icons/icon{16,32,48,128}.png` are rendered from `public/logo/waister.svg`. Manifest
 icons must be PNG (Chrome doesn't accept SVG there). To regenerate them after changing the logo,

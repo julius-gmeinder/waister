@@ -28,15 +28,22 @@ esbuild build into `dist/waister/` (the unpacked extension you load in the brows
     every entry is a single self-contained file.
 - `bundle: true`, `target: 'es2022'`. With `--watch`: inline source maps, no minify. Without it:
   minified, no source maps.
+- `define: process.env.NODE_ENV` is `'development'` with `--watch` and `'production'` without it,
+  so the production popup bundles React without its dev checks
+  ([ADR 0010](decisions/0010-react-popup.md)).
 - **Static files** are copied after each successful build by the `copy-static` plugin
   (`[source, destination]`, skipped if the source doesn't exist):
-  `src/ui/popup/popup.html` → `popup/index.html`,
-  `src/ui/popup/popup.css` → `popup/index.css`, everything in `public/`, and
+  `src/ui/popup.html` → `popup/index.html`, everything in `public/`, and
   `node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm` → `sqlite3.wasm` (next to
   `background.js`).
 - Entries: `src/entries/background.entry.ts` → `background.js`,
-  `src/entries/content.entry.ts` → `content.js`, `src/entries/popup.entry.ts` →
-  `popup/index.js`.
+  `src/entries/content.entry.ts` → `content.js`, `src/entries/popup.entry.tsx` →
+  `popup/index.js` (React app, compiled from TSX by esbuild with no plugin).
+- **Popup CSS is bundled, not copied:** `popup.entry.tsx` imports `src/ui/popup.css` and the
+  Fontsource font CSS, so esbuild emits `popup/index.css` next to `popup/index.js`. In watch
+  mode a CSS change triggers a rebuild. Font files go through the `file` loader
+  (`.woff2`, `.woff`) and land in `popup/fonts/` (`assetNames: 'popup/fonts/[name]'`). See
+  [styling.md](styling.md#fonts).
 - Watch mode keeps one esbuild context per build alive.
 - **Manifest per browser:** after each build, `writeManifest()` writes
   `dist/waister/manifest.json` from `src/manifest.json`. By default (Chrome) it is copied
@@ -69,7 +76,8 @@ the `zip` CLI. Deletes an old zip of the same name first.
 ## TypeScript (`tsconfig.json`)
 
 Type-check only (`noEmit`; esbuild compiles). `target ES2022`, `module ESNext`,
-`moduleResolution Bundler`, libs `ES2022` + `DOM`, types `chrome`. Strict, plus
+`moduleResolution Bundler`, libs `ES2022` + `DOM`, types `chrome`, `jsx: react-jsx` (automatic
+JSX runtime, no `import React` needed; esbuild reads the same setting). Strict, plus
 `noUncheckedIndexedAccess`, `noImplicitOverride`, `noFallthroughCasesInSwitch`,
 `isolatedModules`, `verbatimModuleSyntax` (use `import type` for types).
 Includes `src/`.
@@ -80,7 +88,8 @@ Stub files end in `export {};` so that they count as modules under `isolatedModu
 
 `eslint.config.js` (flat config): `@eslint/js` recommended + `typescript-eslint` recommended +
 `eslint-config-prettier` (turns off formatting rules). Browser + webextension globals for
-`src/**/*.ts`, Node globals for `scripts/**/*.mjs` and root `*.js`.
+`src/**/*.{ts,tsx}`, Node globals for `scripts/**/*.mjs` and root `*.js`. No React-specific
+lint rules yet (`eslint-plugin-react-hooks` would be the next one to add).
 
 **Context boundaries (current config, written for the old layout):**
 
@@ -100,7 +109,7 @@ yet), via `no-restricted-imports` per folder:
 | `src/dto/**`                      | everything                                  |
 | `src/entries/content.entry.ts`    | `handlers/`, `services/`, `ui/`             |
 | `src/entries/background.entry.ts` | `readers/`, `ui/`                           |
-| `src/entries/popup.entry.ts`      | `readers/`, `handlers/`, `services/`        |
+| `src/entries/popup.entry.tsx`     | `readers/`, `handlers/`, `services/`        |
 
 ## Formatting and editor
 
