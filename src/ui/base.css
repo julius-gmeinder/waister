@@ -43,6 +43,14 @@
   --co2-strong: #5a7d00;
   --co2-soft: #e6f0b4;
   --co2-tint: #f8fbe8;
+
+  /* Glassmorphic tokens (Facts Page cards & ambient orbs). */
+  --glass-surface-top: rgba(255, 255, 255, 0.78);
+  --glass-surface-mid: rgba(255, 255, 255, 0.56);
+  --glass-border-specular: rgba(255, 255, 255, 0.72);
+  --glass-highlight-top: rgba(255, 255, 255, 0.92);
+  --glass-shadow: rgba(28, 25, 23, 0.06);
+  --glass-shadow-hover: rgba(28, 25, 23, 0.11);
 }
 
 body {

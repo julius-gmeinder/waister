@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it } from 'node:test';
 import * as esbuild from 'esbuild';
 
@@ -10,6 +12,7 @@ const bundled = await esbuild.build({
   stdin: {
     contents: `
       export { default as config } from './src/config/config.json';
+      export { default as factSheet } from './src/config/factSheet.json';
       export * from './src/services/conversion/conversion.service';
       export * from './src/services/estimation/estimation.service';
       export * from './src/services/estimation/model-profiles';
@@ -17,6 +20,7 @@ const bundled = await esbuild.build({
       export * from './src/readers/sites/effort-inference.helpers';
       export { buildModelInfo, unknownModel } from './src/readers/sites/site.helpers';
       export { parseChatGptSlug, parseChatGptLabel } from './src/readers/sites/chatgpt.site';
+      export * from './src/ui/app/pages/facts.helpers';
     `,
     resolveDir: process.cwd(),
     loader: 'ts',
@@ -32,6 +36,7 @@ const mod = await import(`data:text/javascript;base64,${Buffer.from(code).toStri
 
 const {
   config,
+  factSheet,
   calculateEnvironmentalImpact,
   convertTokensToImpact,
   resolveCategoryEffectiveMultiplier,
@@ -48,6 +53,10 @@ const {
   buildModelInfo,
   parseChatGptSlug,
   parseChatGptLabel,
+  formatFactKpiValue,
+  formatFactMultiplier,
+  getCandidateFacts,
+  shuffleFactsBoard,
 } = mod;
 
 describe('1. Config & UI Gauge Max Values', () => {
@@ -350,5 +359,78 @@ describe('4. System Prompt, Attachments & Tokenizer (TokenizerService & ModelPro
     const maxLabel = parseChatGptLabel('ChatGPT 6 Astra Maximum', true);
     assert.equal(maxLabel.name, 'gpt-astra');
     assert.equal(maxLabel.thinkingEffort, 'max');
+  });
+});
+
+describe('5. FactSheet Icon Library & Smart-Shuffle Logic', () => {
+  it('validates all 60 items in factSheet.json and verifies every SVG file exists with consistent attributes', () => {
+    const kpiKeys = Object.keys(factSheet.kpis);
+    assert.deepEqual(kpiKeys, ['power', 'water', 'co2']);
+
+    let total = 0;
+    for (const kpi of kpiKeys) {
+      const items = factSheet.kpis[kpi].items;
+      assert.equal(items.length, 20, `Expected 20 items for ${kpi}`);
+      for (const item of items) {
+        assert.ok(typeof item.icon === 'string' && item.icon.startsWith('icons/'));
+        assert.ok(item.icon.endsWith('.svg'));
+        assert.ok(item.iconSource === 'lucide' || item.iconSource === 'custom');
+
+        const svgPath = path.join(process.cwd(), 'public', item.icon);
+        assert.ok(fs.existsSync(svgPath), `Missing SVG asset: ${svgPath}`);
+        const svg = fs.readFileSync(svgPath, 'utf8');
+        assert.ok(svg.includes('viewBox="0 0 24 24"'));
+        assert.ok(svg.includes('fill="none"'));
+        assert.ok(svg.includes('stroke="currentColor"'));
+        assert.ok(svg.includes('stroke-width="1.75"'));
+        assert.ok(svg.includes('stroke-linecap="round"'));
+        assert.ok(svg.includes('stroke-linejoin="round"'));
+        total++;
+      }
+    }
+    assert.equal(total, 60);
+  });
+
+  it('formats multipliers and raw KPI values naturally and shuffles without cross-timeframe duplicates', () => {
+    assert.equal(formatFactMultiplier(36, 15).multiplierText, '~2.4×');
+    assert.equal(formatFactMultiplier(6.75, 15).multiplierText, '45% of');
+    assert.equal(formatFactMultiplier(180, 15).multiplierText, '~12×');
+    assert.equal(formatFactMultiplier(0, 15).isBaselineZero, true);
+
+    assert.equal(formatFactKpiValue('power', 15), '15 Wh');
+    assert.equal(formatFactKpiValue('power', 1500), '1.5 kWh');
+    assert.equal(formatFactKpiValue('water', 500), '500 mL');
+    assert.equal(formatFactKpiValue('water', 2000), '2 L');
+    assert.equal(formatFactKpiValue('co2', 80), '80 g CO₂e');
+    assert.equal(formatFactKpiValue('co2', 3000), '3 kg CO₂e');
+
+    // Filter window [0.25, 15]
+    const candidates = getCandidateFacts('power', 30, 'daily');
+    assert.ok(candidates.length > 0);
+    for (const c of candidates) {
+      const ratio = 30 / c.value;
+      assert.ok(ratio >= 0.25 && ratio <= 15);
+    }
+
+    // Board shuffle deduplicates across daily, weekly, allTime and rotates on re-shuffle
+    const mockSummaries = {
+      daily: { impact: { energyWh: 25, waterMl: 300, co2Grams: 18 } },
+      weekly: { impact: { energyWh: 180, waterMl: 2200, co2Grams: 160 } },
+      allTime: { impact: { energyWh: 1400, waterMl: 18000, co2Grams: 1200 } },
+    };
+    const board1 = shuffleFactsBoard(mockSummaries, null, () => 0.1);
+    for (const kpi of ['power', 'water', 'co2']) {
+      const ids = new Set([
+        board1.daily[kpi].item.id,
+        board1.weekly[kpi].item.id,
+        board1.allTime[kpi].item.id,
+      ]);
+      assert.equal(ids.size, 3, `Expected 3 distinct facts across timeframes for ${kpi}`);
+    }
+
+    const board2 = shuffleFactsBoard(mockSummaries, board1, () => 0.2);
+    for (const kpi of ['power', 'water', 'co2']) {
+      assert.notEqual(board2.daily[kpi].item.id, board1.daily[kpi].item.id);
+    }
   });
 });

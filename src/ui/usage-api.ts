@@ -10,9 +10,17 @@ import { useEffect, useState } from 'react';
 import { estimation } from '../config/config.json';
 import type { UsageSummaryDto } from '../dto/usage-summary.dto';
 import type { GetUsageSummaryMessage, UsageSummaryResponse } from '../messages/runtime-messages';
+import { timeframeSinceMs } from './timeframe.helpers';
 
 /** `undefined` while loading, `null` if the background had no answer. */
 export type SummaryState = UsageSummaryDto | null | undefined;
+
+/** Summaries for the three Facts Page timeframe sections. */
+export interface FactsSummaries {
+  daily: SummaryState;
+  weekly: SummaryState;
+  allTime: SummaryState;
+}
 
 /**
  * Fills the fields an older background service worker (not reloaded yet after an update) doesn't
@@ -111,4 +119,35 @@ export function useUsageSummary(sinceMs: number): SummaryState {
   }, [sinceMs]);
 
   return summary;
+}
+
+/**
+ * Fetches Daily (since local midnight), Weekly (last 7 days) and All-Time summaries in parallel
+ * for the Facts Page. Only for `*.app.tsx` roots.
+ */
+export function useFactsSummaries(): FactsSummaries {
+  const [summaries, setSummaries] = useState<FactsSummaries>({
+    daily: undefined,
+    weekly: undefined,
+    allTime: undefined,
+  });
+
+  useEffect(() => {
+    let ignore = false;
+    const nowMs = Date.now();
+    void Promise.all([
+      fetchUsageSummary(timeframeSinceMs('today', nowMs)),
+      fetchUsageSummary(timeframeSinceMs('week', nowMs)),
+      fetchUsageSummary(timeframeSinceMs('all', nowMs)),
+    ]).then(([daily, weekly, allTime]) => {
+      if (!ignore) {
+        setSummaries({ daily, weekly, allTime });
+      }
+    });
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  return summaries;
 }

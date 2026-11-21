@@ -1,0 +1,731 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "description": "Everyday perspective benchmarks for AI prompt energy, water, and CO2 consumption.",
+    "assumptions": {
+      "gridCarbonIntensity_gCO2ePerKWh": 400,
+      "gasCarEmissions_gCO2PerKm": 200,
+      "virtualWaterNote": "Items with isVirtualWater=true represent embedded agricultural/manufacturing water footprints rather than direct tap water."
+    },
+    "tiers": ["micro", "daily", "weekly", "heavy"],
+    "shuffleDefaults": {
+      "minRatio": 0.25,
+      "maxRatio": 15
+    }
+  },
+  "kpis": {
+    "power": {
+      "label": "Power",
+      "baseUnit": "Wh",
+      "displayUnits": {
+        "small": "Wh",
+        "large": "kWh",
+        "largeThreshold": 1000
+      },
+      "items": [
+        {
+          "id": "power-phone-screen-1min",
+          "tier": "micro",
+          "value": 0.05,
+          "unit": "Wh",
+          "equivalent": "1 minute of smartphone screen-on time",
+          "shortCopy": "Keeping your phone screen awake for 1 min",
+          "icon": "icons/smartphone.svg",
+          "iconHint": "smartphone",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "power-led-bulb-1min",
+          "tier": "micro",
+          "value": 0.15,
+          "unit": "Wh",
+          "equivalent": "1 minute of a 9W LED lightbulb",
+          "shortCopy": "Lighting a room with an LED bulb for 1 min",
+          "icon": "icons/lightbulb.svg",
+          "iconHint": "lightbulb",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "power-web-search",
+          "tier": "micro",
+          "value": 0.3,
+          "unit": "Wh",
+          "equivalent": "1 classic web search",
+          "shortCopy": "Running 1 standard web search",
+          "icon": "icons/search.svg",
+          "iconHint": "search",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "power-wireless-earbuds-charge",
+          "tier": "micro",
+          "value": 0.5,
+          "unit": "Wh",
+          "equivalent": "Fully charging wireless earbuds",
+          "shortCopy": "Charging a pair of wireless earbuds (0–100%)",
+          "icon": "icons/headphones.svg",
+          "iconHint": "headphones / earbuds",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "power-tv-1min",
+          "tier": "micro",
+          "value": 1.5,
+          "unit": "Wh",
+          "equivalent": "1 minute of watching a 55\" LED TV",
+          "shortCopy": "Watching 1 min of streaming on a 55\" TV",
+          "icon": "icons/tv.svg",
+          "iconHint": "tv",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "power-smartwatch-charge",
+          "tier": "micro",
+          "value": 2,
+          "unit": "Wh",
+          "equivalent": "Fully charging a smartwatch",
+          "shortCopy": "A full smartwatch charge",
+          "icon": "icons/watch.svg",
+          "iconHint": "watch",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "power-microwave-15sec",
+          "tier": "micro",
+          "value": 5,
+          "unit": "Wh",
+          "equivalent": "15 seconds in a microwave (1,200W)",
+          "shortCopy": "Running a microwave for 15 sec",
+          "icon": "icons/microwave.svg",
+          "iconHint": "microwave",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "power-led-bulb-1hr",
+          "tier": "daily",
+          "value": 10,
+          "unit": "Wh",
+          "equivalent": "1 hour of a 10W LED lightbulb",
+          "shortCopy": "Leaving an LED lightbulb on for 1 hr",
+          "icon": "icons/lamp.svg",
+          "iconHint": "lamp",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "power-smartphone-charge",
+          "tier": "daily",
+          "value": 15,
+          "unit": "Wh",
+          "equivalent": "Fully charging a smartphone",
+          "shortCopy": "A full smartphone charge (0–100%)",
+          "icon": "icons/smartphone-charging.svg",
+          "iconHint": "smartphone-charging",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "power-microwave-1min",
+          "tier": "daily",
+          "value": 20,
+          "unit": "Wh",
+          "equivalent": "1 minute in a microwave (1,200W)",
+          "shortCopy": "Microwaving leftovers for 1 min",
+          "icon": "icons/microwave.svg",
+          "iconHint": "microwave / timer",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "power-toaster-2slices",
+          "tier": "daily",
+          "value": 35,
+          "unit": "Wh",
+          "equivalent": "Toasting 2 slices of bread",
+          "shortCopy": "Making 2 slices of toast",
+          "icon": "icons/toaster.svg",
+          "iconHint": "toaster / bread slice",
+          "iconSource": "custom"
+        },
+        {
+          "id": "power-laptop-charge",
+          "tier": "daily",
+          "value": 60,
+          "unit": "Wh",
+          "equivalent": "Fully charging a standard laptop",
+          "shortCopy": "A full laptop battery charge",
+          "icon": "icons/laptop.svg",
+          "iconHint": "laptop",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "power-kettle-1l",
+          "tier": "weekly",
+          "value": 105,
+          "unit": "Wh",
+          "equivalent": "Boiling 1 liter of water in a kettle",
+          "shortCopy": "Boiling 1 L of water in an electric kettle",
+          "icon": "icons/electric-kettle.svg",
+          "iconHint": "electric kettle",
+          "iconSource": "custom"
+        },
+        {
+          "id": "power-hairdryer-5min",
+          "tier": "weekly",
+          "value": 150,
+          "unit": "Wh",
+          "equivalent": "Blow-drying hair for 5 minutes (1,800W)",
+          "shortCopy": "Blow-drying your hair for 5 min",
+          "icon": "icons/hairdryer.svg",
+          "iconHint": "hairdryer / wind",
+          "iconSource": "custom"
+        },
+        {
+          "id": "power-ev-1km",
+          "tier": "weekly",
+          "value": 180,
+          "unit": "Wh",
+          "equivalent": "Driving an EV for 1 kilometer",
+          "shortCopy": "Driving an electric car 1 km",
+          "icon": "icons/electric-car.svg",
+          "iconHint": "car + zap (electric vehicle)",
+          "iconSource": "custom"
+        },
+        {
+          "id": "power-console-gaming-1hr",
+          "tier": "weekly",
+          "value": 250,
+          "unit": "Wh",
+          "equivalent": "1 hour of console gaming (console + TV)",
+          "shortCopy": "1 hr of console gaming on a TV",
+          "icon": "icons/gamepad-2.svg",
+          "iconHint": "gamepad-2",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "power-washing-machine-cycle",
+          "tier": "heavy",
+          "value": 700,
+          "unit": "Wh",
+          "equivalent": "1 washing machine cycle (30–40°C)",
+          "shortCopy": "Running 1 standard load of laundry",
+          "icon": "icons/washing-machine.svg",
+          "iconHint": "washing-machine",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "power-dishwasher-cycle",
+          "tier": "heavy",
+          "value": 1000,
+          "unit": "Wh",
+          "equivalent": "1 eco dishwasher cycle (1 kWh)",
+          "shortCopy": "Running 1 full dishwasher cycle",
+          "icon": "icons/dishwasher.svg",
+          "iconHint": "dishwasher",
+          "iconSource": "custom"
+        },
+        {
+          "id": "power-fridge-24hr",
+          "tier": "heavy",
+          "value": 1500,
+          "unit": "Wh",
+          "equivalent": "Running a modern fridge for 24 hours",
+          "shortCopy": "Powering a refrigerator for a full day",
+          "icon": "icons/refrigerator.svg",
+          "iconHint": "refrigerator",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "power-tumble-dryer-cycle",
+          "tier": "heavy",
+          "value": 2500,
+          "unit": "Wh",
+          "equivalent": "1 full tumble dryer cycle (2.5 kWh)",
+          "shortCopy": "Drying 1 load of laundry in a dryer",
+          "icon": "icons/tumble-dryer.svg",
+          "iconHint": "tumble dryer",
+          "iconSource": "custom"
+        }
+      ]
+    },
+    "water": {
+      "label": "Water",
+      "baseUnit": "mL",
+      "displayUnits": {
+        "small": "mL",
+        "large": "L",
+        "largeThreshold": 1000
+      },
+      "items": [
+        {
+          "id": "water-single-drop",
+          "tier": "micro",
+          "value": 0.05,
+          "unit": "mL",
+          "equivalent": "1 single drop of water",
+          "shortCopy": "1 drop of water",
+          "isVirtualWater": false,
+          "icon": "icons/droplet.svg",
+          "iconHint": "droplet",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "water-eyedropper",
+          "tier": "micro",
+          "value": 1,
+          "unit": "mL",
+          "equivalent": "1 eyedropper squeeze (~20 drops)",
+          "shortCopy": "1 full eyedropper of water",
+          "isVirtualWater": false,
+          "icon": "icons/pipette.svg",
+          "iconHint": "pipette",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "water-teaspoon",
+          "tier": "micro",
+          "value": 5,
+          "unit": "mL",
+          "equivalent": "1 level teaspoon",
+          "shortCopy": "1 teaspoon of water",
+          "isVirtualWater": false,
+          "icon": "icons/spoon.svg",
+          "iconHint": "spoon (teaspoon)",
+          "iconSource": "custom"
+        },
+        {
+          "id": "water-tablespoon",
+          "tier": "micro",
+          "value": 15,
+          "unit": "mL",
+          "equivalent": "1 tablespoon",
+          "shortCopy": "1 tablespoon of water",
+          "isVirtualWater": false,
+          "icon": "icons/spoon.svg",
+          "iconHint": "spoon (tablespoon)",
+          "iconSource": "custom"
+        },
+        {
+          "id": "water-espresso-shot",
+          "tier": "micro",
+          "value": 30,
+          "unit": "mL",
+          "equivalent": "1 single espresso shot (liquid)",
+          "shortCopy": "1 shot of espresso (liquid volume)",
+          "isVirtualWater": false,
+          "icon": "icons/espresso-cup.svg",
+          "iconHint": "coffee (small espresso cup)",
+          "iconSource": "custom"
+        },
+        {
+          "id": "water-faucet-1sec",
+          "tier": "daily",
+          "value": 100,
+          "unit": "mL",
+          "equivalent": "1 second of a running kitchen faucet",
+          "shortCopy": "Running the kitchen tap for 1 sec",
+          "isVirtualWater": false,
+          "icon": "icons/kitchen-faucet.svg",
+          "iconHint": "faucet / tap",
+          "iconSource": "custom"
+        },
+        {
+          "id": "water-shower-1sec",
+          "tier": "daily",
+          "value": 150,
+          "unit": "mL",
+          "equivalent": "1 second of a standard shower",
+          "shortCopy": "Running a shower for 1 sec",
+          "isVirtualWater": false,
+          "icon": "icons/shower-head.svg",
+          "iconHint": "shower-head",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "water-drinking-glass",
+          "tier": "daily",
+          "value": 250,
+          "unit": "mL",
+          "equivalent": "1 standard drinking glass",
+          "shortCopy": "1 glass of drinking water",
+          "isVirtualWater": false,
+          "icon": "icons/glass-water.svg",
+          "iconHint": "glass-water",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "water-soda-can",
+          "tier": "daily",
+          "value": 330,
+          "unit": "mL",
+          "equivalent": "1 standard soda can",
+          "shortCopy": "1 beverage can of water",
+          "isVirtualWater": false,
+          "icon": "icons/soda-can.svg",
+          "iconHint": "beverage can",
+          "iconSource": "custom"
+        },
+        {
+          "id": "water-bottle-500ml",
+          "tier": "daily",
+          "value": 500,
+          "unit": "mL",
+          "equivalent": "1 small bottled water (0.5 L)",
+          "shortCopy": "1 standard 500 mL water bottle",
+          "isVirtualWater": false,
+          "icon": "icons/water-bottle.svg",
+          "iconHint": "water bottle (small)",
+          "iconSource": "custom"
+        },
+        {
+          "id": "water-bottle-1l",
+          "tier": "weekly",
+          "value": 1000,
+          "unit": "mL",
+          "equivalent": "1 large reusable water bottle (1 L)",
+          "shortCopy": "Filling a 1 L reusable bottle",
+          "isVirtualWater": false,
+          "icon": "icons/reusable-flask.svg",
+          "iconHint": "reusable flask / bottle",
+          "iconSource": "custom"
+        },
+        {
+          "id": "water-daily-drinking",
+          "tier": "weekly",
+          "value": 2000,
+          "unit": "mL",
+          "equivalent": "1 person's daily drinking water (2 L)",
+          "shortCopy": "A full day's drinking water for 1 person",
+          "isVirtualWater": false,
+          "icon": "icons/water-pitcher.svg",
+          "iconHint": "jug / pitcher of water",
+          "iconSource": "custom"
+        },
+        {
+          "id": "water-a4-paper",
+          "tier": "weekly",
+          "value": 5000,
+          "unit": "mL",
+          "equivalent": "Making 1 sheet of A4 paper (production)",
+          "shortCopy": "Water used to produce 1 sheet of A4 paper",
+          "isVirtualWater": true,
+          "icon": "icons/file-text.svg",
+          "iconHint": "file-text (paper sheet)",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "water-toilet-flush",
+          "tier": "weekly",
+          "value": 6000,
+          "unit": "mL",
+          "equivalent": "1 modern toilet flush (6 L)",
+          "shortCopy": "1 low-flow toilet flush",
+          "isVirtualWater": false,
+          "icon": "icons/toilet.svg",
+          "iconHint": "toilet",
+          "iconSource": "custom"
+        },
+        {
+          "id": "water-shower-1min",
+          "tier": "weekly",
+          "value": 9000,
+          "unit": "mL",
+          "equivalent": "1 minute in a standard shower (9 L)",
+          "shortCopy": "1 min in the shower",
+          "isVirtualWater": false,
+          "icon": "icons/shower-head.svg",
+          "iconHint": "shower-head + timer",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "water-dishwasher-cycle",
+          "tier": "heavy",
+          "value": 12000,
+          "unit": "mL",
+          "equivalent": "1 modern dishwasher cycle (12 L)",
+          "shortCopy": "1 eco dishwasher cycle",
+          "isVirtualWater": false,
+          "icon": "icons/dishwasher.svg",
+          "iconHint": "dishwasher",
+          "iconSource": "custom"
+        },
+        {
+          "id": "water-handwash-dishes",
+          "tier": "heavy",
+          "value": 25000,
+          "unit": "mL",
+          "equivalent": "Washing a sink of dishes by hand (25 L)",
+          "shortCopy": "Hand-washing a full load of dishes",
+          "isVirtualWater": false,
+          "icon": "icons/sink-dishes.svg",
+          "iconHint": "sink / bubbles / dishes",
+          "iconSource": "custom"
+        },
+        {
+          "id": "water-washing-machine-load",
+          "tier": "heavy",
+          "value": 50000,
+          "unit": "mL",
+          "equivalent": "1 modern washing machine load (50 L)",
+          "shortCopy": "1 front-load washing machine cycle",
+          "isVirtualWater": false,
+          "icon": "icons/washing-machine.svg",
+          "iconHint": "washing-machine",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "water-shower-10min",
+          "tier": "heavy",
+          "value": 90000,
+          "unit": "mL",
+          "equivalent": "A 10-minute shower (90 L)",
+          "shortCopy": "Taking a 10-min shower",
+          "isVirtualWater": false,
+          "icon": "icons/bath.svg",
+          "iconHint": "bath / long shower",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "water-coffee-production",
+          "tier": "heavy",
+          "value": 140000,
+          "unit": "mL",
+          "equivalent": "Producing 1 cup of coffee (production)",
+          "shortCopy": "Water footprint of producing 1 cup of coffee",
+          "isVirtualWater": true,
+          "icon": "icons/coffee.svg",
+          "iconHint": "coffee beans / cup",
+          "iconSource": "lucide"
+        }
+      ]
+    },
+    "co2": {
+      "label": "CO₂ Emissions",
+      "baseUnit": "g",
+      "displayUnits": {
+        "small": "g CO₂e",
+        "large": "kg CO₂e",
+        "largeThreshold": 1000
+      },
+      "items": [
+        {
+          "id": "co2-car-1m",
+          "tier": "micro",
+          "value": 0.2,
+          "unit": "g",
+          "equivalent": "Driving a gas car 1 meter",
+          "shortCopy": "Driving a petrol car 1 big step (1 m)",
+          "icon": "icons/footprints.svg",
+          "iconHint": "footprints / car-short",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "co2-plain-email",
+          "tier": "micro",
+          "value": 0.3,
+          "unit": "g",
+          "equivalent": "Sending 1 short plain-text email",
+          "shortCopy": "Sending 1 short email (no attachments)",
+          "icon": "icons/mail.svg",
+          "iconHint": "mail",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "co2-car-length",
+          "tier": "micro",
+          "value": 1,
+          "unit": "g",
+          "equivalent": "Driving a gas car 1 car length (~5 m)",
+          "shortCopy": "Driving a petrol car 1 car length",
+          "icon": "icons/car-front.svg",
+          "iconHint": "car-front",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "co2-photo-email",
+          "tier": "micro",
+          "value": 4,
+          "unit": "g",
+          "equivalent": "Sending 1 email with a photo attachment",
+          "shortCopy": "Sending 1 email with a large photo",
+          "icon": "icons/mail.svg",
+          "iconHint": "mail + paperclip / image",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "co2-smartphone-charge",
+          "tier": "micro",
+          "value": 6,
+          "unit": "g",
+          "equivalent": "Fully charging a smartphone",
+          "shortCopy": "Charging a smartphone (0–100%)",
+          "icon": "icons/smartphone-charging.svg",
+          "iconHint": "smartphone-charging",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "co2-plastic-bag",
+          "tier": "daily",
+          "value": 10,
+          "unit": "g",
+          "equivalent": "Producing 1 plastic shopping bag",
+          "shortCopy": "Manufacturing 1 lightweight plastic bag",
+          "icon": "icons/shopping-bag.svg",
+          "iconHint": "shopping-bag",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "co2-kettle-mug",
+          "tier": "daily",
+          "value": 15,
+          "unit": "g",
+          "equivalent": "Boiling 1 mug of water in a kettle",
+          "shortCopy": "Boiling 1 mug of water for tea",
+          "icon": "icons/electric-kettle.svg",
+          "iconHint": "cup-soda / mug steam",
+          "iconSource": "custom"
+        },
+        {
+          "id": "co2-laptop-charge",
+          "tier": "daily",
+          "value": 25,
+          "unit": "g",
+          "equivalent": "Fully charging a standard laptop",
+          "shortCopy": "Charging a laptop (0–100%)",
+          "icon": "icons/laptop.svg",
+          "iconHint": "laptop",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "co2-hd-streaming-1hr",
+          "tier": "daily",
+          "value": 40,
+          "unit": "g",
+          "equivalent": "Streaming 1 hour of HD video",
+          "shortCopy": "1 hr of HD video streaming",
+          "icon": "icons/clapperboard.svg",
+          "iconHint": "play-circle / clapperboard",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "co2-tree-1day",
+          "tier": "daily",
+          "value": 60,
+          "unit": "g",
+          "equivalent": "1 day of CO₂ absorbed by a mature tree",
+          "shortCopy": "What 1 mature tree absorbs in a day",
+          "icon": "icons/tree-deciduous.svg",
+          "iconHint": "tree-deciduous",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "co2-banana",
+          "tier": "weekly",
+          "value": 80,
+          "unit": "g",
+          "equivalent": "Growing & shipping 1 banana",
+          "shortCopy": "Carbon footprint of 1 banana",
+          "icon": "icons/banana.svg",
+          "iconHint": "banana",
+          "iconSource": "custom"
+        },
+        {
+          "id": "co2-plastic-bottle",
+          "tier": "weekly",
+          "value": 85,
+          "unit": "g",
+          "equivalent": "Producing 1 plastic water bottle (500 mL)",
+          "shortCopy": "Making 1 single-use plastic water bottle",
+          "icon": "icons/water-bottle.svg",
+          "iconHint": "plastic bottle",
+          "iconSource": "custom"
+        },
+        {
+          "id": "co2-aluminum-can",
+          "tier": "weekly",
+          "value": 170,
+          "unit": "g",
+          "equivalent": "Producing 1 aluminum beverage can",
+          "shortCopy": "Making 1 aluminum soda can",
+          "icon": "icons/soda-can.svg",
+          "iconHint": "soda can",
+          "iconSource": "custom"
+        },
+        {
+          "id": "co2-car-1km",
+          "tier": "weekly",
+          "value": 200,
+          "unit": "g",
+          "equivalent": "Driving an average gas car 1 km",
+          "shortCopy": "Driving a petrol car 1 km",
+          "icon": "icons/car.svg",
+          "iconHint": "car",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "co2-flight-1km",
+          "tier": "weekly",
+          "value": 250,
+          "unit": "g",
+          "equivalent": "Flying 1 km on a commercial jet",
+          "shortCopy": "Flying 1 km on a passenger plane",
+          "icon": "icons/plane.svg",
+          "iconHint": "plane",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "co2-cafe-latte",
+          "tier": "heavy",
+          "value": 300,
+          "unit": "g",
+          "equivalent": "Making 1 café latte with cow's milk",
+          "shortCopy": "1 café latte with dairy milk",
+          "icon": "icons/coffee.svg",
+          "iconHint": "coffee (latte cup)",
+          "iconSource": "lucide"
+        },
+        {
+          "id": "co2-dishwasher-cycle",
+          "tier": "heavy",
+          "value": 400,
+          "unit": "g",
+          "equivalent": "Running 1 full dishwasher cycle",
+          "shortCopy": "1 full dishwasher run",
+          "icon": "icons/dishwasher.svg",
+          "iconHint": "dishwasher",
+          "iconSource": "custom"
+        },
+        {
+          "id": "co2-tumble-dryer-cycle",
+          "tier": "heavy",
+          "value": 1000,
+          "unit": "g",
+          "equivalent": "Running 1 tumble dryer cycle (1 kg)",
+          "shortCopy": "1 full tumble dryer cycle (or driving 5 km)",
+          "icon": "icons/tumble-dryer.svg",
+          "iconHint": "tumble dryer",
+          "iconSource": "custom"
+        },
+        {
+          "id": "co2-beef-burger",
+          "tier": "heavy",
+          "value": 3000,
+          "unit": "g",
+          "equivalent": "Producing 1 beef burger (3 kg)",
+          "shortCopy": "Carbon footprint of 1 beef burger",
+          "icon": "icons/beef-burger.svg",
+          "iconHint": "beef / burger",
+          "iconSource": "custom"
+        },
+        {
+          "id": "co2-tree-1year",
+          "tier": "heavy",
+          "value": 22000,
+          "unit": "g",
+          "equivalent": "1 year of CO₂ absorbed by a mature tree",
+          "shortCopy": "What 1 mature tree absorbs in a full year",
+          "icon": "icons/trees.svg",
+          "iconHint": "trees (forest/mature tree)",
+          "iconSource": "lucide"
+        }
+      ]
+    }
+  }
+}

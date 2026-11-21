@@ -11,17 +11,16 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type ComponentType 
 import { parseRouteHash, type AppRouteId } from '../app-routes';
 import { Sidebar } from '../components/sidebar.component';
 import { DEFAULT_TIMEFRAME, timeframeSinceMs, type TimeframeId } from '../timeframe.helpers';
-import { useUsageSummary } from '../usage-api';
+import { useFactsSummaries, useUsageSummary } from '../usage-api';
 import { AnalyticsPage } from './pages/analytics.page';
 import { DashboardPage } from './pages/dashboard.page';
 import { FactsPage } from './pages/facts.page';
 import { HistoryPage } from './pages/history.page';
 import { TipsPage } from './pages/tips.page';
 
-/** Pages without props. The dashboard gets its data from here, see below. */
-const PAGES: Record<Exclude<AppRouteId, 'dashboard'>, ComponentType> = {
+/** Pages without props. Dashboard and Facts receive fetched summaries from the App root. */
+const PAGES: Record<Exclude<AppRouteId, 'dashboard' | 'facts'>, ComponentType> = {
   analytics: AnalyticsPage,
-  facts: FactsPage,
   tips: TipsPage,
   history: HistoryPage,
 };
@@ -41,6 +40,7 @@ export function App() {
   // Fixed per selection, so the rolling windows don't refetch on every render.
   const sinceMs = useMemo(() => timeframeSinceMs(timeframe, Date.now()), [timeframe]);
   const summary = useUsageSummary(sinceMs);
+  const factsSummaries = useFactsSummaries();
 
   useEffect(() => {
     document.title = `${route.label} · Waister`;
@@ -51,6 +51,8 @@ export function App() {
     page = (
       <DashboardPage timeframe={timeframe} onTimeframeChange={setTimeframe} summary={summary} />
     );
+  } else if (route.id === 'facts') {
+    page = <FactsPage summaries={factsSummaries} />;
   } else {
     const Page = PAGES[route.id];
     page = <Page />;

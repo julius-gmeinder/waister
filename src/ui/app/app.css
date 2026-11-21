@@ -59,3 +59,360 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Facts Page: ambient radial KPI orbs + header with tactile Shuffle button + 3 distinct
+   asymmetric glassmorphic bento compositions (Daily, Weekly, All-Time). */
+.facts-page {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 1200px;
+  padding-bottom: 40px;
+}
+
+.facts-ambient {
+  position: absolute;
+  inset: -16px -24px 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 28px;
+}
+
+.facts-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(64px);
+  opacity: 0.42;
+}
+
+.facts-orb--power {
+  top: 30px;
+  left: -40px;
+  width: 380px;
+  height: 340px;
+  background: radial-gradient(circle, var(--power-soft) 0%, var(--power) 55%, transparent 75%);
+}
+
+.facts-orb--water {
+  top: 32%;
+  right: -50px;
+  width: 420px;
+  height: 380px;
+  background: radial-gradient(circle, var(--water-soft) 0%, var(--water) 55%, transparent 75%);
+}
+
+.facts-orb--co2 {
+  bottom: 40px;
+  left: 18%;
+  width: 440px;
+  height: 340px;
+  background: radial-gradient(circle, var(--co2-soft) 0%, var(--co2) 55%, transparent 75%);
+}
+
+.facts-header {
+  position: sticky;
+  top: 16px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--glass-surface-top) 0%, var(--glass-surface-mid) 100%);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight-top),
+    0 8px 24px -8px var(--glass-shadow);
+}
+
+.facts-header-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.facts-header .page-title {
+  margin: 0;
+}
+
+.facts-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.facts-shuffle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-pressed);
+  background: var(--accent);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight-top),
+    0 4px 14px -3px var(--glass-shadow);
+}
+
+.facts-shuffle-btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-highlight-top),
+    0 6px 18px -3px var(--glass-shadow-hover);
+}
+
+.facts-shuffle-btn:active {
+  background: var(--accent-pressed);
+  transform: translateY(0);
+}
+
+.facts-shuffle-btn .lucide {
+  width: 17px;
+  height: 17px;
+  color: var(--contrast);
+}
+
+.facts-shuffle-btn--spinning .facts-shuffle-refresh {
+  animation: facts-spin 460ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.facts-shuffle-btn--spinning .facts-shuffle-dice {
+  animation: facts-dice-tilt 460ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes facts-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes facts-dice-tilt {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  40% {
+    transform: rotate(-18deg) scale(1.15);
+  }
+  75% {
+    transform: rotate(12deg) scale(1.05);
+  }
+}
+
+.facts-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.facts-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.facts-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.facts-section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.facts-section-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--contrast);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.facts-section-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--contrast);
+}
+
+.facts-section-meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.facts-section-usage {
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Section 1 (Daily): Asymmetric Hero Bento — 1 wider featured hero card (~58% width, spanning 2
+   rows) paired with 2 stacked/offset compact cards on the right. */
+.facts-grid--daily {
+  display: grid;
+  grid-template-columns: 1.38fr 1fr;
+  grid-template-rows: repeat(2, minmax(158px, auto));
+  gap: 18px;
+  align-items: stretch;
+}
+
+.facts-grid--daily .fact-card:nth-child(1) {
+  grid-row: 1 / span 2;
+  padding: 28px 30px 24px;
+}
+
+.facts-grid--daily .fact-card:nth-child(2) {
+  margin-right: 12px;
+}
+
+.facts-grid--daily .fact-card:nth-child(3) {
+  margin-left: 12px;
+}
+
+/* Section 2 (Weekly): Asymmetric Staggered Trio — 3 varied-width/height cards with subtle
+   vertical staggering so they break out of a uniform row. */
+.facts-grid--weekly {
+  display: grid;
+  grid-template-columns: 1.2fr 0.92fr 1.08fr;
+  gap: 18px;
+  align-items: start;
+  padding-bottom: 18px;
+}
+
+.facts-grid--weekly .fact-card:nth-child(1) {
+  min-height: 215px;
+}
+
+.facts-grid--weekly .fact-card:nth-child(2) {
+  margin-top: 20px;
+  min-height: 235px;
+}
+
+.facts-grid--weekly .fact-card:nth-child(3) {
+  margin-top: 8px;
+  min-height: 200px;
+}
+
+/* Section 3 (All-Time): Dramatic Focal Panorama Ribbon + Asymmetric Split Pair below. */
+.facts-grid--allTime {
+  display: grid;
+  grid-template-columns: 0.9fr 1.25fr;
+  gap: 18px;
+}
+
+.facts-grid--allTime .fact-card:nth-child(1) {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 24px;
+  padding: 26px 30px;
+}
+
+.facts-grid--allTime .fact-card:nth-child(1) .fact-card-top {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.facts-grid--allTime .fact-card:nth-child(1) .fact-card-badges {
+  justify-content: flex-start;
+}
+
+.facts-grid--allTime .fact-card:nth-child(1) .fact-card-footer {
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  padding-top: 0;
+  padding-left: 22px;
+  border-top: 0;
+  border-left: 1px solid color-mix(in srgb, var(--fact-color) 22%, var(--border));
+}
+
+.facts-grid--allTime .fact-card:nth-child(1) .fact-card-readout-sep {
+  display: none;
+}
+
+.facts-grid--allTime .fact-card:nth-child(2) {
+  margin-top: 4px;
+}
+
+.facts-grid--allTime .fact-card:nth-child(3) {
+  margin-top: -6px;
+}
+
+/* Responsive degradation for narrower side panels, popups, or split windows. */
+@media (max-width: 1080px) {
+  .facts-grid--daily,
+  .facts-grid--weekly,
+  .facts-grid--allTime {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    padding-bottom: 0;
+  }
+
+  .facts-grid--daily .fact-card:nth-child(1) {
+    grid-row: auto;
+  }
+
+  .facts-grid--daily .fact-card:nth-child(2),
+  .facts-grid--daily .fact-card:nth-child(3),
+  .facts-grid--weekly .fact-card:nth-child(2),
+  .facts-grid--weekly .fact-card:nth-child(3),
+  .facts-grid--allTime .fact-card:nth-child(2),
+  .facts-grid--allTime .fact-card:nth-child(3) {
+    margin: 0;
+    min-height: 0;
+  }
+
+  .facts-grid--allTime .fact-card:nth-child(1) {
+    grid-template-columns: 1fr;
+  }
+
+  .facts-grid--allTime .fact-card:nth-child(1) .fact-card-top {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .facts-grid--allTime .fact-card:nth-child(1) .fact-card-footer {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 12px;
+    padding-left: 0;
+    border-top: 1px solid color-mix(in srgb, var(--fact-color) 18%, var(--border));
+    border-left: 0;
+  }
+
+  .facts-grid--allTime .fact-card:nth-child(1) .fact-card-readout-sep {
+    display: inline;
+  }
+}
