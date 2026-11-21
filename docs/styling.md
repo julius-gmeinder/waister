@@ -49,18 +49,20 @@ the hex value.
 
 ### impact accents
 
-Only for the Dashboard's impact cards. Each accent has four steps.
+For everything that shows energy or water: the Dashboard's impact cards and the popup's tachos
+(`.tacho--power` / `.tacho--water` map them onto `--tacho-color` / `-strong` / `-soft`). Each
+accent has four steps.
 
-| Variable         | Value     | Use                                                      |
-| ---------------- | --------- | -------------------------------------------------------- |
-| `--power`        | `#FF7A1A` | electric orange: bolts, sparks, gear strokes, glow, icon |
-| `--power-strong` | `#D95A00` | energy number (≥ 3:1 on white for large text)            |
-| `--power-soft`   | `#FFE4CC` | gear fill                                                |
-| `--power-tint`   | `#FFF7F0` | bottom of the PowerCard background gradient              |
-| `--water`        | `#38B6E0` | coral-reef sky blue: drop, basin, front wave, icon       |
-| `--water-strong` | `#0B84B0` | water number, ripple                                     |
-| `--water-soft`   | `#C9ECF8` | back wave                                                |
-| `--water-tint`   | `#F1FAFD` | bottom of the WaterCard background gradient              |
+| Variable         | Value     | Use                                                                  |
+| ---------------- | --------- | -------------------------------------------------------------------- |
+| `--power`        | `#FF7A1A` | electric orange: bolts, sparks, gear strokes, glow, icons, tacho arc |
+| `--power-strong` | `#D95A00` | energy numbers (≥ 3:1 on white for large text)                       |
+| `--power-soft`   | `#FFE4CC` | gear fill, tacho track                                               |
+| `--power-tint`   | `#FFF7F0` | bottom of the PowerCard background gradient                          |
+| `--water`        | `#38B6E0` | coral-reef sky blue: drop, basin, front wave, icons, tacho arc       |
+| `--water-strong` | `#0B84B0` | water numbers, ripple                                                |
+| `--water-soft`   | `#C9ECF8` | back wave, tacho track                                               |
+| `--water-tint`   | `#F1FAFD` | bottom of the WaterCard background gradient                          |
 
 ### interaction states
 
@@ -76,7 +78,7 @@ popup tab bar always opens a new tab, so it has none.
 | `:active` (pressed)         | `--neutral-pressed`                                        | `--accent-pressed`                     |
 | `:focus-visible` (keyboard) | 2px `--focus` outline, 2px offset                          | same                                   |
 
-Icon color is set once in a grouped rule at the top of `components.css` (except the impact card
+Icon color is set once in a grouped rule at the top of `components.css` (except the impact card and tacho
 icons, which use their accent), and sizes per
 component. Backgrounds and text colors fade over 120ms. The neutral tints sit between `--bg` and `--border`,
 so they only work on a `--bg` background. The state rules live at the end of `components.css`. A new

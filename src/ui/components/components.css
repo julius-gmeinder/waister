@@ -8,7 +8,6 @@
 /* Icons: color for all component icons; sizes are set per component below. */
 .total .lucide,
 .breakdown-row .lucide,
-.tacho .lucide,
 .tab-bar-link .lucide,
 .sidebar-link .lucide {
   color: var(--contrast-bright);
@@ -70,7 +69,20 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ImpactTachos + Tacho */
+/* ImpactTachos + Tacho. The tone modifier maps the impact accents (base.css) onto local
+   variables: base for arc + icon, -strong for the number, -soft for the track. */
+.tacho--power {
+  --tacho-color: var(--power);
+  --tacho-strong: var(--power-strong);
+  --tacho-soft: var(--power-soft);
+}
+
+.tacho--water {
+  --tacho-color: var(--water);
+  --tacho-strong: var(--water-strong);
+  --tacho-soft: var(--water-soft);
+}
+
 .tachos {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -108,11 +120,11 @@
 }
 
 .tacho-track {
-  stroke: var(--border);
+  stroke: var(--tacho-soft);
 }
 
 .tacho-fill {
-  stroke: var(--contrast-bright);
+  stroke: var(--tacho-color);
   transition: stroke-dashoffset 240ms ease;
 }
 
@@ -128,6 +140,7 @@
 .tacho .lucide {
   width: 18px;
   height: 18px;
+  color: var(--tacho-color);
 }
 
 .tacho-reading {
@@ -141,7 +154,7 @@
   font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--contrast);
+  color: var(--tacho-strong);
 }
 
 .tacho-unit {
