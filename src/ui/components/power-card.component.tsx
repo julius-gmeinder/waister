@@ -1,12 +1,14 @@
 /**
  * PowerCard: energy used in the selected timeframe. The number pulses, and every pulse strikes a
  * lightning bolt from the number into a gear train that turns one tooth further. The whole timing
- * is CSS (`--pulse`), so bolts, glow and gears stay in sync when the period changes.
+ * is CSS (`--pulse`), so bolts, glow and gears stay in sync when the period changes. The popup
+ * lays the train out as a zigzag row beside the number.
  *
- * Context: app page
+ * Context: popup, app page
  * Docs: docs/modules.md#ui
  */
 
+import { Zap } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import type { SelectedFactComparison } from '../app/pages/facts.helpers';
 import { formatEnergy } from '../format.helpers';
@@ -18,8 +20,10 @@ interface PowerCardProps {
   energyWh: number | undefined;
   /** Time between two pulses. `null` = no usage, nothing moves. */
   pulseMs: number | null;
-  /** Fun fact under the scene. `null` while loading. */
-  fact: SelectedFactComparison | null;
+  /** Fun fact under the scene (Dashboard). `null` while loading or omitted in compact mode. */
+  fact?: SelectedFactComparison | null;
+  /** `card` = Dashboard vertical tile with corner badge; `compact` = popup horizontal tile. */
+  variant?: 'card' | 'compact';
 }
 
 interface Point {
@@ -95,13 +99,22 @@ function axleRadius(pitch: number): number {
   return Math.max(2.2, pitch * 0.12);
 }
 
+interface GearSpec {
+  teeth: number;
+  spokes: boolean;
+  /** Index of the gear this one meshes with, and where it sits (degrees from its center). */
+  parent?: number;
+  angle?: number;
+}
+
 /**
- * The gear train: a big driver on the ground line (y ≈ 160 of the 240 × 170 scene, like the pond
- * and the factory), the rest hung off a parent at `angle` (degrees, from the parent's center), so
- * their centers always sit one pitch-radius sum apart. Sizes vary and the train climbs into the
- * top left, where the number leaves room. The top right stays free for the number and the bolts.
+ * The Dashboard gear train: a big driver on the ground line (y ≈ 160 of the 240 × 170 scene, like
+ * the pond and the factory), the rest hung off a parent at `angle` (degrees, from the parent's
+ * center), so their centers always sit one pitch-radius sum apart. Sizes vary and the train climbs
+ * into the top left, where the number leaves room. The top right stays free for the number and
+ * the bolts.
  */
-const GEAR_SPECS: readonly { teeth: number; spokes: boolean; parent?: number; angle?: number }[] = [
+const CARD_GEAR_SPECS: readonly GearSpec[] = [
   { teeth: 20, spokes: true },
   { teeth: 12, spokes: false, parent: 0, angle: -128 },
   { teeth: 18, spokes: true, parent: 1, angle: -122 },
@@ -110,7 +123,22 @@ const GEAR_SPECS: readonly { teeth: number; spokes: boolean; parent?: number; an
   { teeth: 8, spokes: false, parent: 4, angle: 48 },
   { teeth: 10, spokes: false, parent: 0, angle: 170 },
 ];
-const DRIVER_CENTER: Point = { x: 130, y: 126 };
+const CARD_DRIVER: Point = { x: 130, y: 126 };
+
+/**
+ * The popup gear train (300 × 84 strip, 1 unit = 1px, x = 0 at the number's right edge): big
+ * spoked gears low and small plain ones high, zigzagging to the right, so the train reads as one
+ * row like a belt drive. It ends on a small gear that fits the usual strip width, so no gear is
+ * cut off at the tile edge; a tiny one sits on the driver's top left for variety.
+ */
+const COMPACT_GEAR_SPECS: readonly GearSpec[] = [
+  { teeth: 16, spokes: true },
+  { teeth: 9, spokes: false, parent: 0, angle: -28 },
+  { teeth: 14, spokes: true, parent: 1, angle: 30 },
+  { teeth: 8, spokes: false, parent: 2, angle: -32 },
+  { teeth: 6, spokes: false, parent: 0, angle: -125 },
+];
+const COMPACT_DRIVER: Point = { x: 50, y: 48 };
 
 interface Gear extends Point {
   d: string;
@@ -126,9 +154,9 @@ interface Gear extends Point {
   hub: number | null;
 }
 
-function layoutGears(): Gear[] {
+function layoutGears(specs: readonly GearSpec[], driver: Point): Gear[] {
   const gears: Gear[] = [];
-  for (const { teeth, spokes, parent, angle = 0 } of GEAR_SPECS) {
+  for (const { teeth, spokes, parent, angle = 0 } of specs) {
     const pitch = (MODULE * teeth) / 2;
     const shape = {
       d: gearPath(teeth, spokes),
@@ -139,7 +167,7 @@ function layoutGears(): Gear[] {
     };
     const from = parent === undefined ? undefined : gears[parent];
     if (!from) {
-      gears.push({ ...DRIVER_CENTER, ...shape, base: 0, turn: 1 });
+      gears.push({ ...driver, ...shape, base: 0, turn: 1 });
       continue;
     }
     const distance = (MODULE * from.teeth) / 2 + pitch;
@@ -158,7 +186,8 @@ function layoutGears(): Gear[] {
   return gears;
 }
 
-const GEARS = layoutGears();
+const CARD_GEARS = layoutGears(CARD_GEAR_SPECS, CARD_DRIVER);
+const COMPACT_GEARS = layoutGears(COMPACT_GEAR_SPECS, COMPACT_DRIVER);
 
 /** Point on a gear's rim at `angle` degrees, where a bolt hits it. */
 function rimPoint(gear: Gear, angle: number): Point {
@@ -169,80 +198,130 @@ function rimPoint(gear: Gear, angle: number): Point {
 /** Sideways kinks along the bolt (in viewBox units at each fifth of its length). */
 const BOLT_KINKS = [0, 7, -5, 6, -3, 0];
 
-function boltPoints(from: Point, to: Point): string {
+/** `kink` scales BOLT_KINKS: the popup's short bolts zigzag less, so they clear the gears. */
+function boltPoints(from: Point, to: Point, kink = 1): string {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const length = Math.hypot(dx, dy);
-  return BOLT_KINKS.map((kink, i) => {
+  return BOLT_KINKS.map((offset, i) => {
     const t = i / (BOLT_KINKS.length - 1);
-    const x = from.x + dx * t - (dy / length) * kink;
-    const y = from.y + dy * t + (dx / length) * kink;
+    const x = from.x + dx * t - (dy / length) * offset * kink;
+    const y = from.y + dy * t + (dx / length) * offset * kink;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
 }
 
 /**
- * Bolts start just under the number (top right, always covered by it whatever its width) and hit
- * a gear's rim (`tip`, where the spark flashes). They take turns, one per pulse.
+ * Dashboard bolts start just under the number (top right, always covered by it whatever its
+ * width) and hit a gear's rim (`tip`, where the spark flashes). They take turns, one per pulse.
  */
-const BOLTS = [
-  { from: { x: 168, y: 4 }, tip: rimPoint(GEARS[2]!, -28) },
-  { from: { x: 214, y: 4 }, tip: rimPoint(GEARS[4]!, -80) },
-  { from: { x: 190, y: 4 }, tip: rimPoint(GEARS[1]!, -40) },
+const CARD_BOLTS = [
+  { from: { x: 168, y: 4 }, tip: rimPoint(CARD_GEARS[2]!, -28) },
+  { from: { x: 214, y: 4 }, tip: rimPoint(CARD_GEARS[4]!, -80) },
+  { from: { x: 190, y: 4 }, tip: rimPoint(CARD_GEARS[1]!, -40) },
 ].map(({ from, tip }) => ({ points: boltPoints(from, tip), tip }));
 
-export function PowerCard({ energyWh, pulseMs, fact }: PowerCardProps) {
+/**
+ * Popup bolts jump sideways from the number's right edge (x < 0 is the value's padding): into
+ * the driver's left flank, the tiny gear above it, and the driver's lower flank.
+ */
+const COMPACT_BOLTS = [
+  { from: { x: -5, y: 40 }, tip: rimPoint(COMPACT_GEARS[0]!, 188) },
+  { from: { x: -5, y: 22 }, tip: rimPoint(COMPACT_GEARS[4]!, 185) },
+  { from: { x: -5, y: 52 }, tip: rimPoint(COMPACT_GEARS[0]!, 148) },
+].map(({ from, tip }) => ({ points: boltPoints(from, tip, 0.45), tip }));
+
+/** Dashboard scene (240 × 170, scales with the card) and popup strip (300 × 84, see below). */
+const LAYOUTS = {
+  card: { gears: CARD_GEARS, bolts: CARD_BOLTS, viewBox: '0 0 240 170' },
+  compact: { gears: COMPACT_GEARS, bolts: COMPACT_BOLTS, viewBox: '0 0 300 84' },
+};
+
+export function PowerCard({ energyWh, pulseMs, fact = null, variant = 'card' }: PowerCardProps) {
   const { value, unit } = formatEnergy(energyWh);
   const idle = pulseMs === null;
+  const compact = variant === 'compact';
   const style = idle ? undefined : ({ '--pulse': `${pulseMs}ms` } as CSSProperties);
+  const className = ['power-card', compact && 'power-card--compact', idle && 'power-card--idle']
+    .filter(Boolean)
+    .join(' ');
+
+  const reading = (
+    <p className="power-card-value">
+      {value}
+      <span className="power-card-unit">{unit}</span>
+    </p>
+  );
+
+  const { gears, bolts, viewBox } = LAYOUTS[variant];
+
+  // The popup strip is wider than any visible scene and exactly as tall as the row, so `slice`
+  // keeps 1 unit = 1px, starts it at the number and cuts it off on the right.
+  const scene = (
+    <svg
+      className="power-card-scene"
+      viewBox={viewBox}
+      preserveAspectRatio={compact ? 'xMinYMid slice' : undefined}
+      aria-hidden="true"
+    >
+      {gears.map(({ x, y, d, teeth, base, turn, axle, hub }) => (
+        <g key={`${x},${y}`} transform={`translate(${x.toFixed(2)} ${y.toFixed(2)})`}>
+          <g transform={`rotate(${base.toFixed(2)})`}>
+            {/* Two layers, so the loop never snaps back: the outer one jumps a tooth ahead
+                exactly when the inner ratchet step restarts from 0 (components.css). */}
+            <g
+              className="power-gear-advance"
+              style={{ '--gear-teeth': teeth, '--gear-turn': `${turn * 360}deg` } as CSSProperties}
+            >
+              <g
+                className="power-gear"
+                style={{ '--gear-step': `${(turn * 360) / teeth}deg` } as CSSProperties}
+              >
+                <path className="power-gear-body" d={d} />
+              </g>
+            </g>
+          </g>
+          {hub !== null && <circle className="power-gear-hub" r={hub} />}
+          <circle className="power-gear-axle" r={axle} />
+        </g>
+      ))}
+      {bolts.map(({ points, tip }, index) => (
+        <g
+          key={points}
+          className="power-strike"
+          style={{ '--strike-index': index } as CSSProperties}
+        >
+          <polyline className="power-bolt" points={points} pathLength={1} />
+          <circle className="power-spark" cx={tip.x} cy={tip.y} r="3.5" />
+        </g>
+      ))}
+    </svg>
+  );
 
   return (
-    <article className={idle ? 'power-card power-card--idle' : 'power-card'} style={style}>
+    <article className={className} style={style}>
       <h2 className="power-card-label">
-        <ImpactBadge kind="power" />
+        {compact ? (
+          <>
+            <Zap aria-hidden="true" />
+            Energy
+          </>
+        ) : (
+          <ImpactBadge kind="power" />
+        )}
       </h2>
-      <div className="power-card-stage">
-        <p className="power-card-value">
-          {value}
-          <span className="power-card-unit">{unit}</span>
-        </p>
-        <svg className="power-card-scene" viewBox="0 0 240 170" aria-hidden="true">
-          {GEARS.map(({ x, y, d, teeth, base, turn, axle, hub }) => (
-            <g key={`${x},${y}`} transform={`translate(${x.toFixed(2)} ${y.toFixed(2)})`}>
-              <g transform={`rotate(${base.toFixed(2)})`}>
-                {/* Two layers, so the loop never snaps back: the outer one jumps a tooth ahead
-                    exactly when the inner ratchet step restarts from 0 (components.css). */}
-                <g
-                  className="power-gear-advance"
-                  style={
-                    { '--gear-teeth': teeth, '--gear-turn': `${turn * 360}deg` } as CSSProperties
-                  }
-                >
-                  <g
-                    className="power-gear"
-                    style={{ '--gear-step': `${(turn * 360) / teeth}deg` } as CSSProperties}
-                  >
-                    <path className="power-gear-body" d={d} />
-                  </g>
-                </g>
-              </g>
-              {hub !== null && <circle className="power-gear-hub" r={hub} />}
-              <circle className="power-gear-axle" r={axle} />
-            </g>
-          ))}
-          {BOLTS.map(({ points, tip }, index) => (
-            <g
-              key={points}
-              className="power-strike"
-              style={{ '--strike-index': index } as CSSProperties}
-            >
-              <polyline className="power-bolt" points={points} pathLength={1} />
-              <circle className="power-spark" cx={tip.x} cy={tip.y} r="3.5" />
-            </g>
-          ))}
-        </svg>
-        <ImpactFact comparison={fact} />
-      </div>
+      {compact ? (
+        <>
+          {reading}
+          {scene}
+        </>
+      ) : (
+        <div className="power-card-stage">
+          {reading}
+          {scene}
+          <ImpactFact comparison={fact} />
+        </div>
+      )}
     </article>
   );
 }

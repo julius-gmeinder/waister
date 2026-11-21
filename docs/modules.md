@@ -304,11 +304,13 @@ the EstimationHandler right after `buildTokenEstimateDto`.
 ([ADR 0010](decisions/0010-react-popup.md)). There are two surfaces, and each is its own
 esbuild entry ([ADR 0011](decisions/0011-app-page.md)):
 
-- **Popup** (`ui/popup/`, toolbar button): the dashboard. When opened, it asks the database for
-  the last 24 hours (`GET_USAGE_SUMMARY { sinceMs: now − 24 h }`) and shows the summed
-  `totalTokens`, the breakdown (input, history, output, thinking, tools, overhead), the
-  accumulated energy (Wh), water (mL) and CO2 (g) tachos, and the prompt count. A tab bar at the bottom
-  opens the app page.
+- **Popup** (`ui/popup/`, toolbar button): the quick impact glance. When opened, it starts on the
+  default Dashboard timeframe (`Today`) and lets the user switch between `Today`, `Last week`,
+  `Last 30 days` and `All time` via `TimeframeSelect` (`GET_USAGE_SUMMARY`). It renders four
+  stacked horizontal `variant="compact"` tiles (`TokenTotalCard`, `PowerCard`, `WaterCard`,
+  `Co2Card`) with full-height coloured left badge strips (centered icon over label), vertically
+  centered values, and the animations on the right, framed by whitespace on `--surface`. A `TabBar`
+  at the bottom opens the app page.
 - **App page** (`ui/app/`, a full browser tab at `app/index.html`): a sidebar plus one page per
   route (Dashboard, Analytics, Facts, Tips, History). The Dashboard
   ([ADR 0014](decisions/0014-dashboard-page.md)) shows tokens, energy, water and CO2 for a chosen
@@ -335,7 +337,7 @@ components/                           shared components (used by either surface)
   components.css                      styles of all components, one block each
   header.component.tsx                Header: full logo, centered (/logo/waister-full.svg), popup and app page
   total.component.tsx                 Total: Coins icon + summed token count (a <div>)
-  token-total-card.component.tsx      TokenTotalCard (dashboard, analytics): full-width token tile (TokenCount, label, detail, optional corner pill), optional coins skipping along the bottom (Dashboard)
+  token-total-card.component.tsx      TokenTotalCard (dashboard, analytics, popup): full-width token tile or compact horizontal popup row (`variant="compact"`), optional coins skipping along the bottom
   token-count.component.tsx           TokenCount: every token number (serif, --tokens), optional "tokens" unit, approximate note on hover, sizes inline / large / hero
   token-category.helpers.ts           TOKEN_CATEGORIES: order, label, icon and visible/hidden of the six breakdown parts
   breakdown.component.tsx             Breakdown: the six rows (from TOKEN_CATEGORIES)
@@ -347,9 +349,10 @@ components/                           shared components (used by either surface)
   chip.component.tsx                  Chip (app page): pill toggle button (aria-pressed), yellow when selected
   chip-group.component.tsx            ChipGroup (app page): labelled, wrapping row of Chips (role="group")
   timeframe-picker.component.tsx      TimeframePicker (dashboard, history): one Chip per timeframe, optional `order`
-  power-card.component.tsx            PowerCard (dashboard): energy, pulsing number, bolts from the number into a meshing gear train
-  water-card.component.tsx            WaterCard (dashboard): water, drops arcing round end first from the number's left side into a pond that drains through a stream
-  co2-card.component.tsx              Co2Card (dashboard): CO2, a factory chimney and two cooling towers spewing smoke at random, each cloud pushed up its stack as a bulge
+  timeframe-select.component.tsx      TimeframeSelect (popup): compact dropdown pill + floating option window for the Dashboard timeframes
+  power-card.component.tsx            PowerCard (dashboard, popup): energy, pulsing number, bolts from the number into a meshing gear train (`card`, or `compact`: a zigzag train in a strip beside the number)
+  water-card.component.tsx            WaterCard (dashboard, popup): water, drops arcing round end first from the number's left side into a pond that drains through a stream (`card`, or `compact`: the drop leaves the number's right side into a shrunk pond)
+  co2-card.component.tsx              Co2Card (dashboard, popup): CO2, a factory chimney and two cooling towers spewing smoke at random, each cloud pushed up its stack as a bulge (`card`, or `compact`: its own low skyline layout beside the number)
   impact-fact.component.tsx           ImpactFact (dashboard): one fun fact under an impact card's scene (multiplier, phrase, shortCopy)
   provider-filter.component.tsx       ProviderFilter (history): "All apps" + one toggle Chip per chat app
   sort-picker.component.tsx           SortPicker (history): native select for the order, ChevronDown instead of the native arrow
@@ -367,8 +370,8 @@ components/                           shared components (used by either surface)
   tip-card.component.tsx              TipCard (tips): habit tile, impact tab top left + neutral category tab top right, actions with the example drawer below; exports TipCardTabs / TipCardActions
 popup/
   popup.html                          <div id="root">, loads index.js + index.css
-  popup.css                           popup layout only (full-window card, `.popup-period` line)
-  popup.app.tsx                       PopupApp: fetches the last 24h summary, renders it
+  popup.css                           popup layout only (compact header, stacked rows, stagger indices)
+  popup.app.tsx                       PopupApp: fetches the selected timeframe summary, renders the four compact rows and TabBar
 app/
   app.html                            <div id="root">, loads index.js + index.css
   app.css                             app page layout only (flat sidebar + content grid, dashboard grid, history list, facts grids, analytics tiles and charts)
@@ -391,7 +394,7 @@ app/
 | `popup/popup.html`           | Markup shell, only `#root`                                                     | `popup/index.html`                              |
 | `app/app.html`               | Markup shell, only `#root`, extension icon as favicon                          | `app/index.html`                                |
 | `base.css`, `components.css` | Shared styles. Each entry imports them first, then its own layout CSS          | bundled into `popup/index.css`, `app/index.css` |
-| `popup/popup.app.tsx`        | `PopupApp`: `useUsageSummary(now − 24 h)`, renders below                       | `entries/popup.entry.tsx` → `popup/index.js`    |
+| `popup/popup.app.tsx`        | `PopupApp`: `useUsageSummary` for the selected Dashboard timeframe             | `entries/popup.entry.tsx` → `popup/index.js`    |
 | `app/app.app.tsx`            | `App`: hash route → page, `document.title`, dashboard + history state and data | `entries/app.entry.tsx` → `app/index.js`        |
 | `app/pages/*.page.tsx`       | One component per route. Only the app page bundles them                        | `entries/app.entry.tsx`                         |
 | `components/*.component.tsx` | Presentational components. They only render props and fetch nothing            | whichever entry uses them                       |

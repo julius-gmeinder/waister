@@ -306,6 +306,83 @@
   cursor: pointer;
 }
 
+/* TimeframeSelect (popup): compact dropdown pill with a floating option window styled like
+   InfoTooltip (--surface, 1px --border, --shadow) and yellow --accent for the active choice. */
+.timeframe-select {
+  position: relative;
+  display: inline-flex;
+}
+
+.timeframe-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.timeframe-select-chevron {
+  width: 13px;
+  height: 13px;
+  color: var(--text-muted);
+  transition: transform 140ms ease;
+}
+
+.timeframe-select-chevron--open {
+  transform: rotate(180deg);
+}
+
+.timeframe-select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 2px;
+  min-width: 148px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  animation: timeframe-menu-open 140ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes timeframe-menu-open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.timeframe-select-option {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 /* ImpactBadge (dashboard cards, FactCards, modal impact tiles): a tab flush in the tile's top-left
    corner. The tile's overflow: hidden rounds its outer corner, so only the inner (bottom-right)
    corner is rounded here. Soft accent fill, -strong text, solid icon. */
@@ -488,6 +565,165 @@
   width: 100%;
   margin-top: -10px;
   overflow: visible;
+}
+
+/* Compact horizontal variant (popup): full-height coloured left badge strip (centered icon +
+   label below), value vertically centered beside it, and the animated scene as a strip from the
+   number to the tile's right edge. All four popup rows share the 74px badge width and 84px
+   height so their seams align. */
+.power-card--compact,
+.water-card--compact,
+.co2-card--compact {
+  display: grid;
+  grid-template-columns: 74px auto minmax(0, 1fr);
+  align-items: stretch;
+  min-height: 84px;
+  padding: 0;
+  text-align: left;
+}
+
+.power-card--compact .power-card-label,
+.water-card--compact .water-card-label,
+.co2-card--compact .co2-card-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 6px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.power-card--compact .power-card-label .lucide,
+.water-card--compact .water-card-label .lucide,
+.co2-card--compact .co2-card-label .lucide {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.power-card--compact .power-card-label {
+  background: var(--power-soft);
+  color: var(--power-strong);
+}
+
+.water-card--compact .water-card-label {
+  background: var(--water-soft);
+  color: var(--water-strong);
+}
+
+.co2-card--compact .co2-card-label {
+  background: var(--co2-soft);
+  color: var(--co2-strong);
+}
+
+.power-card--compact .power-card-value,
+.water-card--compact .water-card-value,
+.co2-card--compact .co2-card-value {
+  align-self: center;
+  justify-self: start;
+  margin: 0;
+  padding: 0 8px 0 18px;
+  font-size: 26px;
+  line-height: 1.15;
+  transform-origin: 0% 50%;
+  /* Above the scene strip, so bolts and drops start under the edge of its last glyph. */
+  position: relative;
+  z-index: 1;
+}
+
+.power-card--compact .power-card-unit,
+.water-card--compact .water-card-unit,
+.co2-card--compact .co2-card-unit {
+  margin-left: 5px;
+  font-size: 14px;
+}
+
+/* The scenes are 300 × 84 strips at 1 unit = 1px (preserveAspectRatio slice, no scaling): they
+   start at the number's right edge and run to the tile's, which clips them. overflow: visible
+   lets bolts and drops reach back over the value's padding. */
+.power-card--compact .power-card-scene,
+.water-card--compact .water-card-scene,
+.co2-card--compact .co2-card-scene {
+  align-self: center;
+  width: 100%;
+  height: 84px;
+  margin: 0;
+}
+
+/* WaterCard strip: the drop's positioning box, exactly over the scene (strip px = scene units). */
+.water-card-strip {
+  position: relative;
+  align-self: center;
+  min-width: 0;
+  height: 84px;
+}
+
+/* At 1px per unit the popup drop is smaller than the Dashboard one, in scale with the shrunk
+   pond. Its arc is fixed in strip px (WaterCard). */
+.water-card--compact .water-drop {
+  width: 12px;
+  height: 8px;
+}
+
+/* The pond is drawn at 0.55 (WaterCard), its lines keep their screen width. */
+.water-card--compact .water-bank,
+.water-card--compact .water-glint,
+.water-card--compact .water-current,
+.water-card--compact .water-tuft,
+.water-card--compact .water-lily,
+.water-card--compact .water-ripple {
+  vector-effect: non-scaling-stroke;
+}
+
+.water-card--compact .water-bank {
+  stroke-width: 1.6;
+}
+
+.water-card--compact .water-glint,
+.water-card--compact .water-current {
+  stroke-width: 1.2;
+}
+
+.water-card--compact .water-tuft {
+  stroke-width: 1.3;
+}
+
+/* The drop gathers at the number's right edge here, so the glow pulls that way. */
+.water-card--compact .water-card-value {
+  animation-name: water-wobble-right;
+}
+
+@keyframes water-wobble-right {
+  0%,
+  62%,
+  100% {
+    transform: scale(1);
+    text-shadow: 0 0 0 transparent;
+  }
+  33% {
+    transform: scale(1.035, 0.985);
+    text-shadow: 3px 0 10px var(--water);
+    animation-timing-function: cubic-bezier(0.2, 0, 0.2, 1);
+  }
+  42% {
+    transform: scale(0.97, 1.03);
+    text-shadow: 0 0 4px var(--water);
+  }
+  49% {
+    transform: scale(1.015, 0.99);
+  }
+  56% {
+    transform: scale(0.995, 1.005);
+  }
+}
+
+/* Short popup bolts: a little thinner, so the zigzag stays readable. */
+.power-card--compact .power-bolt {
+  stroke-width: 2;
 }
 
 /* ImpactFact (dashboard cards): a FactCard's wording in small, at the bottom of the card. The
@@ -2193,6 +2429,60 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Compact horizontal variant (popup): matches the 74px left badge strip and 84px height of the
+   impact rows, with the coin track running across column 3. */
+.token-total-card--compact {
+  grid-template-columns: 74px auto minmax(0, 1fr);
+  grid-template-rows: 1fr;
+  align-items: stretch;
+  min-height: 84px;
+  padding: 0;
+}
+
+.token-total-card-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 6px;
+  background: var(--tokens-soft);
+  color: var(--tokens);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+/* Solid like the other three badge icons. The back coin's open arc fills up to its chord, which
+   leaves a thin gap to the front coin. */
+.token-total-card-badge .lucide {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.token-total-card--compact .token-total-card-reading {
+  grid-column: 2;
+  align-self: center;
+  padding: 0 8px 0 18px;
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.token-total-card--compact .token-coins {
+  --coin-ground: 6px;
+  grid-column: 3;
+  grid-row: 1;
+  margin: 0 0 0 8px;
+}
+
+.token-total-card--compact .token-coin-hop {
+  width: 20px;
+  height: 20px;
+}
+
 /* Coin run (Dashboard). The track is the card's second column, stretched over the padding to the
    card's top, right and bottom edges. Each coin is three layers on one --coin-cycle:
    .token-coin-run moves it across (its translateX % = the track width, plus a coin, so it leaves
@@ -2622,21 +2912,28 @@
     display: none;
   }
 
-  .tip-card-chevron {
+  .tip-card-chevron,
+  .timeframe-select-chevron {
     transition: none;
+  }
+
+  .timeframe-select-menu {
+    animation: none;
   }
 }
 
 /* Interaction states, shared by TabBar and Sidebar links, Chips (TimeframePicker,
-   ProviderFilter, the Analytics filters and toggles), the SortPicker, HistoryRows, the History
-   "Load more" button, the PromptDetailModal's buttons, the InfoTooltip button, the Analytics
-   action buttons and the Tips controls (docs/styling.md#interaction-states). Neutral items:
-   --neutral-hover / --neutral-pressed. The selected item (aria-current page, aria-pressed chip or
-   adopt pill) is --accent with its own hover/pressed steps. The selected rules come last, so they
-   win over the neutral ones at equal specificity. */
+   ProviderFilter, the Analytics filters and toggles), TimeframeSelect, the SortPicker,
+   HistoryRows, the History "Load more" button, the PromptDetailModal's buttons, the InfoTooltip
+   button, the Analytics action buttons and the Tips controls (docs/styling.md#interaction-states).
+   Neutral items: --neutral-hover / --neutral-pressed. The selected item (aria-current page,
+   aria-pressed chip, aria-selected option or adopt pill) is --accent with its own hover/pressed
+   steps. The selected rules come last, so they win over the neutral ones at equal specificity. */
 .tab-bar-link,
 .sidebar-link,
 .chip,
+.timeframe-select-trigger,
+.timeframe-select-option,
 .sort-picker-select,
 .history-row,
 .history-more,
@@ -2656,6 +2953,8 @@
 }
 
 .chip:hover,
+.timeframe-select-trigger:hover,
+.timeframe-select-option:hover,
 .sort-picker-select:hover,
 .history-row:hover,
 .history-more:hover:enabled,
@@ -2673,6 +2972,8 @@
 .tab-bar-link:active,
 .sidebar-link:active,
 .chip:active,
+.timeframe-select-trigger:active,
+.timeframe-select-option:active,
 .history-row:active,
 .history-more:active:enabled,
 .prompt-detail-icon-button:active:enabled,
@@ -2687,6 +2988,7 @@
 
 .sidebar-link[aria-current='page'],
 .chip[aria-pressed='true'],
+.timeframe-select-option[aria-selected='true'],
 .tip-card-adopt[aria-pressed='true'] {
   background: var(--accent);
   color: var(--text);
@@ -2713,12 +3015,14 @@
 
 .sidebar-link[aria-current='page']:hover,
 .chip[aria-pressed='true']:hover,
+.timeframe-select-option[aria-selected='true']:hover,
 .tip-card-adopt[aria-pressed='true']:hover {
   background: var(--accent-hover);
 }
 
 .sidebar-link[aria-current='page']:active,
 .chip[aria-pressed='true']:active,
+.timeframe-select-option[aria-selected='true']:active,
 .tip-card-adopt[aria-pressed='true']:active {
   background: var(--accent-pressed);
 }
@@ -2727,6 +3031,8 @@
 .tab-bar-link:focus-visible,
 .sidebar-link:focus-visible,
 .chip:focus-visible,
+.timeframe-select-trigger:focus-visible,
+.timeframe-select-option:focus-visible,
 .sort-picker-select:focus-visible,
 .history-row:focus-visible,
 .history-more:focus-visible,

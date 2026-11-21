@@ -2,7 +2,7 @@
  * Dashboard helpers: turn a usage summary into animation speeds, the pond level and the cloud
  * count (formula in `DashboardConfig`, config.types.ts), and pick the cards' fun facts.
  *
- * Context: app page
+ * Context: popup, app page
  * Docs: docs/modules.md#ui
  */
 

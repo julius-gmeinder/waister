@@ -6,7 +6,7 @@
 | ---------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------- |
 | `src/ui/base.css`                  | font imports, color/font variables, `body`, `.lucide` defaults                                      | both entries      |
 | `src/ui/components/components.css` | styles of the shared components, one commented block per component, incl. their keyframes           | both entries      |
-| `src/ui/popup/popup.css`           | popup layout only (`.popup`, `.popup-period`)                                                       | `popup.entry.tsx` |
+| `src/ui/popup/popup.css`           | popup layout only (`.popup`, `.popup-header`, `.popup-impacts`)                                     | `popup.entry.tsx` |
 | `src/ui/app/app.css`               | app page layout only (`.app`, `.app-content`, `.dashboard*`, `.history*`, `.facts*`, `.analytics*`) | `app.entry.tsx`   |
 
 Each entry imports them in this order, and esbuild bundles them into `popup/index.css` /
@@ -149,10 +149,18 @@ clickable component gets added to those selectors instead of defining its own co
 Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `body` is `--bg`
 (`base.css`).
 
-- **Popup:** `.popup` fills the whole popup window (padding 10px on top and 16px elsewhere).
-  Inside: Header, Total, period line, Breakdown, ImpactTachos (three columns), TabBar. Every tab
-  is 68px wide (fits "Dashboard"), spare width goes between them. The tab bar has no divider. 8px of extra
-  top margin (on top of the 12px gap) sets it apart from the breakdown.
+- **Popup:** `body` is `--surface` (`408px` wide) so whitespace frames the flat `--bg` tiles just
+  like the app pages. `.popup` (padding `18px 24px 16px`, `20px` gap) stacks a compact top bar
+  (logo left, prompt count + `TimeframeSelect` dropdown pill right, offering the Dashboard's
+  timeframes in a floating `--surface` / `--border` / `--shadow` menu with `--accent` on the active
+  option), four stacked horizontal `84px`-tall tiles (`TokenTotalCard`, `PowerCard`, `WaterCard`,
+  `Co2Card`, all `variant="compact"` with a flush full-height `74px` coloured left badge strip —
+  centered icon over label in `--tokens-soft`/`--tokens`, `--power-soft`/`--power-strong`,
+  `--water-soft`/`--water-strong`, `--co2-soft`/`--co2-strong` — a vertically centered 26px serif
+  value beside it and the animation as a strip from the number to the tile's right edge) and the
+  `TabBar`. Every tab is 68px wide (fits
+  "Dashboard"), spare width goes between them. The tab bar has no divider; whitespace separates it
+  from the tiles above.
 - **App page:** `.app` is a grid: the Sidebar (240px, `--bg`, full height, sticky) on the left,
   and the content (`.app-content`, `--surface`, padding 32px 40px) on the right. No border
   between them. Only the background color separates them.
@@ -269,7 +277,7 @@ custom properties, and every animation derives from them:
 | ----------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------- |
 | `--pulse`                                       | PowerCard | number glow, gear step (one tooth per pulse), bolts (3 bolts take turns over 3 pulses)            |
 | `--drip`                                        | WaterCard | number wobble, drop (swell, stretch, arc), plop (crown droplets, rebound jet, two rings)          |
-| `offset-path` (inline)                          | WaterCard | the drop's arc in stage px, measured from the number's left edge to the landing point             |
+| `offset-path` (inline)                          | WaterCard | the drop's arc in stage px, measured from the number's left edge (popup: fixed, from its right)   |
 | `--pond-fill`                                   | WaterCard | pond water size (share of the banks), eases over 900ms                                            |
 | `--gear-step`                                   | PowerCard | per gear: one tooth (360° / teeth), sign alternating along the train, so teeth stay meshed        |
 | `--gear-teeth`, `--gear-turn`                   | PowerCard | outer layer: one tooth ahead per pulse (`steps`), so the inner ratchet's restart never snaps back |
@@ -292,6 +300,17 @@ custom properties, and every animation derives from them:
 - Every cloud slot picks a random stack (chimney: small puffs, cooling towers: wide billows, one
   color for both) and a random rise, drift and size each time its loop restarts, so the stacks
   spew at random while the overall rate stays usage-driven.
+- **Popup (`variant="compact"`):** the same motion, laid out sideways. Each scene is a
+  `300 × 84` strip drawn at 1 unit = 1px (`preserveAspectRatio="xMinYMid slice"`), in the grid
+  column after the number (`74px auto 1fr`), so it always starts at the number's right edge and
+  the tile clips it on the right, whatever the number's width. PowerCard: a short zigzag gear train
+  (big gears low, small ones high, a tiny one on the driver's top left) hit by short bolts from
+  the number's right edge. WaterCard: the pond and stream at 0.55 (lines keep their width via
+  `vector-effect`), a smaller drop gathering at the number's right edge on a fixed arc
+  (`.water-card-strip` is its positioning box) and the wobble glow pulling right. Co2Card: a low
+  skyline (hall + chimney, two towers, shed) on its own layout, set off from the number, smaller
+  clouds and bulges. The value has `z-index: 1`, so bolts and drops start under it. Coins work as
+  on the Dashboard, and every badge icon is solid (`fill: currentColor`).
 - Before each cloud, a bulge travels up its stack (first 14% of the slot's loop) and pops at the
   top as the cloud comes out. The walls are drawn twice around the bulges (thick outline under,
   fill over), so a bulge only shows where it pushes the walls out. It is drawn at full size and
