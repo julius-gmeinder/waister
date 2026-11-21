@@ -39,3 +39,4 @@ _Superseded by NNNN_ instead.
 | 0012 | [All tunable values in one shared config.json](decisions/0012-central-config.md)                         | Accepted                            |
 | 0013 | [Markdown reconstruction, attachments, artifacts and tool calls](decisions/0013-rich-message-content.md) | Accepted                            |
 | 0014 | [Dashboard page with timeframes and animated impact cards](decisions/0014-dashboard-page.md)             | Accepted                            |
+| 0015 | [History page with paged prompt list and detail modal](decisions/0015-history-page.md)                   | Accepted                            |

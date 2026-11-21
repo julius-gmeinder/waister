@@ -1,17 +1,19 @@
 /**
- * UsageHandler: answers the popup and app page's usage queries and history reset requests from the
- * database.
+ * UsageHandler: answers the popup and app page's usage queries, history queries, and history reset
+ * requests from the database.
  *
  * Context: background
  * Docs: docs/modules.md#handlers
  */
 
+import type { PromptHistoryDto, PromptHistoryQuery } from '../dto/prompt-history.dto';
 import type { PromptRecordDto } from '../dto/prompt-record.dto';
 import type { UsageSummaryDto } from '../dto/usage-summary.dto';
 import type { ClearPromptRecordsResponse } from '../messages/runtime-messages';
 import {
   clearLegacyPromptRecords,
   clearPromptRecords,
+  getPromptHistory,
   getPromptRecords,
   getUsageSummary,
 } from '../services/prompt-store/prompt-store.service';
@@ -33,4 +35,8 @@ export async function handleClearPromptRecords(
     await clearPromptRecords();
   }
   return { cleared: true };
+}
+
+export async function handleGetPromptHistory(query: PromptHistoryQuery): Promise<PromptHistoryDto> {
+  return getPromptHistory(query);
 }

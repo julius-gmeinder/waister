@@ -44,6 +44,22 @@
   --co2-soft: #e6f0b4;
   --co2-tint: #f8fbe8;
 
+  /* Token categories (TokenBar, detail legend): cool hues for the visible parts, warm for the
+     hidden ones. Validated as neighbors in this exact order (CVD + normal vision), so keep the
+     order of TOKEN_CATEGORIES. Docs: docs/styling.md#token-categories */
+  --token-input: #2a78d6;
+  --token-history: #1baf7a;
+  --token-output: #6250d6;
+  --token-thinking: #e87ba4;
+  --token-tools: #eda100;
+  --token-overhead: #e34948;
+  /* Light stripes over hidden (estimated) segments in the detail view. */
+  --token-hatch: rgb(255 255 255 / 45%);
+
+  /* PromptDetailModal: the dimmed page behind it and its lift. */
+  --backdrop: rgb(28 25 23 / 40%);
+  --shadow: 0 24px 48px -12px rgb(28 25 23 / 25%);
+
   /* Glassmorphic tokens (Facts Page cards & ambient orbs). */
   --glass-surface-top: rgba(255, 255, 255, 0.78);
   --glass-surface-mid: rgba(255, 255, 255, 0.56);

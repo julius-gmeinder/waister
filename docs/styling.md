@@ -7,7 +7,7 @@
 | `src/ui/base.css`                  | font imports, color/font variables, `body`, `.lucide` defaults                            | both entries      |
 | `src/ui/components/components.css` | styles of the shared components, one commented block per component, incl. their keyframes | both entries      |
 | `src/ui/popup/popup.css`           | popup layout only (`.popup`, `.popup-period`)                                             | `popup.entry.tsx` |
-| `src/ui/app/app.css`               | app page layout only (`.app`, `.app-content`, `.dashboard*`)                              | `app.entry.tsx`   |
+| `src/ui/app/app.css`               | app page layout only (`.app`, `.app-content`, `.dashboard*`, `.history*`)                 | `app.entry.tsx`   |
 
 Each entry imports them in this order, and esbuild bundles them into `popup/index.css` /
 `app/index.css`. A new component's styles go into `components.css`, and a new surface's layout
@@ -69,12 +69,36 @@ accent has four steps.
 | `--co2-soft`     | `#E6F0B4` | factory and cloud fill, tacho track                                  |
 | `--co2-tint`     | `#F8FBE8` | bottom of the Co2Card background gradient                            |
 
+### token categories
+
+The six breakdown parts in the TokenBar and the PromptDetailModal's legend. Cool hues for the
+visible (counted) parts, warm hues for the hidden (estimated) ones. Not the impact accents, so a
+segment never reads as "energy" or "CO2". The set was checked with the dataviz palette validator
+(lightness band, chroma, CVD and normal-vision separation of **neighbors in this order**), so keep
+the order of `TOKEN_CATEGORIES` when changing a value. Three of them are below 3:1 on white, which
+is why the legend always shows the numbers next to the swatches.
+
+| Variable           | Value              | Use                                                       |
+| ------------------ | ------------------ | --------------------------------------------------------- |
+| `--token-input`    | `#2A78D6`          | input (blue)                                              |
+| `--token-history`  | `#1BAF7A`          | history (aqua)                                            |
+| `--token-output`   | `#6250D6`          | output (violet)                                           |
+| `--token-thinking` | `#E87BA4`          | thinking (magenta)                                        |
+| `--token-tools`    | `#EDA100`          | tools (yellow)                                            |
+| `--token-overhead` | `#E34948`          | overhead (red)                                            |
+| `--token-hatch`    | white 45%          | stripes over hidden segments (thick bar, legend swatches) |
+| `--backdrop`       | `--text` 40%       | dimmed page behind the PromptDetailModal                  |
+| `--shadow`         | soft, `--text` 25% | the PromptDetailModal's lift                              |
+
 ### interaction states
 
 Every clickable item uses the same steps. Yellow means "selected", never "hovered", so the
 current page stays recognizable. The sidebar (`aria-current="page"` on `.sidebar-link`) and the
 TimeframePicker (`aria-pressed="true"` on `.timeframe-picker-chip`) have a selected state. The
-popup tab bar always opens a new tab, so it has none.
+popup tab bar always opens a new tab, so it has none. The History adds the ProviderFilter chips
+(selected state like the TimeframePicker), the SortPicker select, HistoryRows, the "Load more"
+button and the modal's icon buttons and conversation link (neutral states only). Disabled buttons
+(`:enabled` guard) don't react to hover.
 
 | State                       | Unselected item (tab bar, sidebar link, chip)              | Selected (current page / pressed chip) |
 | --------------------------- | ---------------------------------------------------------- | -------------------------------------- |
@@ -108,6 +132,18 @@ Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `b
   inline SVG scene (max 320px wide, 28px of whitespace above it). All scenes share one viewBox
   (240 × 170) and ground line (y ≈ 160: gear bottoms, basin floor, factory floor), so they line
   up side by side.
+
+- **History:** `.history` stacks PageTitle, TimeframePicker, a controls row (ProviderFilter left,
+  SortPicker right), a flat `--bg` summary strip (no border) and the list (max 1000px). Day groups
+  have a sticky header (serif day name, muted totals) over a 1px `--border` line. A HistoryRow is a
+  full-width button, grid `64px | 1fr | 256px`: time, then model + total on the first line and
+  TokenBar + ImpactFigures on the second. The fixed last column lines every bar up. Below 760px
+  everything stacks next to the time.
+- **PromptDetailModal:** native `<dialog>` (max 620px wide), the second exception to "no floating
+  cards": 1px `--border`, 16px radius, `--shadow`, `--backdrop` behind it. Sections are split by
+  1px `--border` lines. The impact tiles reuse the card look (border, `--surface` → `-tint`
+  gradient). It fades and lifts in over 180ms (none with reduced motion), and the page behind it
+  doesn't scroll (`body:has(.prompt-detail[open])`).
 
 ## motion
 
@@ -165,20 +201,24 @@ browser only loads the Latin files it needs (~110 KB, from disk). A new weight i
 | totalTokens   | `Coins`             | `total.component.tsx`                             |
 | model         | `Cpu`               | (not shown yet)                                   |
 | latencyMs     | `Timer`             | (not shown yet)                                   |
-| input         | `MessageSquare`     | `breakdown.component.tsx`                         |
-| history       | `History`           | `breakdown.component.tsx`                         |
-| output        | `MessageSquareText` | `breakdown.component.tsx`                         |
-| thinking      | `Brain`             | `breakdown.component.tsx`                         |
-| tools         | `Wrench`            | `breakdown.component.tsx`                         |
-| overhead      | `Settings2`         | `breakdown.component.tsx`                         |
-| energyWh      | `Zap`               | `tacho.component.tsx`, `power-card.component.tsx` |
-| waterMl       | `Droplet`           | `tacho.component.tsx`, `water-card.component.tsx` |
-| co2Grams      | `Factory`           | `tacho.component.tsx`, `co2-card.component.tsx`   |
+| input         | `MessageSquare`     | `token-category.helpers.ts`                       |
+| history       | `History`           | `token-category.helpers.ts`                       |
+| output        | `MessageSquareText` | `token-category.helpers.ts`                       |
+| thinking      | `Brain`             | `token-category.helpers.ts`                       |
+| tools         | `Wrench`            | `token-category.helpers.ts`                       |
+| overhead      | `Settings2`         | `token-category.helpers.ts`                       |
+| energyWh      | `Zap`               | tacho, power card, impact figures, detail modal   |
+| waterMl       | `Droplet`           | tacho, water card, impact figures, detail modal   |
+| co2Grams      | `Factory`           | tacho, CO2 card, impact figures, detail modal     |
 | Dashboard     | `LayoutDashboard`   | `app-routes.ts`                                   |
 | Analytics     | `ChartColumn`       | `app-routes.ts`                                   |
 | Facts         | `BookOpen`          | `app-routes.ts`                                   |
 | Tips          | `Lightbulb`         | `app-routes.ts`                                   |
-| History page  | `Clock`             | `app-routes.ts`                                   |
+| History page  | `Clock`             | `app-routes.ts`, `history.page.tsx` (empty state) |
+| sort          | `ArrowDownUp`       | `sort-picker.component.tsx`                       |
+| prev / next   | `ChevronLeft/Right` | `prompt-detail-modal.component.tsx`               |
+| close         | `X`                 | `prompt-detail-modal.component.tsx`               |
+| open chat     | `ExternalLink`      | `prompt-detail-modal.component.tsx`               |
 
 The History page uses `Clock`, not `History`, because `History` already marks the history
 tokens in the breakdown.

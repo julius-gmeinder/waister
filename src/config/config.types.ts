@@ -275,6 +275,11 @@ export interface DashboardConfig {
   poolFill: { min: number; max: number };
 }
 
+export interface HistoryConfig {
+  /** Prompts per `GET_PROMPT_HISTORY` page, i.e. per "Load more" click. */
+  pageSize: number;
+}
+
 export interface UiConfig {
   /** Time window of the popup's usage summary. */
   usageWindowHours: number;
@@ -285,6 +290,7 @@ export interface UiConfig {
     co2Grams: number;
   };
   dashboard: DashboardConfig;
+  history: HistoryConfig;
 }
 
 export interface WaisterConfig {

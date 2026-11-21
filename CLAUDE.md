@@ -38,11 +38,12 @@ background:  handlers/estimation.handler (EstimationHandler)
                  ├─ services/estimation  (EstimationService + model-profiles)
                  ├─ services/conversion  (ConversionService: tokens → energy, water, CO2)
                  └─ services/prompt-store (SQLite WASM, snapshot in IndexedDB) ← PromptRecordDto
-             handlers/usage.handler → services/prompt-store → UsageSummaryDto
+             handlers/usage.handler → services/prompt-store → UsageSummaryDto, PromptHistoryDto
 popup:       ui/popup/  (React, dashboard)  ← GET_USAGE_SUMMARY (reads only the database)
                  │ tab bar → chrome.tabs.create
 app page:    ui/app/    (React, full tab, hash routes: dashboard · analytics · facts · tips · history)
-                 └─ dashboard ← GET_USAGE_SUMMARY per timeframe (fetched by the App root)
+                 ├─ dashboard ← GET_USAGE_SUMMARY per timeframe (fetched by the App root)
+                 └─ history   ← GET_PROMPT_HISTORY pages per filter (fetched by the App root)
              ui/components/ + ui/base.css + ui/app-routes.ts + ui/usage-api.ts shared by both
 shared:      dto/, messages/, config/ (config.json: every tunable rate, heuristic and timing)
 entries/:    one esbuild entry per context, wiring only
@@ -77,8 +78,8 @@ All docs live in `docs/` only. Start at `docs/README.md`. The per-module referen
   unchecked selectors with `// UNVERIFIED:` (see `site-adapter.types.ts`).
 - **Lint enforces the layers:** `eslint.config.js` has `no-restricted-imports` per layer, matching
   the import table in `docs/architecture.md`.
-- **UI (React):** only the `*.app.tsx` roots fetch data (through `useUsageSummary` in
-  `ui/usage-api.ts`). Pages and `components/` only render props (and may navigate). Routes only in `ui/app-routes.ts`. Shared styles in `base.css` / `components.css`,
+- **UI (React):** only the `*.app.tsx` roots fetch data (through `useUsageSummary` /
+  `usePromptHistory` in `ui/usage-api.ts`). Pages and `components/` only render props (and may navigate). Routes only in `ui/app-routes.ts`. Shared styles in `base.css` / `components.css`,
   surface layout in `popup.css` / `app.css`, colors only via the CSS variables
   (`docs/styling.md`).
 - **Keep docs in sync:** when you add, move or change a module, update its section in
@@ -95,8 +96,10 @@ the database and shows the last 24h of token usage (total, breakdown, accumulate
 CO2 tachos, prompt count). Its tab bar opens the full-page app page
 ([ADR 0011](docs/decisions/0011-app-page.md)). Its default page, the Dashboard
 ([ADR 0014](docs/decisions/0014-dashboard-page.md)), shows tokens plus the energy/water/CO2 `impact`
-for a chosen timeframe in three animated cards (CSS + inline SVG). The other four pages (Analytics,
-Facts, Tips, History) are empty placeholders so far. `npm run check` and
+for a chosen timeframe in three animated cards (CSS + inline SVG). The History
+([ADR 0015](docs/decisions/0015-history-page.md)) lists every saved prompt (timeframe, chat-app
+and sort filters, day groups, "Load more" paging) with a detail modal per prompt. Analytics,
+Facts and Tips are empty placeholders so far. `npm run check` and
 `npm run build` pass.
 
 ## Commands
