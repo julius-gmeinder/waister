@@ -201,6 +201,25 @@
     "tachoMax": {
       "energyWh": 10,
       "waterMl": 50
+    },
+    "dashboard": {
+      "busyDay": {
+        "energyWh": 400,
+        "waterMl": 1400
+      },
+      "intensityExponent": 0.5,
+      "pulseMs": {
+        "slowest": 3200,
+        "fastest": 600
+      },
+      "dripMs": {
+        "slowest": 4000,
+        "fastest": 700
+      },
+      "poolFill": {
+        "min": 0.15,
+        "max": 0.6
+      }
     }
   }
 }

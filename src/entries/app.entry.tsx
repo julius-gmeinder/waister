@@ -1,5 +1,5 @@
 /**
- * App page entry: mounts the React app (Analytics, Facts, Tips, History).
+ * App page entry: mounts the React app (Dashboard, Analytics, Facts, Tips, History).
  *
  * Context: app page
  * Docs: docs/modules.md#entries

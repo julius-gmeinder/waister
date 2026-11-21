@@ -1,6 +1,6 @@
 /**
  * PromptStoreService: one row per estimated prompt in the SQLite `prompts` table, plus usage
- * queries for the popup.
+ * queries for the popup and the app page.
  * Metrics only, never chat text (ADR 0009).
  *
  * Context: background
@@ -86,7 +86,8 @@ const SELECT_USAGE_SUMMARY = `
     COALESCE(SUM(overhead_tokens), 0) AS overhead,
     COALESCE(SUM(energy_wh), 0)       AS energyWh,
     COALESCE(SUM(water_ml), 0)        AS waterMl,
-    COALESCE(SUM(co2_grams), 0)       AS co2Grams
+    COALESCE(SUM(co2_grams), 0)       AS co2Grams,
+    MIN(captured_at)                  AS firstCapturedAt
   FROM prompts
   WHERE captured_at >= $sinceMs
 `;
@@ -144,6 +145,9 @@ export async function getUsageSummary(sinceMs: number): Promise<UsageSummaryDto>
 
   return {
     sinceMs,
+    queriedAtMs: Date.now(),
+    // MIN() of an empty window is NULL.
+    firstCapturedAt: row.firstCapturedAt == null ? null : num(row.firstCapturedAt),
     promptCount: num(row.promptCount),
     totalTokens: num(row.totalTokens),
     breakdown: {

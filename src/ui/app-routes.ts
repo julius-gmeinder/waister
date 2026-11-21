@@ -1,14 +1,21 @@
 /**
  * App routes: the pages of the full-screen app page (app/index.html), addressed by hash
- * (`#/analytics`). Used by the app's Sidebar and by the popup's TabBar.
+ * (`#/dashboard`). Used by the app's Sidebar and by the popup's TabBar.
  *
  * Context: popup, app page
  * Docs: docs/modules.md#ui
  */
 
-import { BookOpen, ChartColumn, Clock, Lightbulb, type LucideIcon } from 'lucide-react';
+import {
+  BookOpen,
+  ChartColumn,
+  Clock,
+  LayoutDashboard,
+  Lightbulb,
+  type LucideIcon,
+} from 'lucide-react';
 
-export type AppRouteId = 'analytics' | 'facts' | 'tips' | 'history';
+export type AppRouteId = 'dashboard' | 'analytics' | 'facts' | 'tips' | 'history';
 
 export interface AppRoute {
   id: AppRouteId;
@@ -16,18 +23,19 @@ export interface AppRoute {
   icon: LucideIcon;
 }
 
-const ANALYTICS: AppRoute = { id: 'analytics', label: 'Analytics', icon: ChartColumn };
+const DASHBOARD: AppRoute = { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard };
 
 /** Order of the tabs in the popup and of the links in the sidebar. */
 export const APP_ROUTES: readonly AppRoute[] = [
-  ANALYTICS,
+  DASHBOARD,
+  { id: 'analytics', label: 'Analytics', icon: ChartColumn },
   { id: 'facts', label: 'Facts', icon: BookOpen },
   { id: 'tips', label: 'Tips', icon: Lightbulb },
   { id: 'history', label: 'History', icon: Clock },
 ];
 
 /** Shown when the hash is empty or unknown. */
-export const DEFAULT_ROUTE: AppRoute = ANALYTICS;
+export const DEFAULT_ROUTE: AppRoute = DASHBOARD;
 
 /** Hash link inside the app page. */
 export function routeHash(id: AppRouteId): string {

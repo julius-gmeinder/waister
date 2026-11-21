@@ -18,15 +18,44 @@
   background: var(--surface);
 }
 
-.page-title {
-  margin: 0 0 8px;
-  color: var(--contrast);
-  font-family: var(--font-serif);
-  font-size: 28px;
-  font-weight: 700;
-}
-
 .page-placeholder {
   margin: 0;
   color: var(--text-muted);
+}
+
+/* Dashboard: title, picker, subtitle, then the two impact cards side by side. */
+.dashboard {
+  display: grid;
+  gap: 16px;
+  max-width: 1040px;
+}
+
+.dashboard .page-title {
+  margin: 0;
+}
+
+.dashboard-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 15px;
+}
+
+.dashboard-subtitle-value {
+  color: var(--contrast);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 8px;
+}
+
+/* Too narrow for two scenes next to each other: stack the cards. */
+@media (max-width: 860px) {
+  .dashboard-cards {
+    grid-template-columns: 1fr;
+  }
 }

@@ -274,10 +274,10 @@ EstimationHandler right after `buildTokenEstimateDto`.
 `prompts` table, and the popup's queries are answered from it
 ([ADR 0009](decisions/0009-sqlite-prompt-store.md)). **Metrics only, no chat text.**
 
-| File                      | Role                                                                                                                                                             |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `prompt-store.service.ts` | Schema + SQL. `createPromptRecord(capture, estimate)` (adds `crypto.randomUUID()` and `conversationUrl`), `savePromptRecord(record)`, `getUsageSummary(sinceMs)` |
-| `sqlite-database.ts`      | Internal. Inits `@sqlite.org/sqlite-wasm` once, restores/saves the IndexedDB snapshot, `getDatabase(schema)`, `writeAndPersist(schema, write)`                   |
+| File                      | Role                                                                                                                                                                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prompt-store.service.ts` | Schema + SQL. `createPromptRecord(capture, estimate)` (adds `crypto.randomUUID()` and `conversationUrl`), `savePromptRecord(record)`, `getUsageSummary(sinceMs)` (token, breakdown and impact sums, oldest `captured_at`) |
+| `sqlite-database.ts`      | Internal. Inits `@sqlite.org/sqlite-wasm` once, restores/saves the IndexedDB snapshot, `getDatabase(schema)`, `writeAndPersist(schema, write)`                                                                            |
 
 - **Persistence:** MV3 service workers can't use the OPFS VFSes, so the database runs in memory.
   After every insert the whole database is exported and written to IndexedDB (`waister` →
@@ -307,14 +307,18 @@ esbuild entry ([ADR 0011](decisions/0011-app-page.md)):
   accumulated energy (Wh) and water (mL) tachos, and the prompt count. A tab bar at the bottom
   opens the app page.
 - **App page** (`ui/app/`, a full browser tab at `app/index.html`): a sidebar plus one page per
-  route (Analytics, Facts, Tips, History). The pages are empty placeholders for now.
+  route (Dashboard, Analytics, Facts, Tips, History). The Dashboard
+  ([ADR 0014](decisions/0014-dashboard-page.md)) shows tokens, energy and water for a chosen
+  timeframe. The other pages are empty placeholders for now.
 
-Neither surface talks to the estimation pipeline. The layout is deliberately plain for now.
+Neither surface talks to the estimation pipeline.
 
 ```
-base.css                              shared: fonts, color/font tokens, element defaults
+base.css                              shared: fonts, color/font tokens (incl. --power* / --water*), element defaults
 app-routes.ts                         shared: APP_ROUTES (id, label, icon), hash ↔ route, extension URLs
-format.helpers.ts                     shared: formatCount, formatMetric (locale number, en dash while loading)
+usage-api.ts                          shared: fetchUsageSummary(sinceMs) + useUsageSummary hook (roots only), fills fields a stale worker lacks
+format.helpers.ts                     shared: formatCount, formatMetric (tachos), formatEnergy / formatWater (auto-scaled Quantity, cards)
+timeframe.helpers.ts                  app page: TIMEFRAMES (Today, Last week, Last 30 days, All time), timeframeSinceMs
 components/                           shared components (used by either surface)
   components.css                      styles of all components, one block each
   header.component.tsx                Header: full logo, centered (/logo/waister-full.svg), popup and app page
@@ -324,48 +328,64 @@ components/                           shared components (used by either surface)
   tacho.component.tsx                 ImpactTachos: two semi-circular tacho gauges for energy (Wh) and water (mL)
   tab-bar.component.tsx               TabBar (popup): one tab per route, opens it in a new browser tab
   sidebar.component.tsx               Sidebar (app page): logo + one hash link per route
+  page-title.component.tsx            PageTitle (app page): serif headline of every page
+  timeframe-picker.component.tsx      TimeframePicker (dashboard): one chip per timeframe (aria-pressed)
+  power-card.component.tsx            PowerCard (dashboard): energy, pulsing number, lightning + gears scene
+  water-card.component.tsx            WaterCard (dashboard): water, drops falling into a swaying pool
 popup/
   popup.html                          <div id="root">, loads index.js + index.css
   popup.css                           popup layout only (full-window card, `.popup-period` line)
-  popup.app.tsx                       PopupApp: fetches the summary, holds the state
+  popup.app.tsx                       PopupApp: fetches the last 24h summary, renders it
 app/
   app.html                            <div id="root">, loads index.js + index.css
-  app.css                             app page layout only (flat sidebar + content grid, page title)
-  app.app.tsx                         App: reads the hash route, renders Sidebar + the page
+  app.css                             app page layout only (flat sidebar + content grid, dashboard grid)
+  app.app.tsx                         App: reads the hash route, holds the timeframe, fetches the summary, renders Sidebar + the page
   pages/
+    dashboard.page.tsx                DashboardPage: title, picker, token subtitle, PowerCard + WaterCard
+    dashboard.helpers.ts              dashboardAnimation(summary): pulse / drip period + pool fill from config
     analytics.page.tsx                AnalyticsPage (empty)
     facts.page.tsx                    FactsPage (empty)
     tips.page.tsx                     TipsPage (empty)
     history.page.tsx                  HistoryPage (empty)
 ```
 
-| File / folder                | Role                                                                  | Copied/bundled to                               |
-| ---------------------------- | --------------------------------------------------------------------- | ----------------------------------------------- |
-| `popup/popup.html`           | Markup shell, only `#root`                                            | `popup/index.html`                              |
-| `app/app.html`               | Markup shell, only `#root`, extension icon as favicon                 | `app/index.html`                                |
-| `base.css`, `components.css` | Shared styles. Each entry imports them first, then its own layout CSS | bundled into `popup/index.css`, `app/index.css` |
-| `popup/popup.app.tsx`        | `PopupApp`: sends `GET_USAGE_SUMMARY` in a `useEffect`, renders below | `entries/popup.entry.tsx` → `popup/index.js`    |
-| `app/app.app.tsx`            | `App`: maps the hash route to a page component, sets `document.title` | `entries/app.entry.tsx` → `app/index.js`        |
-| `app/pages/*.page.tsx`       | One component per route. Only the app page bundles them               | `entries/app.entry.tsx`                         |
-| `components/*.component.tsx` | Presentational components. They only render props and fetch nothing   | whichever entry uses them                       |
+| File / folder                | Role                                                                   | Copied/bundled to                               |
+| ---------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------- |
+| `popup/popup.html`           | Markup shell, only `#root`                                             | `popup/index.html`                              |
+| `app/app.html`               | Markup shell, only `#root`, extension icon as favicon                  | `app/index.html`                                |
+| `base.css`, `components.css` | Shared styles. Each entry imports them first, then its own layout CSS  | bundled into `popup/index.css`, `app/index.css` |
+| `popup/popup.app.tsx`        | `PopupApp`: `useUsageSummary(now − 24 h)`, renders below               | `entries/popup.entry.tsx` → `popup/index.js`    |
+| `app/app.app.tsx`            | `App`: hash route → page, `document.title`, dashboard timeframe + data | `entries/app.entry.tsx` → `app/index.js`        |
+| `app/pages/*.page.tsx`       | One component per route. Only the app page bundles them                | `entries/app.entry.tsx`                         |
+| `components/*.component.tsx` | Presentational components. They only render props and fetch nothing    | whichever entry uses them                       |
 
 - **Routing (app page):** hash based (`app/index.html#/tips`). `App` reads `location.hash`
   through `useSyncExternalStore` + `hashchange`. No router library. An empty or unknown hash
-  shows `DEFAULT_ROUTE` (Analytics). Sidebar links are plain `#/<id>` anchors, so switching pages
+  shows `DEFAULT_ROUTE` (Dashboard). Sidebar links are plain `#/<id>` anchors, so switching pages
   doesn't reload, and back/forward works.
 - **Routes** live in `app-routes.ts` only. The popup's TabBar and the app's Sidebar both render
   `APP_ROUTES`, so a new page is one entry there, one `*.page.tsx`, and one line in `PAGES`
-  (`app.app.tsx`). `app-routes.ts` doesn't import the pages, so the popup bundle doesn't
-  contain them.
+  (`app.app.tsx`). The dashboard is the exception: it gets props, so `App` renders it directly.
+  `app-routes.ts` doesn't import the pages, so the popup bundle doesn't contain them.
+- **Dashboard:** `App` holds the `TimeframeId` (starts on Today, not remembered) and fetches
+  `useUsageSummary(timeframeSinceMs(timeframe))`. The `sinceMs` is fixed per selection, so a
+  rolling window doesn't refetch on every render. `DashboardPage` turns the summary into
+  `pulseMs` / `dripMs` / `poolFill` (`dashboard.helpers.ts`, formula and values in
+  `config.json` → `ui.dashboard`, field docs in `DashboardConfig`). `null` periods mean no usage,
+  so the card stands still. The motion itself is pure CSS driven by custom properties
+  (`--pulse`, `--drip`, `--drop-fall`), see [styling.md](styling.md#motion).
 - **Opening from the popup:** `TabBar` calls `chrome.tabs.create({ url: appRouteUrl(id) })`
   (no permission needed). Every click opens a new tab. Reusing an already open app tab would
   need the `tabs` permission.
-- **State:** `PopupApp` holds one `UsageSummaryDto | null | undefined` (`undefined` = loading,
-  `null` = no usable answer from the background). It treats a missing response and an `{ error }`
-  response as `null`, and ignores a result that arrives after it unmounted. Components get plain
-  values and show `–` (`formatCount`) while a value is `undefined`.
-- **Data flow:** only the `*.app.tsx` root components send `chrome.runtime` messages.
-  Components never fetch data. They may only navigate (`chrome.tabs.create`, hash links).
+- **State:** `useUsageSummary` (`usage-api.ts`) holds one `SummaryState` =
+  `UsageSummaryDto | null | undefined` (`undefined` = loading, `null` = no usable answer from the
+  background). It treats a missing response and an `{ error }` response as `null`, ignores a
+  result that arrives after unmount or a newer request, and keeps the previous summary while a
+  new window loads. Components get plain values and show `–` (`formatCount`, `formatEnergy`, …)
+  while a value is `undefined`.
+- **Data flow:** only the `*.app.tsx` root components send `chrome.runtime` messages (through
+  `useUsageSummary`). Pages and components never fetch data. They may only navigate
+  (`chrome.tabs.create`, hash links).
 - The popup only lives while it is open, so nothing persists between openings.
 - **Naming:** kebab-case file, PascalCase export (`breakdown-row.component.tsx` →
   `BreakdownRow`, `tips.page.tsx` → `TipsPage`). Function components only.
@@ -386,12 +406,12 @@ Must not import: `handlers/`, `services/`, `readers/`. Enforced by ESLint.
 `chrome.runtime` messages. Types only: no logic and no imports from other layers. Everything
 here must survive structured cloning (no classes, functions or DOM nodes).
 
-| File                    | DTO                | From → To                                 |
-| ----------------------- | ------------------ | ----------------------------------------- |
-| `chat-capture.dto.ts`   | `ChatCaptureDto`   | reader strategy → EstimationHandler       |
-| `token-estimate.dto.ts` | `TokenEstimateDto` | EstimationService → EstimationHandler     |
-| `prompt-record.dto.ts`  | `PromptRecordDto`  | EstimationHandler → PromptStoreService    |
-| `usage-summary.dto.ts`  | `UsageSummaryDto`  | PromptStoreService → UsageHandler → popup |
+| File                    | DTO                | From → To                                           |
+| ----------------------- | ------------------ | --------------------------------------------------- |
+| `chat-capture.dto.ts`   | `ChatCaptureDto`   | reader strategy → EstimationHandler                 |
+| `token-estimate.dto.ts` | `TokenEstimateDto` | EstimationService → EstimationHandler               |
+| `prompt-record.dto.ts`  | `PromptRecordDto`  | EstimationHandler → PromptStoreService              |
+| `usage-summary.dto.ts`  | `UsageSummaryDto`  | PromptStoreService → UsageHandler → popup, app page |
 
 Field reference: [dto.md](dto.md).
 
@@ -404,10 +424,10 @@ May import: nothing.
 `src/messages/` (shared): the contract for every `chrome.runtime` message, a discriminated union
 on `type`, plus the response type of each message.
 
-| `type`              | Sender  | Receiver   | Payload          | Response                                          |
-| ------------------- | ------- | ---------- | ---------------- | ------------------------------------------------- |
-| `ESTIMATE_PROMPT`   | content | background | `ChatCaptureDto` | `PromptRecordDto` (the content script ignores it) |
-| `GET_USAGE_SUMMARY` | popup   | background | `{ sinceMs }`    | `UsageSummaryDto` (`UsageSummaryResponse`)        |
+| `type`              | Sender          | Receiver   | Payload          | Response                                          |
+| ------------------- | --------------- | ---------- | ---------------- | ------------------------------------------------- |
+| `ESTIMATE_PROMPT`   | content         | background | `ChatCaptureDto` | `PromptRecordDto` (the content script ignores it) |
+| `GET_USAGE_SUMMARY` | popup, app page | background | `{ sinceMs }`    | `UsageSummaryDto` (`UsageSummaryResponse`)        |
 
 On a handler failure the listener answers `{ error: string }`. An unknown `type` gets no answer
 (the listener returns `false`).
@@ -443,6 +463,7 @@ The field list, units and calibration notes live in `config.types.ts`, not here.
 | `capture.models.claude`, `.gemini` | site adapters                        | `fallbackName`, `families` (name → label keywords), `thinkingKeywords`                                |
 | `capture.models.chatgpt`           | ChatGPT adapter                      | `effortWords`, `slug.*` and `label.*` (regex sources for the model slug and picker label)             |
 | `ui`                               | PopupApp, ImpactTachos               | `usageWindowHours`, `tachoMax` (`energyWh`, `waterMl`)                                                |
+| `ui.dashboard`                     | Dashboard (`dashboard.helpers.ts`)   | `busyDay` (Wh / mL per day = intensity 1), `intensityExponent`, `pulseMs`, `dripMs`, `poolFill`       |
 
 - **Import by section:** `import { capture } from '../../config/config.json'`. esbuild
   tree-shakes JSON per top-level key, so each bundle only contains the sections it reads.
