@@ -35,18 +35,47 @@ function ensureImpact(summary: UsageSummaryResponse): UsageSummaryDto {
   ) {
     return summary;
   }
-  const { perTokensUnit, roundingDecimals } = estimation.impact;
+  const {
+    perTokensUnit,
+    roundingDecimals,
+    waterMlPerWh,
+    co2GramsPerWh,
+    cachedInputMultiplier,
+    tokenEnergyProfile,
+  } = estimation.impact;
   const rates = estimation.models.openai.default;
   const factor = 10 ** roundingDecimals;
-  const scale = Math.max(0, summary.totalTokens) / perTokensUnit;
   const round = (value: number): number => Math.round(value * factor) / factor;
+
+  const breakdown = summary.breakdown;
+  const categoryTokens = {
+    output: breakdown?.output ?? summary.totalTokens,
+    thinking: breakdown?.thinking ?? 0,
+    input: breakdown?.input ?? 0,
+    tools: breakdown?.tools ?? 0,
+    history: breakdown?.history ?? 0,
+    systemPrompt: breakdown?.overhead ?? 0,
+  } as const;
+
+  let totalEnergyWh = 0;
+  for (const [key, count] of Object.entries(categoryTokens) as [
+    keyof typeof tokenEnergyProfile,
+    number,
+  ][]) {
+    const profile = tokenEnergyProfile[key];
+    const effectiveMultiplier =
+      (1 - profile.avgCacheHitRate) * profile.baseMultiplier +
+      profile.avgCacheHitRate * cachedInputMultiplier;
+    totalEnergyWh +=
+      (Math.max(0, count) / perTokensUnit) * rates.energyWhPer1M * effectiveMultiplier;
+  }
 
   return {
     ...summary,
     impact: {
-      energyWh: round(scale * rates.energyWhPer1M),
-      waterMl: round(scale * rates.waterMlPer1M),
-      co2Grams: round(scale * rates.co2GramsPer1M),
+      energyWh: round(totalEnergyWh),
+      waterMl: round(totalEnergyWh * waterMlPerWh),
+      co2Grams: round(totalEnergyWh * co2GramsPerWh.openai),
     },
   };
 }

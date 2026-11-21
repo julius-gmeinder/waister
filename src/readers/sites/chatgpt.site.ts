@@ -34,7 +34,7 @@ import {
   readToolCalls,
   type ToolSelectors,
 } from '../dom-content.reader';
-import { THINKING_DETECTED_EFFORT } from './effort-inference.helpers';
+import { familyDefaultEffort, THINKING_DETECTED_EFFORT } from './effort-inference.helpers';
 import type { SiteAdapter } from './site-adapter.types';
 import {
   buildHistory,
@@ -144,10 +144,27 @@ const LABEL = {
   version: pattern(MODELS.label.version),
 };
 
-/** Whole-word regexes per effort, in the order they are checked (high wins over medium / low). */
-const EFFORT_PATTERNS: [ThinkingEffort, RegExp][] = (['high', 'medium', 'low'] as const).map(
-  (effort) => [effort, pattern(`\\b(${MODELS.effortWords[effort].join('|')})\\b`)],
+/**
+ * Whole-word regexes per effort, in the order they are checked
+ * (max > xhigh > high > medium > low).
+ */
+const EFFORT_PATTERNS: [ThinkingEffort, RegExp][] = (
+  ['max', 'xhigh', 'high', 'medium', 'low'] as const
+).map((effort) => [effort, pattern(`\\b(${MODELS.effortWords[effort].join('|')})\\b`)]);
+
+/**
+ * Named ChatGPT model families from `capture.models.chatgpt.families`, checked before falling back
+ * to `openai-o` or generic `gpt`.
+ */
+const FAMILY_KEYWORDS: [ModelFamily<'openai'>, string[]][] = Object.entries(MODELS.families).map(
+  ([family, keywords]) => [family as ModelFamily<'openai'>, keywords],
 );
+
+function matchChatGptFamily(lower: string): ModelFamily<'openai'> | null {
+  return (
+    FAMILY_KEYWORDS.find(([, keywords]) => keywords.some((kw) => lower.includes(kw)))?.[0] ?? null
+  );
+}
 
 interface GptTurn {
   role: Role;
@@ -227,51 +244,69 @@ function parseEffort(lower: string): ThinkingEffort | null {
 }
 
 /**
- * Parses slugs like "gpt-4o", "gpt-5-1-thinking", "o4-mini-high". `uiLabel` supplies the effort
- * when the slug doesn't carry it (e.g. "Thinking · Extended" in the model picker).
+ * Parses slugs like "gpt-4o", "gpt-5-1-thinking", "o4-mini-high", "gpt-astra". `uiLabel` supplies
+ * the effort when the slug doesn't carry it (e.g. "Thinking · Extended" in the model picker).
  */
-function parseSlug(slug: string, uiLabel: string): ModelInfo {
+export function parseChatGptSlug(slug: string, uiLabel: string): ModelInfo {
   const lower = slug.toLowerCase();
   const words = lower.replace(/[-_]/g, ' ');
-  const labelEffort = parseEffort(uiLabel.toLowerCase());
-  const reasoningEffort = parseEffort(words) ?? labelEffort ?? THINKING_DETECTED_EFFORT;
+  const labelLower = uiLabel.toLowerCase();
+  const explicitEffort = parseEffort(words) ?? parseEffort(labelLower);
+  const matchedFamily = matchChatGptFamily(lower) ?? matchChatGptFamily(labelLower);
 
   if (SLUG.oSeries.test(lower)) {
     const version = lower.match(SLUG.oSeriesVersion)?.[1] ?? lower;
+    const reasoningEffort = explicitEffort ?? THINKING_DETECTED_EFFORT;
     return { name: O_SERIES, version, thinkingEffort: reasoningEffort, rawLabel: slug };
   }
 
+  const name = matchedFamily ?? GPT;
   const v = lower.match(SLUG.gptVersion);
   const version = v ? `${v[1]}${v[2] ? `.${v[2]}` : ''}${v[3] ?? ''}` : 'unknown';
-  // No reasoning marker: the router picked a non-reasoning model (instant / chat / 4o).
-  const thinkingEffort = SLUG.reasoning.test(words) ? reasoningEffort : 'none';
-  return { name: GPT, version, thinkingEffort, rawLabel: slug };
+
+  const defaultEffort = matchedFamily ? familyDefaultEffort(matchedFamily) : 'unknown';
+  const fallbackReasoningEffort =
+    defaultEffort !== 'unknown' ? defaultEffort : THINKING_DETECTED_EFFORT;
+  // No reasoning marker: the router picked a non-reasoning model (instant / chat / 4o / luna),
+  // unless an explicit effort or a family default (e.g. gpt-luna -> low) applies.
+  const thinkingEffort = SLUG.reasoning.test(words)
+    ? (explicitEffort ?? fallbackReasoningEffort)
+    : (explicitEffort ?? (defaultEffort !== 'unknown' ? defaultEffort : 'none'));
+  return { name, version, thinkingEffort, rawLabel: slug };
 }
 
 /**
- * Parses picker labels like "ChatGPT 4o", "o3-mini-high", "ChatGPT 5 Thinking". Fallback for when
- * no message carries a model slug.
+ * Parses picker labels like "ChatGPT 4o", "o3-mini-high", "ChatGPT 5 Thinking", "GPT-6 Astra".
+ * Fallback for when no message carries a model slug.
  */
-function parseModel(rawLabel: string, hasThinkingSignal: boolean): ModelInfo {
+export function parseChatGptLabel(rawLabel: string, hasThinkingSignal: boolean): ModelInfo {
   const label = rawLabel.trim();
   const lower = label.toLowerCase();
   const { nonReasoning, reasoning } = MODELS.label;
+  const matchedFamily = matchChatGptFamily(lower);
+  const name = matchedFamily ?? (LABEL.oSeries.test(lower) ? O_SERIES : GPT);
+  const defaultEffort = matchedFamily ? familyDefaultEffort(matchedFamily) : 'unknown';
 
-  let thinkingEffort: ThinkingEffort = hasThinkingSignal ? THINKING_DETECTED_EFFORT : 'unknown';
+  let thinkingEffort: ThinkingEffort = hasThinkingSignal ? THINKING_DETECTED_EFFORT : defaultEffort;
   const effort = parseEffort(lower);
   if (effort) {
     thinkingEffort = effort;
   } else if (nonReasoning.some((word) => lower.includes(word))) {
-    thinkingEffort = hasThinkingSignal ? THINKING_DETECTED_EFFORT : 'none';
+    thinkingEffort = hasThinkingSignal
+      ? THINKING_DETECTED_EFFORT
+      : defaultEffort !== 'unknown'
+        ? defaultEffort
+        : 'none';
   } else if (
     reasoning.some((word) => lower.includes(word)) ||
     LABEL.reasoningPatterns.some((regex) => regex.test(lower))
   ) {
-    thinkingEffort = THINKING_DETECTED_EFFORT;
+    thinkingEffort =
+      !hasThinkingSignal && defaultEffort !== 'unknown' ? defaultEffort : THINKING_DETECTED_EFFORT;
   }
 
   return {
-    name: LABEL.oSeries.test(lower) ? O_SERIES : GPT,
+    name,
     version: label.match(LABEL.version)?.[1] ?? 'unknown',
     thinkingEffort,
     rawLabel: label,
@@ -293,12 +328,14 @@ export const chatgptSite: SiteAdapter = {
       .map((node) => node.getAttribute(CHATGPT_SELECTORS.modelSlugAttr))
       .filter((s): s is string => Boolean(s))
       .pop();
-    if (slug) return parseSlug(slug, uiLabel);
+    if (slug) return parseChatGptSlug(slug, uiLabel);
 
     const hasThinkingSignal =
       hasMatch(turn?.nodes ?? [], CHATGPT_SELECTORS.thinkingBadge) ||
       document.querySelector(CHATGPT_SELECTORS.thinkingToggle) !== null;
-    return uiLabel ? parseModel(uiLabel, hasThinkingSignal) : unknownModel(GPT, hasThinkingSignal);
+    return uiLabel
+      ? parseChatGptLabel(uiLabel, hasThinkingSignal)
+      : unknownModel(GPT, hasThinkingSignal);
   },
 
   readUserInput(): string {

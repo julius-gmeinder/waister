@@ -108,16 +108,18 @@ Unknown models fall back to the provider default and set `approximate: true`.
 ## 4. ConversionService: environmental impact
 
 `services/conversion/conversion.service.ts`. Entry points: `convertTokensToImpact(estimateDto)`,
-`calculateEnvironmentalImpact(totalTokens, provider, model)`.
+`calculateEnvironmentalImpact(tokens, provider, model)`.
 
-Takes the `TokenEstimateDto` from `EstimationService` and converts `totalTokens` into energy,
-water and CO2 using the model's rates in `config.json` (`estimation.models`, `estimation.impact`):
+Takes the `TokenEstimateDto` from `EstimationService` and converts each category of `breakdown`
+(`output`, `thinking`, `input`, `tools`, `history`, and `overhead` mapped to `systemPrompt`) into
+energy, water and CO2 using the model's `energyWhPer1M` and `estimation.impact` in `config.json`:
 
 ```
-scale     = totalTokens / 1_000_000
-energyWh  = scale × profile.energyWhPer1M
-waterMl   = scale × profile.waterMlPer1M
-co2Grams  = scale × profile.co2GramsPer1M
+effectiveMultiplier(c) = (1 − avgCacheHitRate(c)) × baseMultiplier(c) + avgCacheHitRate(c) × cachedInputMultiplier
+categoryEnergyWh(c)    = (tokens(c) / 1_000_000) × profile.energyWhPer1M × effectiveMultiplier(c)
+totalEnergyWh          = sum(categoryEnergyWh(c))
+waterMl                = totalEnergyWh × impact.waterMlPerWh
+co2Grams               = totalEnergyWh × impact.co2GramsPerWh[provider]
 ```
 
 Returns the updated [`TokenEstimateDto`](dto.md#tokenestimatedto) with `impact` (`energyWh`,

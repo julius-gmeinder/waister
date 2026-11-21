@@ -24,12 +24,12 @@ EstimationHandler. One DTO per sent prompt.
 
 ### ModelInfo
 
-| Field            | Type             | Description                                                       |
-| ---------------- | ---------------- | ----------------------------------------------------------------- |
-| `name`           | `string`         | Model family, e.g. `gpt`, `claude-sonnet`, `gemini-pro`           |
-| `version`        | `string`         | Version label as far as it is visible, e.g. `5.5`, `2.5`          |
-| `thinkingEffort` | `ThinkingEffort` | `'none' \| 'low' \| 'medium' \| 'high' \| 'unknown'` (normalized) |
-| `rawLabel`       | `string`         | Unparsed text from the UI, for debugging and later re-parsing     |
+| Field            | Type             | Description                                                                           |
+| ---------------- | ---------------- | ------------------------------------------------------------------------------------- |
+| `name`           | `string`         | Model family, e.g. `gpt`, `claude-sonnet`, `gemini-pro`                               |
+| `version`        | `string`         | Version label as far as it is visible, e.g. `5.5`, `2.5`                              |
+| `thinkingEffort` | `ThinkingEffort` | `'none' \| 'low' \| 'medium' \| 'high' \| 'xhigh' \| 'max' \| 'unknown'` (normalized) |
+| `rawLabel`       | `string`         | Unparsed text from the UI, for debugging and later re-parsing                         |
 
 ### ChatTurn
 

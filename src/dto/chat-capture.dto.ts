@@ -8,7 +8,7 @@
 
 export type Provider = 'openai' | 'anthropic' | 'google';
 
-export type ThinkingEffort = 'none' | 'low' | 'medium' | 'high' | 'unknown';
+export type ThinkingEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'unknown';
 
 /** Fields the site's UI doesn't show are 'unknown'. */
 export interface ModelInfo {

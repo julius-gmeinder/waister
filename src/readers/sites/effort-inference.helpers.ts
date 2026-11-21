@@ -18,6 +18,8 @@ const VALID_EFFORTS: Record<ThinkingEffort, true> = {
   low: true,
   medium: true,
   high: true,
+  xhigh: true,
+  max: true,
   unknown: true,
 };
 

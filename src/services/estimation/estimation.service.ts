@@ -52,10 +52,8 @@ export function estimateThinkingTokens(
   // An effort string outside ThinkingEffort (it crosses a message boundary) counts as unknown.
   const effortMultiplier =
     THINKING.effortMultipliers[thinkingEffort] ?? THINKING.effortMultipliers.unknown;
-  return Math.min(
-    THINKING.maxTokens,
-    Math.round(effectiveMs * tokensPerMsThinking * effortMultiplier),
-  );
+  const rawTokens = Math.round(effectiveMs * tokensPerMsThinking * effortMultiplier);
+  return Math.max(0, Math.min(THINKING.maxTokens, rawTokens));
 }
 
 /** Tool tokens: sum of `estimation.tools[provider][kind]` over all detected calls. */

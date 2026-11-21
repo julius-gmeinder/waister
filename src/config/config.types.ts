@@ -31,13 +31,10 @@ type RawConfig = typeof rawConfig;
 export interface ModelRates {
   /** Hidden input: system prompt + tool definitions sent with every prompt. */
   systemPromptTokens: number;
-  /** Thinking tokens per ms of `thinkingTimeMs`, i.e. output speed (0.075 ≈ 75 tokens/s). */
+  /** Thinking tokens per ms of `thinkingTimeMs`, i.e. output speed (0.085 ≈ 85 tokens/s). */
   tokensPerMsThinking: number;
+  /** Base output/thinking energy in Wh per `perTokensUnit` tokens. */
   energyWhPer1M: number;
-  /** Covers cooling and power generation. */
-  waterMlPer1M: number;
-  /** Grams of CO2 equivalent. */
-  co2GramsPer1M: number;
 }
 
 export interface ProviderModels {
@@ -47,14 +44,25 @@ export interface ProviderModels {
   families: Record<string, ModelRates>;
 }
 
+/** Token categories weighted separately in `estimation.impact.tokenEnergyProfile`. */
+export type TokenEnergyCategory =
+  'output' | 'thinking' | 'input' | 'tools' | 'history' | 'systemPrompt';
+
+export interface TokenCategoryEnergyProfile {
+  /** Energy cost relative to base output/thinking generation (1.0 = full decode cost). */
+  baseMultiplier: number;
+  /** Fraction of tokens in this category expected to hit the KV cache (`[0, 1]`). */
+  avgCacheHitRate: number;
+}
+
 /**
  * Assumptions: every value here is a guess, not a measurement (ADR 0012).
  * - `thinking.baselineMs`: typical network + time-to-first-token of a non-reasoning reply.
  * - `thinking.effortMultipliers`: relative reasoning budget per UI effort level, `medium` = 1.
  *   `none` is 0 because a model with thinking switched off emits no reasoning tokens, whatever
- *   the latency. `unknown` is 0.5 to hedge between thinking and not thinking.
- * - `tools`: snippet sizes per call, i.e. a search returns a few result snippets (~3000 tokens,
- *   2500 for Gemini), a code run its input plus output (~600), any other tool ~800.
+ *   the latency. `unknown` hedges between thinking and not thinking.
+ * - `tools`: snippet sizes per call, i.e. a search returns a few result snippets (~3500 tokens,
+ *   3000 for Gemini), a code run its input plus output (~850), any other tool ~900.
  */
 export interface EstimationConfig {
   thinking: {
@@ -73,6 +81,14 @@ export interface EstimationConfig {
     perTokensUnit: number;
     /** Decimals kept, so tiny single-prompt Wh / mL values don't round to 0. */
     roundingDecimals: number;
+    /** Datacenter cooling + power generation water intensity (mL per Wh). */
+    waterMlPerWh: number;
+    /** Grid carbon intensity per provider (g CO2e per Wh). */
+    co2GramsPerWh: Record<Provider, number>;
+    /** Relative energy multiplier for tokens served from the KV cache. */
+    cachedInputMultiplier: number;
+    /** Per-category energy multiplier and average KV-cache hit rate. */
+    tokenEnergyProfile: Record<TokenEnergyCategory, TokenCategoryEnergyProfile>;
   };
   /** Hidden tokens per tool call (`search` snippets, `code` execution, `other`), per provider. */
   tools: Record<Provider, Record<ToolCallKind, number>>;
@@ -168,11 +184,15 @@ export interface ModelKeywordConfig {
  */
 export interface ChatGptModelConfig {
   /**
-   * Plain words per effort level, matched as whole words in slugs and picker labels. Checked
-   * high, medium, low (first hit wins). "Extended" and "Heavy" are the effort labels of the
-   * Thinking picker, "Standard" and "Light" the lower ones.
+   * Family name -> lowercase keywords matched against slugs and picker labels before falling back
+   * to `openai-o` or generic `gpt`. Keys must exist in `estimation.models.openai.families`.
    */
-  effortWords: Record<'high' | 'medium' | 'low', string[]>;
+  families: Record<string, string[]>;
+  /**
+   * Plain words per effort level, matched as whole words in slugs and picker labels. Checked
+   * max, xhigh, high, medium, low (first hit wins).
+   */
+  effortWords: Record<'max' | 'xhigh' | 'high' | 'medium' | 'low', string[]>;
   slug: {
     /** o-series slugs ("o3", "o4-mini-high") start with `o` + digit. */
     oSeries: string;
@@ -262,12 +282,13 @@ export type CheckedFamilyDefaults = Expect<
 >;
 
 /**
- * Compile-time only: `false` here means a family key under `capture.models.claude|gemini.families`
- * has no rates in `estimation.models`.
+ * Compile-time only: `false` here means a family key under
+ * `capture.models.claude|gemini|chatgpt.families` has no rates in `estimation.models`.
  */
 export type CheckedModelKeywordFamilies = [
   Expect<
     HasOnlyKeys<RawConfig['capture']['models']['claude']['families'], ModelFamily<'anthropic'>>
   >,
   Expect<HasOnlyKeys<RawConfig['capture']['models']['gemini']['families'], ModelFamily<'google'>>>,
+  Expect<HasOnlyKeys<RawConfig['capture']['models']['chatgpt']['families'], ModelFamily<'openai'>>>,
 ];

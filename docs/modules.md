@@ -198,12 +198,12 @@ May import: `services/`, `dto/`, `messages/`. Must not import: `readers/`, `ui/`
 plain exported functions with a `*.service.ts` facade. Other files in the same folder are
 internal to that service.
 
-| Folder          | Service                                     | Job                                                                    |
-| --------------- | ------------------------------------------- | ---------------------------------------------------------------------- |
-| `tokenizer/`    | [TokenizerService](#tokenizer-service)      | Counts the tokens of all **visible** text in the DTO                   |
-| `estimation/`   | [EstimationService](#estimation-service)    | Estimates **hidden** tokens (thinking, system/tool overhead)           |
-| `conversion/`   | [ConversionService](#conversion-service)    | Converts `totalTokens` into energy (Wh), water (mL) and CO2 (g) impact |
-| `prompt-store/` | [PromptStoreService](#prompt-store-service) | Saves every prompt to SQLite and answers the popup's queries           |
+| Folder          | Service                                     | Job                                                               |
+| --------------- | ------------------------------------------- | ----------------------------------------------------------------- |
+| `tokenizer/`    | [TokenizerService](#tokenizer-service)      | Counts the tokens of all **visible** text in the DTO              |
+| `estimation/`   | [EstimationService](#estimation-service)    | Estimates **hidden** tokens (thinking, system/tool overhead)      |
+| `conversion/`   | [ConversionService](#conversion-service)    | Converts token breakdown into energy (Wh), water (mL) and CO2 (g) |
+| `prompt-store/` | [PromptStoreService](#prompt-store-service) | Saves every prompt to SQLite and answers the popup's queries      |
 
 Rules:
 
@@ -259,14 +259,15 @@ All rates and constants come from [`config.json`](#config) → `estimation`.
 
 ### Conversion service
 
-`src/services/conversion/`: converts the estimated `totalTokens` of a prompt into environmental
-`impact` (`energyWh`, `waterMl`, `co2Grams`) using the per-model rates and impact unit/rounding in
-[`config.json`](#config) → `estimation.models` and `estimation.impact`. Called by the
-EstimationHandler right after `buildTokenEstimateDto`.
+`src/services/conversion/`: converts the estimated token `breakdown` of a prompt into environmental
+`impact` (`energyWh`, `waterMl`, `co2Grams`) using the per-model `energyWhPer1M`, per-category
+`tokenEnergyProfile` + `cachedInputMultiplier`, uniform `waterMlPerWh`, and vendor-specific
+`co2GramsPerWh` in [`config.json`](#config) → `estimation.models` and `estimation.impact`. Called by
+the EstimationHandler right after `buildTokenEstimateDto`.
 
-| File                    | Role                                                                                                                                                 |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `conversion.service.ts` | `convertTokensToImpact(estimateDto)` → `TokenEstimateDto` with `impact` populated, plus `calculateEnvironmentalImpact(totalTokens, provider, model)` |
+| File                    | Role                                                                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `conversion.service.ts` | `convertTokensToImpact(estimateDto)` → `TokenEstimateDto` with `impact` populated, plus `calculateEnvironmentalImpact(tokens, provider, model)` |
 
 ### Prompt store service
 
@@ -432,16 +433,16 @@ The field list, units and calibration notes live in `config.types.ts`, not here.
 | Section                            | Used by                              | What it holds                                                                                         |
 | ---------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------- |
 | `estimation.thinking`              | EstimationService                    | thinking baseline, token cap (`maxTokens`), effort multipliers                                        |
-| `estimation.impact`                | ConversionService                    | unit and rounding of the energy / water / CO2 rates                                                   |
+| `estimation.impact`                | ConversionService                    | unit, rounding, per-category energy profile, KV-cache multiplier, water/Wh, vendor CO2/Wh             |
 | `estimation.tools`                 | EstimationService                    | per-provider hidden tokens per tool call (`search`, `code`, `other`)                                  |
-| `estimation.models.<provider>`     | EstimationService, ConversionService | `default` + `families.<family>`: system prompt size, thinking speed, impact rates                     |
+| `estimation.models.<provider>`     | EstimationService, ConversionService | `default` + `families.<family>`: system prompt size, thinking speed, base `energyWhPer1M`             |
 | `tokenizer.<provider>`             | TokenizerService                     | heuristic parameters, turn framing, attachment estimates                                              |
 | `tokenizer.whitespace`             | TokenizerService                     | tokens per newline run and indentation run (`newlineRunTokens`, `indentRunTokens`, `indentMinSpaces`) |
 | `capture.timings`                  | dom-capture strategy, Claude adapter | turn-detection timings                                                                                |
 | `capture.attachments`              | DOM content reader                   | `maxIconPx`: images up to this size are icons, not attachments                                        |
 | `capture.effortInference`          | site adapters                        | effort when thinking is detected / per family default                                                 |
 | `capture.models.claude`, `.gemini` | site adapters                        | `fallbackName`, `families` (name → label keywords), `thinkingKeywords`                                |
-| `capture.models.chatgpt`           | ChatGPT adapter                      | `effortWords`, `slug.*` and `label.*` (regex sources for the model slug and picker label)             |
+| `capture.models.chatgpt`           | ChatGPT adapter                      | `families`, `effortWords`, `slug.*` and `label.*` (regex sources for the model slug and picker label) |
 | `ui`                               | PopupApp, ImpactTachos               | `usageWindowHours`, `tachoMax` (`energyWh`, `waterMl`)                                                |
 
 - **Import by section:** `import { capture } from '../../config/config.json'`. esbuild

@@ -1,105 +1,132 @@
 {
   "estimation": {
     "thinking": {
-      "baselineMs": 250,
-      "maxTokens": 32000,
+      "baselineMs": 450,
+      "maxTokens": 64000,
       "effortMultipliers": {
         "none": 0,
-        "low": 0.6,
+        "low": 0.9,
         "medium": 1.0,
-        "high": 1.4,
-        "unknown": 0.5
+        "high": 1.05,
+        "xhigh": 1.1,
+        "max": 1.15,
+        "unknown": 0.85
       }
     },
     "impact": {
       "perTokensUnit": 1000000,
-      "roundingDecimals": 4
+      "roundingDecimals": 4,
+      "waterMlPerWh": 3.54,
+      "co2GramsPerWh": {
+        "openai": 0.35,
+        "anthropic": 0.29,
+        "google": 0.2
+      },
+      "cachedInputMultiplier": 0.03,
+      "tokenEnergyProfile": {
+        "output": { "baseMultiplier": 1.0, "avgCacheHitRate": 0.0 },
+        "thinking": { "baseMultiplier": 1.0, "avgCacheHitRate": 0.0 },
+        "input": { "baseMultiplier": 0.2, "avgCacheHitRate": 0.0 },
+        "tools": { "baseMultiplier": 0.2, "avgCacheHitRate": 0.3 },
+        "history": { "baseMultiplier": 0.2, "avgCacheHitRate": 0.7 },
+        "systemPrompt": { "baseMultiplier": 0.2, "avgCacheHitRate": 0.9 }
+      }
     },
     "tools": {
-      "openai": { "search": 3000, "code": 600, "other": 800 },
-      "anthropic": { "search": 3000, "code": 600, "other": 800 },
-      "google": { "search": 2500, "code": 600, "other": 800 }
+      "openai": { "search": 3500, "code": 850, "other": 900 },
+      "anthropic": { "search": 3500, "code": 850, "other": 900 },
+      "google": { "search": 3000, "code": 800, "other": 850 }
     },
     "models": {
       "openai": {
         "default": {
-          "systemPromptTokens": 1400,
-          "tokensPerMsThinking": 0.075,
-          "energyWhPer1M": 400,
-          "waterMlPer1M": 1400,
-          "co2GramsPer1M": 160
+          "systemPromptTokens": 2000,
+          "tokensPerMsThinking": 0.085,
+          "energyWhPer1M": 1000
         },
         "families": {
           "gpt": {
+            "systemPromptTokens": 2000,
+            "tokensPerMsThinking": 0.085,
+            "energyWhPer1M": 1000
+          },
+          "gpt-astra": {
+            "systemPromptTokens": 2200,
+            "tokensPerMsThinking": 0.078,
+            "energyWhPer1M": 2500
+          },
+          "gpt-sol": {
+            "systemPromptTokens": 2000,
+            "tokensPerMsThinking": 0.085,
+            "energyWhPer1M": 1000
+          },
+          "gpt-luna": {
             "systemPromptTokens": 1400,
-            "tokensPerMsThinking": 0.065,
-            "energyWhPer1M": 390,
-            "waterMlPer1M": 1380,
-            "co2GramsPer1M": 155
+            "tokensPerMsThinking": 0.095,
+            "energyWhPer1M": 250
           },
           "openai-o": {
-            "systemPromptTokens": 1600,
+            "systemPromptTokens": 1800,
             "tokensPerMsThinking": 0.095,
-            "energyWhPer1M": 520,
-            "waterMlPer1M": 1850,
-            "co2GramsPer1M": 205
+            "energyWhPer1M": 1600
           }
         }
       },
       "anthropic": {
         "default": {
-          "systemPromptTokens": 1800,
-          "tokensPerMsThinking": 0.07,
-          "energyWhPer1M": 410,
-          "waterMlPer1M": 1450,
-          "co2GramsPer1M": 165
+          "systemPromptTokens": 4800,
+          "tokensPerMsThinking": 0.1,
+          "energyWhPer1M": 1150
         },
         "families": {
-          "claude-sonnet": {
-            "systemPromptTokens": 1800,
-            "tokensPerMsThinking": 0.075,
-            "energyWhPer1M": 390,
-            "waterMlPer1M": 1380,
-            "co2GramsPer1M": 155
+          "claude-fable": {
+            "systemPromptTokens": 5800,
+            "tokensPerMsThinking": 0.092,
+            "energyWhPer1M": 2800
           },
           "claude-opus": {
-            "systemPromptTokens": 2000,
-            "tokensPerMsThinking": 0.055,
-            "energyWhPer1M": 620,
-            "waterMlPer1M": 2200,
-            "co2GramsPer1M": 245
+            "systemPromptTokens": 5200,
+            "tokensPerMsThinking": 0.085,
+            "energyWhPer1M": 2000
+          },
+          "claude-sonnet": {
+            "systemPromptTokens": 4800,
+            "tokensPerMsThinking": 0.12,
+            "energyWhPer1M": 1100
           },
           "claude-haiku": {
-            "systemPromptTokens": 1200,
-            "tokensPerMsThinking": 0.1,
-            "energyWhPer1M": 180,
-            "waterMlPer1M": 640,
-            "co2GramsPer1M": 72
+            "systemPromptTokens": 2800,
+            "tokensPerMsThinking": 0.2,
+            "energyWhPer1M": 280
           }
         }
       },
       "google": {
         "default": {
-          "systemPromptTokens": 1500,
-          "tokensPerMsThinking": 0.08,
-          "energyWhPer1M": 340,
-          "waterMlPer1M": 1200,
-          "co2GramsPer1M": 135
+          "systemPromptTokens": 1800,
+          "tokensPerMsThinking": 0.11,
+          "energyWhPer1M": 650
         },
         "families": {
+          "gemini-neon": {
+            "systemPromptTokens": 2000,
+            "tokensPerMsThinking": 0.085,
+            "energyWhPer1M": 1150
+          },
           "gemini-pro": {
+            "systemPromptTokens": 2000,
+            "tokensPerMsThinking": 0.095,
+            "energyWhPer1M": 1100
+          },
+          "gemini-hydrogen": {
             "systemPromptTokens": 1600,
-            "tokensPerMsThinking": 0.075,
-            "energyWhPer1M": 420,
-            "waterMlPer1M": 1480,
-            "co2GramsPer1M": 168
+            "tokensPerMsThinking": 0.13,
+            "energyWhPer1M": 380
           },
           "gemini-flash": {
-            "systemPromptTokens": 1300,
-            "tokensPerMsThinking": 0.11,
-            "energyWhPer1M": 160,
-            "waterMlPer1M": 560,
-            "co2GramsPer1M": 64
+            "systemPromptTokens": 1500,
+            "tokensPerMsThinking": 0.18,
+            "energyWhPer1M": 240
           }
         }
       }
@@ -113,25 +140,25 @@
     },
     "openai": {
       "turnFramingTokens": 4,
-      "attachmentTokens": { "image": 765, "file": 1500 },
+      "attachmentTokens": { "image": 765, "file": 2500 },
       "singleTokenMaxWordLength": 6,
-      "charsPerSubword": 4.2,
+      "charsPerSubword": 4.0,
       "digitChunkSize": 3,
       "charsPerSymbolToken": 2
     },
     "anthropic": {
       "turnFramingTokens": 5,
-      "attachmentTokens": { "image": 1600, "file": 1500 },
-      "singleTokenMaxWordLength": 5,
-      "charsPerSubword": 3.8,
+      "attachmentTokens": { "image": 1600, "file": 2500 },
+      "singleTokenMaxWordLength": 4,
+      "charsPerSubword": 3.0,
       "digitChunkSize": 3,
-      "charsPerSymbolToken": 1.8
+      "charsPerSymbolToken": 1.5
     },
     "google": {
       "turnFramingTokens": 4,
-      "attachmentTokens": { "image": 258, "file": 1500 },
+      "attachmentTokens": { "image": 774, "file": 2500 },
       "singleTokenMaxWordLength": 7,
-      "charsPerSubword": 4.3,
+      "charsPerSubword": 4.1,
       "digitChunkSize": 4,
       "charsPerSymbolToken": 2.2
     }
@@ -142,8 +169,8 @@
       "textStableMs": 2500,
       "checkDelayMs": 150,
       "pollMs": 500,
-      "stalePromptMs": 120000,
-      "claudeInterleavedStallMs": 450
+      "stalePromptMs": 180000,
+      "claudeInterleavedStallMs": 600
     },
     "attachments": {
       "maxIconPx": 48
@@ -152,44 +179,60 @@
       "thinkingDetected": "medium",
       "familyDefaults": {
         "claude-haiku": "none",
+        "claude-fable": "high",
         "gemini-pro": "medium",
-        "gemini-flash": "low"
+        "gemini-neon": "high",
+        "gemini-hydrogen": "low",
+        "gemini-flash": "low",
+        "gpt-astra": "high",
+        "gpt-sol": "medium",
+        "gpt-luna": "low"
       }
     },
     "models": {
       "claude": {
         "fallbackName": "claude",
         "families": {
-          "claude-sonnet": ["sonnet"],
+          "claude-fable": ["fable"],
           "claude-opus": ["opus"],
+          "claude-sonnet": ["sonnet"],
           "claude-haiku": ["haiku"]
         },
-        "thinkingKeywords": ["thinking", "extended"]
+        "thinkingKeywords": ["thinking", "extended", "thought"]
       },
       "gemini": {
         "fallbackName": "gemini",
         "families": {
-          "gemini-pro": ["pro"],
+          "gemini-neon": ["neon"],
+          "gemini-pro": ["pro", "argon", "carbon"],
+          "gemini-hydrogen": ["hydrogen"],
           "gemini-flash": ["flash"]
         },
-        "thinkingKeywords": ["thinking"]
+        "thinkingKeywords": ["thinking", "thought"]
       },
       "chatgpt": {
+        "families": {
+          "gpt-astra": ["astra"],
+          "gpt-sol": ["sol", "terra"],
+          "gpt-luna": ["luna", "mini", "nano"]
+        },
         "effortWords": {
+          "max": ["max", "maximum"],
+          "xhigh": ["xhigh", "extra-high", "deep"],
           "high": ["heavy", "extended", "high"],
           "medium": ["standard", "medium"],
-          "low": ["light", "low"]
+          "low": ["light", "low", "minimal"]
         },
         "slug": {
           "oSeries": "^o\\d",
           "oSeriesVersion": "^(o\\d+(?:-mini|-pro)?)",
           "gptVersion": "^gpt-(\\d+)(?:[.-](\\d+))?([a-z])?",
-          "reasoning": "\\b(thinking|t|pro)\\b"
+          "reasoning": "\\b(thinking|t|pro|astra|sol)\\b"
         },
         "label": {
-          "nonReasoning": ["instant", "non-reasoning", "4o"],
-          "reasoning": ["thinking", "pro"],
-          "reasoningPatterns": ["\\bo[134]\\b", "\\b5(?:\\.\\d+)?\\b"],
+          "nonReasoning": ["instant", "non-reasoning", "4o", "luna"],
+          "reasoning": ["thinking", "pro", "astra", "sol"],
+          "reasoningPatterns": ["\\bo[134]\\b", "\\b[56](?:\\.\\d+)?\\b"],
           "oSeries": "^o|\\bo[134]",
           "version": "(\\d+(?:\\.\\d+)?[a-z]*|o\\d+(?:-\\w+)?)"
         }
@@ -199,8 +242,8 @@
   "ui": {
     "usageWindowHours": 24,
     "tachoMax": {
-      "energyWh": 10,
-      "waterMl": 50
+      "energyWh": 30,
+      "waterMl": 105
     }
   }
 }
