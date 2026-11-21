@@ -266,9 +266,9 @@
         "fastest": 1000
       },
       "cloudRiseMs": 4800,
-      "poolFill": {
-        "min": 0.15,
-        "max": 0.6
+      "pondFill": {
+        "min": 0.8,
+        "max": 0.97
       }
     },
     "history": {

@@ -1,12 +1,13 @@
 /**
- * DashboardPage: tokens (TokenTotalCard), energy, water and CO2 of the selected timeframe. The App root owns the
- * timeframe and the fetched summary, this page only renders them.
+ * DashboardPage: tokens (TokenTotalCard), energy, water and CO2 of the selected timeframe, each
+ * impact card with a fun fact. The App root owns the timeframe and the fetched summary, this page
+ * only renders them. The facts are drawn fresh every time the page opens.
  *
  * Context: app page
  * Docs: docs/modules.md#ui
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Co2Card } from '../../components/co2-card.component';
 import { PageTitle } from '../../components/page-title.component';
 import { PowerCard } from '../../components/power-card.component';
@@ -16,7 +17,8 @@ import { WaterCard } from '../../components/water-card.component';
 import { formatCount } from '../../format.helpers';
 import type { TimeframeId } from '../../timeframe.helpers';
 import type { SummaryState } from '../../usage-api';
-import { dashboardAnimation } from './dashboard.helpers';
+import { dashboardAnimation, dashboardFacts } from './dashboard.helpers';
+import { seededRandom } from './facts.helpers';
 
 interface DashboardPageProps {
   timeframe: TimeframeId;
@@ -34,6 +36,13 @@ function describeUsage(summary: SummaryState): string {
 
 export function DashboardPage({ timeframe, onTimeframeChange, summary }: DashboardPageProps) {
   const animation = useMemo(() => dashboardAnimation(summary), [summary]);
+  // New seed per visit, so every opening shows other facts. Seeded instead of Math.random, so a
+  // summary refresh while the page is open keeps the same picks for the same numbers.
+  const [seed] = useState(() => Math.floor(Math.random() * 2 ** 32));
+  const facts = useMemo(
+    () => dashboardFacts(summary, timeframe, seededRandom(seed)),
+    [summary, timeframe, seed],
+  );
 
   return (
     <section className="dashboard">
@@ -46,16 +55,22 @@ export function DashboardPage({ timeframe, onTimeframeChange, summary }: Dashboa
         coins
       />
       <div className="dashboard-cards">
-        <PowerCard energyWh={summary?.impact.energyWh} pulseMs={animation.pulseMs} />
+        <PowerCard
+          energyWh={summary?.impact.energyWh}
+          pulseMs={animation.pulseMs}
+          fact={facts?.power ?? null}
+        />
         <WaterCard
           waterMl={summary?.impact.waterMl}
           dripMs={animation.dripMs}
-          poolFill={animation.poolFill}
+          pondFill={animation.pondFill}
+          fact={facts?.water ?? null}
         />
         <Co2Card
           co2Grams={summary?.impact.co2Grams}
           puffMs={animation.puffMs}
           cloudCount={animation.cloudCount}
+          fact={facts?.co2 ?? null}
         />
       </div>
     </section>
