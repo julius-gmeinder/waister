@@ -29,9 +29,12 @@ the tokens and saves every prompt to a SQLite database, and the popup reads that
 │                                                                           │
 │  handlers/usage.handler.ts         handleGetUsageSummary(sinceMs)         │
 │     └─ services/prompt-store/      SELECT SUM(...) → UsageSummaryDto      │
+│                                    handleGetPromptHistory(query)          │
+│                                    SELECT … LIMIT → PromptHistoryDto      │
 └───────────────────────────▲───────────────────────────────────────────────┘
                             │ chrome.runtime message GET_USAGE_SUMMARY
                             │ (popup: last 24h · app page: selected timeframe)
+                            │ + GET_PROMPT_HISTORY (app page: History pages)
 ┌─ popup ───────────────────────────────────────────────────────────────────┐
 │  ui/popup/popup.app.tsx (React)    shows the last 24h of token usage      │
 │  ui/components/tab-bar             opens a route in a new browser tab ──┐ │
@@ -40,7 +43,8 @@ the tokens and saves every prompt to a SQLite database, and the popup reads that
 ┌─ app page (full browser tab, app/index.html#/<route>) ──────────────────▼─┐
 │  ui/app/app.app.tsx (React)        Sidebar + Dashboard (tokens, energy,   │
 │                                    water, CO2 per timeframe) · Analytics ·│
-│                                    Facts · Tips · History (empty for now) │
+│                                    Facts · Tips · History (prompt list +  │
+│                                    detail modal)                          │
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 

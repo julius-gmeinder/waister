@@ -14,6 +14,7 @@ Reader ──ChatCaptureDto──▶ EstimationHandler ──▶ TokenizerServic
                            PromptStoreService ──INSERT──▶ SQLite `prompts`
 
 Popup / App ──GET_USAGE_SUMMARY──▶ UsageHandler ──▶ PromptStoreService ──SELECT──▶ UsageSummaryDto
+App History ──GET_PROMPT_HISTORY─▶ UsageHandler ──▶ PromptStoreService ──SELECT──▶ PromptHistoryDto
 ```
 
 ## 1. Reader & Consolidated Strategy (content script)
@@ -162,6 +163,13 @@ The summary also carries the summed `impact`, the oldest `captured_at` in the wi
 query time. `DashboardPage` shows the tokens, and the PowerCard and WaterCard show the energy and
 water. Their animation speed follows the usage per active day relative to `ui.dashboard.busyDay`
 ([ADR 0014](decisions/0014-dashboard-page.md)).
+
+## 9. History (app page)
+
+`App` sends `GET_PROMPT_HISTORY { sinceMs, providers, sort, offset, limit }` while the History is
+open. `getPromptHistory` returns one page of saved rows (metrics only, as stored) and the sums of
+every row matching the same filter. "Load more" asks for the next `offset`
+([ADR 0015](decisions/0015-history-page.md)).
 
 ## Open questions
 

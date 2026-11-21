@@ -59,3 +59,152 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* History: title, timeframe chips, provider chips + sort, summary strip, then the prompts in day
+   groups (sticky day headers) or as one ranking. */
+.history {
+  display: grid;
+  gap: 16px;
+  max-width: 1000px;
+}
+
+.history .page-title {
+  margin: 0;
+}
+
+.history-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Flat strip in --bg, no border: it summarizes, it isn't a card. */
+.history-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+  margin: 4px 0 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 15px;
+}
+
+.history-summary-value {
+  color: var(--contrast);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Old rows stay while a new filter loads, dimmed so the change is visible. */
+.history-results {
+  transition: opacity 120ms ease;
+}
+
+.history-results--loading {
+  opacity: 0.55;
+}
+
+.history-days,
+.history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-days {
+  display: grid;
+  gap: 24px;
+}
+
+.history-day-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--contrast);
+  font-size: 16px;
+}
+
+.history-day-label {
+  font-family: var(--font-serif);
+  font-weight: 700;
+}
+
+.history-day-total {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-empty {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 64px 16px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.history-empty .lucide {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 8px;
+  color: var(--contrast-bright);
+}
+
+.history-empty-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.history-empty-text {
+  margin: 0;
+}
+
+/* Chip-like, with its own --bg so the shared neutral states (components.css) work on --surface. */
+.history-more {
+  display: inline-flex;
+  align-items: baseline;
+  justify-self: center;
+  gap: 10px;
+  padding: 8px 20px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.history-more:disabled {
+  cursor: progress;
+}
+
+.history-more-count {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+/* A modal <dialog> doesn't stop the page behind it from scrolling. */
+body:has(.prompt-detail[open]) {
+  overflow: hidden;
+}

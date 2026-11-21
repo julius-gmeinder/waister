@@ -1,6 +1,6 @@
 /**
  * PromptStoreService: one row per estimated prompt in the SQLite `prompts` table, plus usage
- * queries for the popup and the app page.
+ * and history queries for the popup and the app page.
  * Metrics only, never chat text (ADR 0009).
  *
  * Context: background
@@ -8,7 +8,12 @@
  */
 
 import type { Database, SqlValue } from '@sqlite.org/sqlite-wasm';
-import type { ChatCaptureDto } from '../../dto/chat-capture.dto';
+import type { ChatCaptureDto, Provider, ThinkingEffort } from '../../dto/chat-capture.dto';
+import type {
+  HistorySort,
+  PromptHistoryDto,
+  PromptHistoryQuery,
+} from '../../dto/prompt-history.dto';
 import type { PromptRecordDto } from '../../dto/prompt-record.dto';
 import type { TokenEstimateDto } from '../../dto/token-estimate.dto';
 import type { UsageSummaryDto } from '../../dto/usage-summary.dto';
@@ -74,6 +79,7 @@ const INSERT_PROMPT = `
   )
 `;
 
+/** Followed by a WHERE clause from `whereClause`, so the sums cover the same rows as a page. */
 const SELECT_USAGE_SUMMARY = `
   SELECT
     COUNT(*)                          AS promptCount,
@@ -89,8 +95,57 @@ const SELECT_USAGE_SUMMARY = `
     COALESCE(SUM(co2_grams), 0)       AS co2Grams,
     MIN(captured_at)                  AS firstCapturedAt
   FROM prompts
-  WHERE captured_at >= $sinceMs
 `;
+
+/** Every column of one `PromptRecordDto`, aliased to the names `toPromptRecord` reads. */
+const SELECT_PROMPT_RECORDS = `
+  SELECT
+    id, conversation_url AS conversationUrl, captured_at AS capturedAt, provider,
+    model_name AS modelName, model_version AS modelVersion,
+    thinking_effort AS thinkingEffort, model_raw_label AS modelRawLabel,
+    input_tokens AS input, history_tokens AS history, output_tokens AS output,
+    thinking_tokens AS thinking, tool_tokens AS tools, overhead_tokens AS overhead,
+    total_tokens AS totalTokens, latency_ms AS latencyMs, thinking_time_ms AS thinkingTimeMs,
+    approximate, energy_wh AS energyWh, water_ml AS waterMl, co2_grams AS co2Grams
+  FROM prompts
+`;
+
+/**
+ * Whitelist instead of interpolating the requested sort. Ties fall back to newest first and then
+ * the id, so paging with OFFSET never skips or repeats a row between two pages.
+ */
+const HISTORY_ORDER: Record<HistorySort, string> = {
+  newest: 'captured_at DESC, id',
+  oldest: 'captured_at ASC, id',
+  tokens: 'total_tokens DESC, captured_at DESC, id',
+  energy: 'energy_wh DESC, captured_at DESC, id',
+};
+
+/** Shared WHERE clause of the summary and the history page. Providers are bound, never inlined. */
+function whereClause(
+  sinceMs: number,
+  providers: readonly Provider[],
+): { sql: string; bind: Record<string, SqlValue> } {
+  const bind: Record<string, SqlValue> = { $sinceMs: sinceMs };
+  let sql = 'WHERE captured_at >= $sinceMs';
+  if (providers.length > 0) {
+    const names = providers.map((provider, index) => {
+      bind[`$provider${index}`] = provider;
+      return `$provider${index}`;
+    });
+    sql += ` AND provider IN (${names.join(', ')})`;
+  }
+  return { sql, bind };
+}
+
+function num(value: SqlValue | undefined): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function str(value: SqlValue | undefined): string {
+  return value == null ? '' : String(value);
+}
 
 export function createPromptRecord(
   capture: ChatCaptureDto,
@@ -137,11 +192,32 @@ export async function savePromptRecord(record: PromptRecordDto): Promise<void> {
 /** `sinceMs` is epoch ms, inclusive. */
 export async function getUsageSummary(sinceMs: number): Promise<UsageSummaryDto> {
   const db = await getDatabase(applySchema);
-  const row = db.selectObject(SELECT_USAGE_SUMMARY, { $sinceMs: sinceMs }) ?? {};
-  const num = (value: SqlValue | undefined): number => {
-    const parsed = Number(value ?? 0);
-    return Number.isFinite(parsed) ? parsed : 0;
+  return summarize(db, sinceMs, []);
+}
+
+/** One page of rows plus the totals of every row matching the same filter (both in one read). */
+export async function getPromptHistory(query: PromptHistoryQuery): Promise<PromptHistoryDto> {
+  const db = await getDatabase(applySchema);
+  const where = whereClause(query.sinceMs, query.providers);
+  const order = HISTORY_ORDER[query.sort] ?? HISTORY_ORDER.newest;
+  const rows = db.selectObjects(
+    `${SELECT_PROMPT_RECORDS} ${where.sql} ORDER BY ${order} LIMIT $limit OFFSET $offset`,
+    {
+      ...where.bind,
+      $limit: Math.max(1, Math.floor(query.limit)),
+      $offset: Math.max(0, Math.floor(query.offset)),
+    },
+  );
+
+  return {
+    records: rows.map(toPromptRecord),
+    summary: summarize(db, query.sinceMs, query.providers),
   };
+}
+
+function summarize(db: Database, sinceMs: number, providers: readonly Provider[]): UsageSummaryDto {
+  const where = whereClause(sinceMs, providers);
+  const row = db.selectObject(`${SELECT_USAGE_SUMMARY} ${where.sql}`, where.bind) ?? {};
 
   return {
     sinceMs,
@@ -163,5 +239,42 @@ export async function getUsageSummary(sinceMs: number): Promise<UsageSummaryDto>
       waterMl: num(row.waterMl),
       co2Grams: num(row.co2Grams),
     },
+  };
+}
+
+/** Inverse of the INSERT binding in `savePromptRecord`. */
+function toPromptRecord(row: Record<string, SqlValue>): PromptRecordDto {
+  return {
+    id: str(row.id),
+    conversationUrl: str(row.conversationUrl),
+    capturedAt: num(row.capturedAt),
+    // Rows only come from `handleEstimation`, which rejects unknown providers; the readers only
+    // emit known efforts. The UI still renders any string it gets.
+    provider: str(row.provider) as Provider,
+    model: {
+      name: str(row.modelName),
+      version: str(row.modelVersion),
+      thinkingEffort: str(row.thinkingEffort) as ThinkingEffort,
+      rawLabel: str(row.modelRawLabel),
+    },
+    totalTokens: num(row.totalTokens),
+    breakdown: {
+      input: num(row.input),
+      history: num(row.history),
+      output: num(row.output),
+      thinking: num(row.thinking),
+      tools: num(row.tools),
+      overhead: num(row.overhead),
+    },
+    impact: {
+      energyWh: num(row.energyWh),
+      waterMl: num(row.waterMl),
+      co2Grams: num(row.co2Grams),
+    },
+    timings: {
+      latencyMs: num(row.latencyMs),
+      thinkingTimeMs: num(row.thinkingTimeMs),
+    },
+    approximate: num(row.approximate) === 1,
   };
 }

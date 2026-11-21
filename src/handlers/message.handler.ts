@@ -9,7 +9,7 @@
 
 import type { RuntimeMessage } from '../messages/runtime-messages';
 import { handleEstimation } from './estimation.handler';
-import { handleGetUsageSummary } from './usage.handler';
+import { handleGetPromptHistory, handleGetUsageSummary } from './usage.handler';
 
 export function handleRuntimeMessage(message: RuntimeMessage): Promise<unknown> | undefined {
   switch (message.type) {
@@ -17,6 +17,8 @@ export function handleRuntimeMessage(message: RuntimeMessage): Promise<unknown> 
       return handleEstimation(message.payload);
     case 'GET_USAGE_SUMMARY':
       return handleGetUsageSummary(message.payload.sinceMs);
+    case 'GET_PROMPT_HISTORY':
+      return handleGetPromptHistory(message.payload);
     default:
       return undefined;
   }

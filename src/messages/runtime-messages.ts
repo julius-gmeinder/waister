@@ -6,6 +6,7 @@
  */
 
 import type { ChatCaptureDto } from '../dto/chat-capture.dto';
+import type { PromptHistoryDto, PromptHistoryQuery } from '../dto/prompt-history.dto';
 import type { UsageSummaryDto } from '../dto/usage-summary.dto';
 
 /** Content -> background, once the response has finished streaming. */
@@ -22,6 +23,15 @@ export interface GetUsageSummaryMessage {
   };
 }
 
-export type RuntimeMessage = EstimatePromptMessage | GetUsageSummaryMessage;
+/** App page (History) -> background. */
+export interface GetPromptHistoryMessage {
+  type: 'GET_PROMPT_HISTORY';
+  payload: PromptHistoryQuery;
+}
+
+export type RuntimeMessage =
+  EstimatePromptMessage | GetUsageSummaryMessage | GetPromptHistoryMessage;
 
 export type UsageSummaryResponse = UsageSummaryDto;
+
+export type PromptHistoryResponse = PromptHistoryDto;

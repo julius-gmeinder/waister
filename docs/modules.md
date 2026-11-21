@@ -181,9 +181,9 @@ estimation formulas).
 
 | File                    | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `message.handler.ts`    | Routes each `chrome.runtime` message by `type` to the matching handler: `ESTIMATE_PROMPT` → EstimationHandler, `GET_USAGE_SUMMARY` → UsageHandler. Returns `undefined` for an unknown type, so `background.entry.ts` answers `false` and doesn't keep the channel open.                                                                                                                                                                                                                                                                                                                    |
+| `message.handler.ts`    | Routes each `chrome.runtime` message by `type` to the matching handler: `ESTIMATE_PROMPT` → EstimationHandler, `GET_USAGE_SUMMARY` and `GET_PROMPT_HISTORY` → UsageHandler. Returns `undefined` for an unknown type, so `background.entry.ts` answers `false` and doesn't keep the channel open.                                                                                                                                                                                                                                                                                           |
 | `estimation.handler.ts` | **EstimationHandler**: `ChatCaptureDto` → `PromptRecordDto`. Gets visible counts from the TokenizerService and hidden counts from the EstimationService, has the EstimationService build the `TokenEstimateDto` (`totalTokens`), delegates to the ConversionService (`convertTokensToImpact`) to compute energy/water/CO2 impact, then has the PromptStoreService add a UUID + the conversation URL and save the row. `normalizeCaptureDto` first trims the text, clamps negative times, drops attachment and tool kinds it doesn't know (they count 0) and throws on an unknown provider. |
-| `usage.handler.ts`      | **UsageHandler**: `handleGetUsageSummary(sinceMs)` → `UsageSummaryDto`, read straight from the PromptStoreService. No link to the estimation pipeline.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `usage.handler.ts`      | **UsageHandler**: `handleGetUsageSummary(sinceMs)` → `UsageSummaryDto` and `handleGetPromptHistory(query)` → `PromptHistoryDto`, read straight from the PromptStoreService. No link to the estimation pipeline.                                                                                                                                                                                                                                                                                                                                                                            |
 
 Style: plain exported functions (no classes). Services are imported directly. Pipeline details:
 [pipeline.md](pipeline.md).
@@ -275,10 +275,10 @@ the EstimationHandler right after `buildTokenEstimateDto`.
 `prompts` table, and the popup's queries are answered from it
 ([ADR 0009](decisions/0009-sqlite-prompt-store.md)). **Metrics only, no chat text.**
 
-| File                      | Role                                                                                                                                                                                                                      |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `prompt-store.service.ts` | Schema + SQL. `createPromptRecord(capture, estimate)` (adds `crypto.randomUUID()` and `conversationUrl`), `savePromptRecord(record)`, `getUsageSummary(sinceMs)` (token, breakdown and impact sums, oldest `captured_at`) |
-| `sqlite-database.ts`      | Internal. Inits `@sqlite.org/sqlite-wasm` once, restores/saves the IndexedDB snapshot, `getDatabase(schema)`, `writeAndPersist(schema, write)`                                                                            |
+| File                      | Role                                                                                                                                                                                                                                                                                                  |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prompt-store.service.ts` | Schema + SQL. `createPromptRecord(capture, estimate)` (adds `crypto.randomUUID()` and `conversationUrl`), `savePromptRecord(record)`, `getUsageSummary(sinceMs)` (token, breakdown and impact sums, oldest `captured_at`), `getPromptHistory(query)` (one page of rows + the sums of the same filter) |
+| `sqlite-database.ts`      | Internal. Inits `@sqlite.org/sqlite-wasm` once, restores/saves the IndexedDB snapshot, `getDatabase(schema)`, `writeAndPersist(schema, write)`                                                                                                                                                        |
 
 - **Persistence:** MV3 service workers can't use the OPFS VFSes, so the database runs in memory.
   After every insert the whole database is exported and written to IndexedDB (`waister` →
@@ -292,6 +292,7 @@ the EstimationHandler right after `buildTokenEstimateDto`.
   `model_name`, `model_version`, `thinking_effort`, `model_raw_label`, `input_tokens`,
   `history_tokens`, `output_tokens`, `thinking_tokens`, `tool_tokens`, `overhead_tokens`, `total_tokens`,
   `latency_ms`, `thinking_time_ms`, `approximate` (0/1), `energy_wh`, `water_ml`, `co2_grams`.
+- **History query:** `getPromptHistory` and the summary share one `WHERE` builder (`captured_at >= $sinceMs`, optional `provider IN (…)` with bound values), so the History's totals always cover the same rows as its pages. The order comes from a whitelist (`HISTORY_ORDER`, unknown sort → newest), with `captured_at DESC, id` as tie-breakers so `LIMIT`/`OFFSET` paging never repeats or skips a row. `toPromptRecord` maps a row back to a `PromptRecordDto`.
 - The schema runs on every start (`applySchema`) and must stay idempotent (`CREATE TABLE IF NOT EXISTS` plus `pragma_table_info('prompts')` checks that run `ALTER TABLE` for columns in `ADDED_COLUMNS` such as `tool_tokens`).
 
 ---
@@ -310,21 +311,25 @@ esbuild entry ([ADR 0011](decisions/0011-app-page.md)):
 - **App page** (`ui/app/`, a full browser tab at `app/index.html`): a sidebar plus one page per
   route (Dashboard, Analytics, Facts, Tips, History). The Dashboard
   ([ADR 0014](decisions/0014-dashboard-page.md)) shows tokens, energy, water and CO2 for a chosen
-  timeframe. The other pages are empty placeholders for now.
+  timeframe. The History lists every saved prompt (filters, day groups, detail modal,
+  [ADR 0015](decisions/0015-history-page.md)). Analytics, Facts and Tips are empty placeholders
+  for now.
 
 Neither surface talks to the estimation pipeline.
 
 ```
 base.css                              shared: fonts, color/font tokens (incl. --power* / --water* / --co2*), element defaults
 app-routes.ts                         shared: APP_ROUTES (id, label, icon), hash ↔ route, extension URLs
-usage-api.ts                          shared: fetchUsageSummary(sinceMs) + useUsageSummary hook (roots only), fills fields a stale worker lacks
-format.helpers.ts                     shared: formatCount, formatMetric (tachos), formatEnergy / formatWater / formatCo2 (auto-scaled Quantity, cards)
+usage-api.ts                          shared: fetchUsageSummary + useUsageSummary, fetchPromptHistory + usePromptHistory (paging) — hooks for roots only; fills fields a stale worker lacks
+format.helpers.ts                     shared: formatCount, formatMetric (tachos), formatEnergy / formatWater / formatCo2 (auto-scaled Quantity, cards), formatProvider / formatModel / formatEffort, formatDuration, formatClock / formatShortDate / formatDateTime
 timeframe.helpers.ts                  app page: TIMEFRAMES (Today, Last week, Last 30 days, All time), timeframeSinceMs
+history.helpers.ts                    app page: HistoryView (timeframe, providers, sort) + default, HISTORY_SORTS, HISTORY_PROVIDERS, toggleProvider, isChronological, groupByDay
 components/                           shared components (used by either surface)
   components.css                      styles of all components, one block each
   header.component.tsx                Header: full logo, centered (/logo/waister-full.svg), popup and app page
   total.component.tsx                 Total: icon + summed token count (a <div>)
-  breakdown.component.tsx             Breakdown: the six rows (order, labels, icons)
+  token-category.helpers.ts           TOKEN_CATEGORIES: order, label, icon and visible/hidden of the six breakdown parts
+  breakdown.component.tsx             Breakdown: the six rows (from TOKEN_CATEGORIES)
   breakdown-row.component.tsx         BreakdownRow: icon, label, count of one part
   tacho.component.tsx                 ImpactTachos: three semi-circular tacho gauges for energy (Wh), water (mL), CO2 (g)
   tab-bar.component.tsx               TabBar (popup): one fixed-width tab per route, opens it in a new browser tab
@@ -334,32 +339,38 @@ components/                           shared components (used by either surface)
   power-card.component.tsx            PowerCard (dashboard): energy, pulsing number, lightning + gears scene
   water-card.component.tsx            WaterCard (dashboard): water, drops falling into a swaying pool
   co2-card.component.tsx              Co2Card (dashboard): CO2, a small factory puffing rising, fading clouds
+  provider-filter.component.tsx       ProviderFilter (history): "All apps" + one toggle chip per chat app (aria-pressed)
+  sort-picker.component.tsx           SortPicker (history): native select for the order
+  token-bar.component.tsx             TokenBar (history): stacked bar of one breakdown, thin (row) or thick with hatched hidden parts (modal)
+  impact-figures.component.tsx        ImpactFigures (history): energy / water / CO2 as small icon + value pairs
+  history-row.component.tsx           HistoryRow (history): one prompt as a clickable row (time, app, model, total, TokenBar, impact)
+  prompt-detail-modal.component.tsx   PromptDetailModal (history): native <dialog> with breakdown legend, impact tiles, model & timings, conversation link, ← / → stepping
 popup/
   popup.html                          <div id="root">, loads index.js + index.css
   popup.css                           popup layout only (full-window card, `.popup-period` line)
   popup.app.tsx                       PopupApp: fetches the last 24h summary, renders it
 app/
   app.html                            <div id="root">, loads index.js + index.css
-  app.css                             app page layout only (flat sidebar + content grid, dashboard grid)
-  app.app.tsx                         App: reads the hash route, holds the timeframe, fetches the summary, renders Sidebar + the page
+  app.css                             app page layout only (flat sidebar + content grid, dashboard grid, history list)
+  app.app.tsx                         App: reads the hash route, holds the dashboard timeframe and the HistoryView, fetches summary + history pages, renders Sidebar + the page
   pages/
     dashboard.page.tsx                DashboardPage: title, picker, token subtitle, PowerCard + WaterCard + Co2Card
     dashboard.helpers.ts              dashboardAnimation(summary): pulse / drip / puff period, pool fill, cloud count from config
     analytics.page.tsx                AnalyticsPage (empty)
     facts.page.tsx                    FactsPage (empty)
     tips.page.tsx                     TipsPage (empty)
-    history.page.tsx                  HistoryPage (empty)
+    history.page.tsx                  HistoryPage: pickers, summary strip, day groups or ranking, "Load more", PromptDetailModal
 ```
 
-| File / folder                | Role                                                                   | Copied/bundled to                               |
-| ---------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------- |
-| `popup/popup.html`           | Markup shell, only `#root`                                             | `popup/index.html`                              |
-| `app/app.html`               | Markup shell, only `#root`, extension icon as favicon                  | `app/index.html`                                |
-| `base.css`, `components.css` | Shared styles. Each entry imports them first, then its own layout CSS  | bundled into `popup/index.css`, `app/index.css` |
-| `popup/popup.app.tsx`        | `PopupApp`: `useUsageSummary(now − 24 h)`, renders below               | `entries/popup.entry.tsx` → `popup/index.js`    |
-| `app/app.app.tsx`            | `App`: hash route → page, `document.title`, dashboard timeframe + data | `entries/app.entry.tsx` → `app/index.js`        |
-| `app/pages/*.page.tsx`       | One component per route. Only the app page bundles them                | `entries/app.entry.tsx`                         |
-| `components/*.component.tsx` | Presentational components. They only render props and fetch nothing    | whichever entry uses them                       |
+| File / folder                | Role                                                                           | Copied/bundled to                               |
+| ---------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------- |
+| `popup/popup.html`           | Markup shell, only `#root`                                                     | `popup/index.html`                              |
+| `app/app.html`               | Markup shell, only `#root`, extension icon as favicon                          | `app/index.html`                                |
+| `base.css`, `components.css` | Shared styles. Each entry imports them first, then its own layout CSS          | bundled into `popup/index.css`, `app/index.css` |
+| `popup/popup.app.tsx`        | `PopupApp`: `useUsageSummary(now − 24 h)`, renders below                       | `entries/popup.entry.tsx` → `popup/index.js`    |
+| `app/app.app.tsx`            | `App`: hash route → page, `document.title`, dashboard + history state and data | `entries/app.entry.tsx` → `app/index.js`        |
+| `app/pages/*.page.tsx`       | One component per route. Only the app page bundles them                        | `entries/app.entry.tsx`                         |
+| `components/*.component.tsx` | Presentational components. They only render props and fetch nothing            | whichever entry uses them                       |
 
 - **Routing (app page):** hash based (`app/index.html#/tips`). `App` reads `location.hash`
   through `useSyncExternalStore` + `hashchange`. No router library. An empty or unknown hash
@@ -368,7 +379,8 @@ app/
 - **Routes** live in `app-routes.ts` only. The popup's TabBar and the app's Sidebar both render
   `APP_ROUTES`, so a new page is one entry there, one `*.page.tsx`, and one line in `PAGES`
   (`app.app.tsx`). The dashboard is the exception: it gets props, so `App` renders it directly.
-  `app-routes.ts` doesn't import the pages, so the popup bundle doesn't contain them.
+  `app-routes.ts` doesn't import the pages, so the popup bundle doesn't contain them. The
+  History is the second exception, for the same reason.
 - **Dashboard:** `App` holds the `TimeframeId` (starts on Today, not remembered) and fetches
   `useUsageSummary(timeframeSinceMs(timeframe))`. The `sinceMs` is fixed per selection, so a
   rolling window doesn't refetch on every render. `DashboardPage` turns the summary into
@@ -376,6 +388,16 @@ app/
   `config.json` → `ui.dashboard`, field docs in `DashboardConfig`). `null` periods mean no usage,
   so the card stands still. The motion itself is pure CSS driven by custom properties
   (`--pulse`, `--drip`, `--drop-fall`), see [styling.md](styling.md#motion).
+- **History** ([ADR 0015](decisions/0015-history-page.md)): `App` holds a `HistoryView`
+  (timeframe, providers, sort; starts on All time / all apps / newest first, not remembered),
+  memoizes it into a `HistoryFilter` and calls `usePromptHistory(filter, route is history)`. The
+  hook fetches `ui.history.pageSize` rows per `GET_PROMPT_HISTORY`, restarts on a new filter and on
+  every visit to the page, appends pages on `loadMore` (dropping ids it already has, since a prompt
+  saved meanwhile shifts the offset), drops answers that belong to an older filter, and keeps the
+  old rows (dimmed) while a new filter loads. `HistoryPage` groups the rows by local day for the
+  time orders (`groupByDay`; the last day's totals say "so far" while more pages exist) and shows a
+  flat ranking with dates for the metric orders. Its only own state is the open prompt's id. The
+  modal steps through the loaded rows only.
 - **Opening from the popup:** `TabBar` calls `chrome.tabs.create({ url: appRouteUrl(id) })`
   (no permission needed). Every click opens a new tab. Reusing an already open app tab would
   need the `tabs` permission.
@@ -386,7 +408,7 @@ app/
   new window loads. Components get plain values and show `–` (`formatCount`, `formatEnergy`, …)
   while a value is `undefined`.
 - **Data flow:** only the `*.app.tsx` root components send `chrome.runtime` messages (through
-  `useUsageSummary`). Pages and components never fetch data. They may only navigate
+  `useUsageSummary` and `usePromptHistory`). Pages and components never fetch data. They may only navigate
   (`chrome.tabs.create`, hash links).
 - The popup only lives while it is open, so nothing persists between openings.
 - **Naming:** kebab-case file, PascalCase export (`breakdown-row.component.tsx` →
@@ -408,12 +430,13 @@ Must not import: `handlers/`, `services/`, `readers/`. Enforced by ESLint.
 `chrome.runtime` messages. Types only: no logic and no imports from other layers. Everything
 here must survive structured cloning (no classes, functions or DOM nodes).
 
-| File                    | DTO                | From → To                                           |
-| ----------------------- | ------------------ | --------------------------------------------------- |
-| `chat-capture.dto.ts`   | `ChatCaptureDto`   | reader strategy → EstimationHandler                 |
-| `token-estimate.dto.ts` | `TokenEstimateDto` | EstimationService → EstimationHandler               |
-| `prompt-record.dto.ts`  | `PromptRecordDto`  | EstimationHandler → PromptStoreService              |
-| `usage-summary.dto.ts`  | `UsageSummaryDto`  | PromptStoreService → UsageHandler → popup, app page |
+| File                    | DTO                                                     | From → To                                               |
+| ----------------------- | ------------------------------------------------------- | ------------------------------------------------------- |
+| `chat-capture.dto.ts`   | `ChatCaptureDto`                                        | reader strategy → EstimationHandler                     |
+| `token-estimate.dto.ts` | `TokenEstimateDto`                                      | EstimationService → EstimationHandler                   |
+| `prompt-record.dto.ts`  | `PromptRecordDto`                                       | EstimationHandler → PromptStoreService                  |
+| `usage-summary.dto.ts`  | `UsageSummaryDto`                                       | PromptStoreService → UsageHandler → popup, app page     |
+| `prompt-history.dto.ts` | `PromptHistoryQuery`, `PromptHistoryDto`, `HistorySort` | app page → UsageHandler → PromptStoreService → app page |
 
 Field reference: [dto.md](dto.md).
 
@@ -426,10 +449,11 @@ May import: nothing.
 `src/messages/` (shared): the contract for every `chrome.runtime` message, a discriminated union
 on `type`, plus the response type of each message.
 
-| `type`              | Sender          | Receiver   | Payload          | Response                                          |
-| ------------------- | --------------- | ---------- | ---------------- | ------------------------------------------------- |
-| `ESTIMATE_PROMPT`   | content         | background | `ChatCaptureDto` | `PromptRecordDto` (the content script ignores it) |
-| `GET_USAGE_SUMMARY` | popup, app page | background | `{ sinceMs }`    | `UsageSummaryDto` (`UsageSummaryResponse`)        |
+| `type`               | Sender             | Receiver   | Payload              | Response                                          |
+| -------------------- | ------------------ | ---------- | -------------------- | ------------------------------------------------- |
+| `ESTIMATE_PROMPT`    | content            | background | `ChatCaptureDto`     | `PromptRecordDto` (the content script ignores it) |
+| `GET_USAGE_SUMMARY`  | popup, app page    | background | `{ sinceMs }`        | `UsageSummaryDto` (`UsageSummaryResponse`)        |
+| `GET_PROMPT_HISTORY` | app page (History) | background | `PromptHistoryQuery` | `PromptHistoryDto` (`PromptHistoryResponse`)      |
 
 On a handler failure the listener answers `{ error: string }`. An unknown `type` gets no answer
 (the listener returns `false`).
@@ -466,6 +490,7 @@ The field list, units and calibration notes live in `config.types.ts`, not here.
 | `capture.models.chatgpt`           | ChatGPT adapter                      | `families`, `effortWords`, `slug.*` and `label.*` (regex sources for the model slug and picker label)                        |
 | `ui`                               | PopupApp, ImpactTachos               | `usageWindowHours`, `tachoMax` (`energyWh`, `waterMl`, `co2Grams`)                                                           |
 | `ui.dashboard`                     | Dashboard (`dashboard.helpers.ts`)   | `busyDay` (Wh / mL / g per day = intensity 1), `intensityExponent`, `pulseMs`, `dripMs`, `puffMs`, `cloudRiseMs`, `poolFill` |
+| `ui.history`                       | History (`usePromptHistory`)         | `pageSize`: prompts per `GET_PROMPT_HISTORY` page / "Load more"                                                              |
 
 - **Import by section:** `import { capture } from '../../config/config.json'`. esbuild
   tree-shakes JSON per top-level key, so each bundle only contains the sections it reads.

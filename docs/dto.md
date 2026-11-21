@@ -83,3 +83,26 @@ shown by the popup and the app page's Dashboard. Response of `GET_USAGE_SUMMARY`
 | `totalTokens`     | `number`              | Sum of their `totalTokens`                                             |
 | `breakdown`       | `TokenBreakdown`      | Sum of each breakdown field                                            |
 | `impact`          | `EnvironmentalImpact` | Sum of each impact field (`energyWh`, `waterMl`, `co2Grams`)           |
+
+## PromptHistoryDto
+
+`src/dto/prompt-history.dto.ts`. Built by `getPromptHistory(query)` in the PromptStoreService,
+shown by the app page's History. Response of `GET_PROMPT_HISTORY`, whose payload is a
+`PromptHistoryQuery`.
+
+### PromptHistoryQuery
+
+| Field       | Type          | Description                                                                |
+| ----------- | ------------- | -------------------------------------------------------------------------- |
+| `sinceMs`   | `number`      | Start of the window (epoch ms, inclusive)                                  |
+| `providers` | `Provider[]`  | Only these providers. Empty = every provider                               |
+| `sort`      | `HistorySort` | `'newest' \| 'oldest' \| 'tokens' \| 'energy'` (unknown values → `newest`) |
+| `offset`    | `number`      | Rows to skip ("Load more")                                                 |
+| `limit`     | `number`      | Rows per page (`ui.history.pageSize`)                                      |
+
+### PromptHistoryDto
+
+| Field     | Type                | Description                                                                                           |
+| --------- | ------------------- | ----------------------------------------------------------------------------------------------------- |
+| `records` | `PromptRecordDto[]` | At most `limit` saved prompts, in `sort` order                                                        |
+| `summary` | `UsageSummaryDto`   | Sums over **every** prompt matching `sinceMs` + `providers`. `promptCount` > loaded rows = more pages |
