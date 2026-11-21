@@ -44,34 +44,18 @@ body {
 
 .popup-impacts {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
-.popup-tokens {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: -4px;
-  padding: 0 4px;
-  font-size: 13px;
-  color: var(--text-muted);
+/* TokenTotalCard takes enter-index 0; shift the three impact tiles down by one in the popup. */
+.popup-impacts .power-card {
+  --enter-index: 1;
 }
 
-.popup-tokens-total {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.popup-impacts .water-card {
+  --enter-index: 2;
 }
 
-.popup-tokens-total .lucide {
-  width: 15px;
-  height: 15px;
-  color: var(--tokens);
-}
-
-.popup-tokens-avg {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+.popup-impacts .co2-card {
+  --enter-index: 3;
 }

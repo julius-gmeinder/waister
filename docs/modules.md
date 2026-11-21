@@ -306,11 +306,11 @@ esbuild entry ([ADR 0011](decisions/0011-app-page.md)):
 
 - **Popup** (`ui/popup/`, toolbar button): the quick impact glance. When opened, it starts on the
   default Dashboard timeframe (`Today`) and lets the user switch between `Today`, `Last week`,
-  `Last 30 days` and `All time` via `TimeframeSelect` (`GET_USAGE_SUMMARY`). It leads with
-  accumulated energy, water and CO2 in three compact horizontal `PowerCard` / `WaterCard` /
-  `Co2Card` tiles (scaled-down Dashboard scenes, no corner `ImpactBadge`), framed by whitespace on
-  `--surface`, followed by a quiet token summary line (`TokenCount` + average per prompt). A
-  `TabBar` at the bottom opens the app page.
+  `Last 30 days` and `All time` via `TimeframeSelect` (`GET_USAGE_SUMMARY`). It renders four
+  stacked horizontal `variant="compact"` tiles (`TokenTotalCard`, `PowerCard`, `WaterCard`,
+  `Co2Card`) with full-height coloured left badge strips (centered icon over label), vertically
+  centered values, and the animations on the right, framed by whitespace on `--surface`. A `TabBar`
+  at the bottom opens the app page.
 - **App page** (`ui/app/`, a full browser tab at `app/index.html`): a sidebar plus one page per
   route (Dashboard, Analytics, Facts, Tips, History). The Dashboard
   ([ADR 0014](decisions/0014-dashboard-page.md)) shows tokens, energy, water and CO2 for a chosen
@@ -337,7 +337,7 @@ components/                           shared components (used by either surface)
   components.css                      styles of all components, one block each
   header.component.tsx                Header: full logo, centered (/logo/waister-full.svg), popup and app page
   total.component.tsx                 Total: Coins icon + summed token count (a <div>)
-  token-total-card.component.tsx      TokenTotalCard (dashboard, analytics): full-width token tile (TokenCount, label, detail, optional corner pill), optional coins skipping along the bottom (Dashboard)
+  token-total-card.component.tsx      TokenTotalCard (dashboard, analytics, popup): full-width token tile or compact horizontal popup row (`variant="compact"`), optional coins skipping along the bottom
   token-count.component.tsx           TokenCount: every token number (serif, --tokens), optional "tokens" unit, approximate note on hover, sizes inline / large / hero
   token-category.helpers.ts           TOKEN_CATEGORIES: order, label, icon and visible/hidden of the six breakdown parts
   breakdown.component.tsx             Breakdown: the six rows (from TOKEN_CATEGORIES)

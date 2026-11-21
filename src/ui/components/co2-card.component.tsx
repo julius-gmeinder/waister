@@ -54,8 +54,8 @@ export function Co2Card({ co2Grams, puffMs, cloudCount, variant = 'card' }: Co2C
     .filter(Boolean)
     .join(' ');
 
-  const reading = (
-    <>
+  return (
+    <article className={className} style={style}>
       <h2 className="co2-card-label">
         {compact ? (
           <>
@@ -70,12 +70,6 @@ export function Co2Card({ co2Grams, puffMs, cloudCount, variant = 'card' }: Co2C
         {value}
         <span className="co2-card-unit">{unit}</span>
       </p>
-    </>
-  );
-
-  return (
-    <article className={className} style={style}>
-      {compact ? <div className="co2-card-info">{reading}</div> : reading}
       <svg
         className="co2-card-scene"
         viewBox={compact ? '24 -4 192 170' : '0 0 240 170'}

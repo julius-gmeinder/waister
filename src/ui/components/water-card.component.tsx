@@ -66,8 +66,8 @@ export function WaterCard({ waterMl, dripMs, poolFill, variant = 'card' }: Water
     .filter(Boolean)
     .join(' ');
 
-  const reading = (
-    <>
+  return (
+    <article className={className} style={style}>
       <h2 className="water-card-label">
         {compact ? (
           <>
@@ -82,12 +82,6 @@ export function WaterCard({ waterMl, dripMs, poolFill, variant = 'card' }: Water
         {value}
         <span className="water-card-unit">{unit}</span>
       </p>
-    </>
-  );
-
-  return (
-    <article className={className} style={style}>
-      {compact ? <div className="water-card-info">{reading}</div> : reading}
       <svg
         className="water-card-scene"
         viewBox={compact ? '24 -4 192 170' : '0 0 240 170'}

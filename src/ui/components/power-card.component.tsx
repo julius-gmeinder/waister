@@ -74,8 +74,8 @@ export function PowerCard({ energyWh, pulseMs, variant = 'card' }: PowerCardProp
     .filter(Boolean)
     .join(' ');
 
-  const reading = (
-    <>
+  return (
+    <article className={className} style={style}>
       <h2 className="power-card-label">
         {compact ? (
           <>
@@ -90,12 +90,6 @@ export function PowerCard({ energyWh, pulseMs, variant = 'card' }: PowerCardProp
         {value}
         <span className="power-card-unit">{unit}</span>
       </p>
-    </>
-  );
-
-  return (
-    <article className={className} style={style}>
-      {compact ? <div className="power-card-info">{reading}</div> : reading}
       <svg
         className="power-card-scene"
         viewBox={compact ? '24 -4 192 170' : '0 0 240 170'}

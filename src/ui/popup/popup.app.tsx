@@ -1,19 +1,19 @@
 /**
  * PopupApp: root component of the popup. Fetches usage for the chosen Dashboard timeframe and
- * leads with energy, water and CO2 in compact animated tiles, with tokens as a quiet summary.
+ * renders tokens, energy, water and CO2 as four stacked horizontal tiles with full-height left
+ * badge strips.
  *
  * Context: popup
  * Docs: docs/modules.md#ui
  */
 
-import { Coins } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { dashboardAnimation } from '../app/pages/dashboard.helpers';
 import { Co2Card } from '../components/co2-card.component';
 import { PowerCard } from '../components/power-card.component';
 import { TabBar } from '../components/tab-bar.component';
 import { TimeframeSelect } from '../components/timeframe-select.component';
-import { TokenCount } from '../components/token-count.component';
+import { TokenTotalCard } from '../components/token-total-card.component';
 import { WaterCard } from '../components/water-card.component';
 import { formatCount } from '../format.helpers';
 import { DEFAULT_TIMEFRAME, timeframeSinceMs, type TimeframeId } from '../timeframe.helpers';
@@ -34,10 +34,6 @@ export function PopupApp() {
   const sinceMs = useMemo(() => timeframeSinceMs(timeframe, Date.now()), [timeframe]);
   const summary = useUsageSummary(sinceMs);
   const animation = useMemo(() => dashboardAnimation(summary), [summary]);
-  const avgTokens =
-    summary && summary.promptCount > 0
-      ? Math.round(summary.totalTokens / summary.promptCount)
-      : null;
 
   return (
     <main className="popup">
@@ -48,7 +44,14 @@ export function PopupApp() {
           <TimeframeSelect value={timeframe} onChange={setTimeframe} />
         </div>
       </header>
-      <section className="popup-impacts" aria-label="Environmental impact">
+      <section className="popup-impacts" aria-label="Usage and environmental impact">
+        <TokenTotalCard
+          variant="compact"
+          tokens={summary === null ? 0 : summary?.totalTokens}
+          label="Tokens"
+          coins
+          enterIndex={0}
+        />
         <PowerCard
           variant="compact"
           energyWh={summary?.impact.energyWh}
@@ -67,15 +70,6 @@ export function PopupApp() {
           cloudCount={animation.cloudCount}
         />
       </section>
-      <div className="popup-tokens">
-        <span className="popup-tokens-total">
-          <Coins aria-hidden="true" />
-          <TokenCount value={summary === null ? 0 : summary?.totalTokens} />
-        </span>
-        {avgTokens !== null && (
-          <span className="popup-tokens-avg">avg {formatCount(avgTokens)} / prompt</span>
-        )}
-      </div>
       <TabBar />
     </main>
   );

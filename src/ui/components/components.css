@@ -549,67 +549,66 @@
   overflow: visible;
 }
 
-/* Compact horizontal variant (popup): drops the corner ImpactBadge in favour of an inline
-   icon + label above the serif value, with the scaled-down animated scene on the right. */
+/* Compact horizontal variant (popup): full-height coloured left badge strip (centered icon +
+   label below), value vertically centered beside it, and the scaled-down animated scene on the
+   right. All four popup rows share the 74px badge width and 84px height so their seams align. */
 .power-card--compact,
 .water-card--compact,
 .co2-card--compact {
   display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 18px 10px 22px;
+  grid-template-columns: 74px minmax(0, 1fr) auto;
+  align-items: stretch;
+  min-height: 84px;
+  padding: 0;
   text-align: left;
-}
-
-.power-card-info,
-.water-card-info,
-.co2-card-info {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  min-width: 0;
 }
 
 .power-card--compact .power-card-label,
 .water-card--compact .water-card-label,
 .co2-card--compact .co2-card-label {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  padding: 10px 6px;
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--text-muted);
-  line-height: 1.3;
+  line-height: 1.2;
 }
 
 .power-card--compact .power-card-label .lucide,
 .water-card--compact .water-card-label .lucide,
 .co2-card--compact .co2-card-label .lucide {
-  width: 13px;
-  height: 13px;
+  width: 24px;
+  height: 24px;
   fill: currentColor;
 }
 
-.power-card--compact .power-card-label .lucide {
+.power-card--compact .power-card-label {
+  background: var(--power-soft);
   color: var(--power-strong);
 }
 
-.water-card--compact .water-card-label .lucide {
+.water-card--compact .water-card-label {
+  background: var(--water-soft);
   color: var(--water-strong);
 }
 
-.co2-card--compact .co2-card-label .lucide {
+.co2-card--compact .co2-card-label {
+  background: var(--co2-soft);
   color: var(--co2-strong);
 }
 
 .power-card--compact .power-card-value,
 .water-card--compact .water-card-value,
 .co2-card--compact .co2-card-value {
+  align-self: center;
+  justify-self: start;
   margin: 0;
-  font-size: 28px;
+  padding: 0 8px 0 18px;
+  font-size: 26px;
   line-height: 1.15;
 }
 
@@ -617,20 +616,21 @@
 .water-card--compact .water-card-unit,
 .co2-card--compact .co2-card-unit {
   margin-left: 5px;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .power-card--compact .power-card-scene,
 .water-card--compact .water-card-scene,
 .co2-card--compact .co2-card-scene {
-  width: 96px;
-  height: 85px;
+  align-self: center;
+  width: 84px;
+  height: 74px;
   max-width: none;
-  margin-top: 0;
+  margin: 5px 14px 5px 0;
   flex-shrink: 0;
 }
 
-/* Slightly heavier strokes so the scaled-down scenes stay crisp at 96px wide. */
+/* Slightly heavier strokes so the scaled-down scenes stay crisp at 84px wide. */
 .power-card--compact .power-gear-body,
 .co2-card--compact .co2-factory {
   stroke-width: 2.2;
@@ -1995,6 +1995,57 @@
   font-size: 13px;
   line-height: 1.45;
   font-variant-numeric: tabular-nums;
+}
+
+/* Compact horizontal variant (popup): matches the 74px left badge strip and 84px height of the
+   impact rows, with the coin track running across column 3. */
+.token-total-card--compact {
+  grid-template-columns: 74px auto minmax(0, 1fr);
+  grid-template-rows: 1fr;
+  align-items: stretch;
+  min-height: 84px;
+  padding: 0;
+}
+
+.token-total-card-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 6px;
+  background: var(--tokens-soft);
+  color: var(--tokens);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.token-total-card-badge .lucide {
+  width: 24px;
+  height: 24px;
+}
+
+.token-total-card--compact .token-total-card-reading {
+  grid-column: 2;
+  align-self: center;
+  padding: 0 8px 0 18px;
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.token-total-card--compact .token-coins {
+  --coin-ground: 6px;
+  grid-column: 3;
+  grid-row: 1;
+  margin: 0 0 0 8px;
+}
+
+.token-total-card--compact .token-coin-hop {
+  width: 20px;
+  height: 20px;
 }
 
 /* Coin run (Dashboard). The track is the card's second column, stretched over the padding to the
