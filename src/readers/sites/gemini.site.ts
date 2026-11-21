@@ -6,6 +6,7 @@
  * Docs: docs/modules.md#site-adapters
  */
 
+import type { ModelFamily } from '../../config/config.types';
 import type {
   AttachmentKind,
   ChatTurn,
@@ -20,6 +21,7 @@ import {
   readToolCalls,
   type ToolSelectors,
 } from '../dom-content.reader';
+import { familyDefaultEffort, THINKING_DETECTED_EFFORT } from './effort-inference';
 import type { SiteAdapter } from './site-adapter.types';
 
 export const GEMINI_SELECTORS = {
@@ -68,7 +70,8 @@ function parseGeminiModel(rawLabel: string, hasThinkingDrawer: boolean): ModelIn
   const cleaned = rawLabel.trim();
   const lower = cleaned.toLowerCase();
 
-  let name = 'gemini';
+  // Generic 'gemini' has no config entry and uses the provider default rates.
+  let name: ModelFamily<'google'> | 'gemini' = 'gemini';
   if (lower.includes('pro')) {
     name = 'gemini-pro';
   } else if (lower.includes('flash')) {
@@ -78,12 +81,10 @@ function parseGeminiModel(rawLabel: string, hasThinkingDrawer: boolean): ModelIn
   const versionMatch = cleaned.match(/(\d+(?:\.\d+)?)/);
   const version = versionMatch?.[1] ?? 'unknown';
 
-  let thinkingEffort: ThinkingEffort = 'unknown';
-  if (hasThinkingDrawer || lower.includes('thinking') || lower.includes('pro')) {
-    thinkingEffort = 'medium';
-  } else if (lower.includes('flash')) {
-    thinkingEffort = 'low';
-  }
+  const thinkingEffort: ThinkingEffort =
+    hasThinkingDrawer || lower.includes('thinking')
+      ? THINKING_DETECTED_EFFORT
+      : familyDefaultEffort(name);
 
   return {
     name,
@@ -159,7 +160,7 @@ export const geminiSite: SiteAdapter = {
       return {
         name: 'gemini',
         version: 'unknown',
-        thinkingEffort: hasThinkingDrawer ? 'medium' : 'unknown',
+        thinkingEffort: hasThinkingDrawer ? THINKING_DETECTED_EFFORT : 'unknown',
         rawLabel: 'unknown',
       };
     }

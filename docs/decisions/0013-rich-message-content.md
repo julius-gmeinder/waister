@@ -1,4 +1,4 @@
-# 0011: Markdown reconstruction, attachments, artifacts and tool calls
+# 0013: Markdown reconstruction, attachments, artifacts and tool calls
 
 **Status:** Accepted (2026-11-21)
 
@@ -33,12 +33,12 @@ annotation + visual spans). Furthermore:
 4. **Attachments (`userAttachments` & `ChatTurn.attachments`)**:
    - `readAttachments` detects uploaded content images (`'image'`) and file / pasted-content
      cards (`'file'`) per user turn. `TokenizerService` adds fixed per-provider estimates from
-     `tokenizer-lookup.json` to `input` and `history`.
+     `config.json` (`tokenizer.<provider>.attachmentTokens`) to `input` and `history`.
 5. **Tool calls (`toolCalls` & `TokenBreakdown.tools`)**:
    - `readToolCalls` detects visible search, code-execution, and other tool calls on the latest
      assistant turn.
-   - `EstimationService` estimates hidden tool tokens per call (`TOOL_CALL_TOKENS` in
-     `model-profiles.ts`) into a new `tools` breakdown category (`totalTokens = input + history +
+   - `EstimationService` estimates hidden tool tokens per call (`estimation.tools` in
+     `config.json`) into a new `tools` breakdown category (`totalTokens = input + history +
 output + thinking + tools + overhead`).
    - `PromptStoreService` adds `tool_tokens INTEGER NOT NULL DEFAULT 0` with an idempotent
      `ALTER TABLE` migration for existing IndexedDB snapshots, and the popup `Breakdown` renders

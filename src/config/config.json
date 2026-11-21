@@ -1,0 +1,155 @@
+{
+  "description": "All tunable values for token estimation and capture in one place. Field meanings: src/config/config.types.ts and docs/modules.md#config.",
+  "estimation": {
+    "thinking": {
+      "baselineMs": 250,
+      "effortMultipliers": {
+        "none": 0,
+        "low": 0.6,
+        "medium": 1.0,
+        "high": 1.4,
+        "unknown": 0.5
+      }
+    },
+    "impact": {
+      "perTokensUnit": 1000000,
+      "roundingDecimals": 4
+    },
+    "tools": {
+      "openai": { "search": 3000, "code": 600, "other": 800 },
+      "anthropic": { "search": 3000, "code": 600, "other": 800 },
+      "google": { "search": 2500, "code": 600, "other": 800 }
+    },
+    "models": {
+      "openai": {
+        "default": {
+          "systemPromptTokens": 1400,
+          "tokensPerMsThinking": 0.075,
+          "energyWhPer1M": 400,
+          "waterMlPer1M": 1400,
+          "co2GramsPer1M": 160
+        },
+        "families": {
+          "gpt": {
+            "systemPromptTokens": 1400,
+            "tokensPerMsThinking": 0.065,
+            "energyWhPer1M": 390,
+            "waterMlPer1M": 1380,
+            "co2GramsPer1M": 155
+          },
+          "openai-o": {
+            "systemPromptTokens": 1600,
+            "tokensPerMsThinking": 0.095,
+            "energyWhPer1M": 520,
+            "waterMlPer1M": 1850,
+            "co2GramsPer1M": 205
+          }
+        }
+      },
+      "anthropic": {
+        "default": {
+          "systemPromptTokens": 1800,
+          "tokensPerMsThinking": 0.07,
+          "energyWhPer1M": 410,
+          "waterMlPer1M": 1450,
+          "co2GramsPer1M": 165
+        },
+        "families": {
+          "claude-sonnet": {
+            "systemPromptTokens": 1800,
+            "tokensPerMsThinking": 0.075,
+            "energyWhPer1M": 390,
+            "waterMlPer1M": 1380,
+            "co2GramsPer1M": 155
+          },
+          "claude-opus": {
+            "systemPromptTokens": 2000,
+            "tokensPerMsThinking": 0.055,
+            "energyWhPer1M": 620,
+            "waterMlPer1M": 2200,
+            "co2GramsPer1M": 245
+          },
+          "claude-haiku": {
+            "systemPromptTokens": 1200,
+            "tokensPerMsThinking": 0.1,
+            "energyWhPer1M": 180,
+            "waterMlPer1M": 640,
+            "co2GramsPer1M": 72
+          }
+        }
+      },
+      "google": {
+        "default": {
+          "systemPromptTokens": 1500,
+          "tokensPerMsThinking": 0.08,
+          "energyWhPer1M": 340,
+          "waterMlPer1M": 1200,
+          "co2GramsPer1M": 135
+        },
+        "families": {
+          "gemini-pro": {
+            "systemPromptTokens": 1600,
+            "tokensPerMsThinking": 0.075,
+            "energyWhPer1M": 420,
+            "waterMlPer1M": 1480,
+            "co2GramsPer1M": 168
+          },
+          "gemini-flash": {
+            "systemPromptTokens": 1300,
+            "tokensPerMsThinking": 0.11,
+            "energyWhPer1M": 160,
+            "waterMlPer1M": 560,
+            "co2GramsPer1M": 64
+          }
+        }
+      }
+    }
+  },
+  "tokenizer": {
+    "openai": {
+      "turnFramingTokens": 4,
+      "attachmentTokens": { "image": 765, "file": 1500 },
+      "singleTokenMaxWordLength": 6,
+      "charsPerSubword": 4.2,
+      "digitChunkSize": 3,
+      "charsPerSymbolToken": 2
+    },
+    "anthropic": {
+      "turnFramingTokens": 5,
+      "attachmentTokens": { "image": 1600, "file": 1500 },
+      "singleTokenMaxWordLength": 5,
+      "charsPerSubword": 3.8,
+      "digitChunkSize": 3,
+      "charsPerSymbolToken": 1.8
+    },
+    "google": {
+      "turnFramingTokens": 4,
+      "attachmentTokens": { "image": 258, "file": 1500 },
+      "singleTokenMaxWordLength": 7,
+      "charsPerSubword": 4.3,
+      "digitChunkSize": 4,
+      "charsPerSymbolToken": 2.2
+    }
+  },
+  "capture": {
+    "timings": {
+      "settleMs": 400,
+      "textStableMs": 2500,
+      "checkDelayMs": 150,
+      "pollMs": 500,
+      "stalePromptMs": 120000,
+      "claudeInterleavedStallMs": 450
+    },
+    "effortInference": {
+      "thinkingDetected": "medium",
+      "familyDefaults": {
+        "claude-haiku": "none",
+        "gemini-pro": "medium",
+        "gemini-flash": "low"
+      }
+    }
+  },
+  "ui": {
+    "usageWindowHours": 24
+  }
+}

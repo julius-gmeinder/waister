@@ -5,15 +5,14 @@
  * Docs: docs/modules.md#entries
  */
 
-// Styles: esbuild bundles these into popup/index.css and copies the font files to popup/fonts/.
-import '@fontsource-variable/inter/opsz.css';
-import '@fontsource/libre-baskerville/400.css';
-import '@fontsource/libre-baskerville/700.css';
-import '../ui/popup.css';
+// Styles: esbuild bundles these (plus the fonts imported by base.css) into popup/index.css.
+import '../ui/base.css';
+import '../ui/components/components.css';
+import '../ui/popup/popup.css';
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { PopupApp } from '../ui/popup.app';
+import { PopupApp } from '../ui/popup/popup.app';
 
 // Loaded with `defer`, so #root is already parsed when this runs.
 const root = document.getElementById('root');

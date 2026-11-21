@@ -2,15 +2,17 @@
  * TokenizerService: counts the visible tokens (input, history, output) per provider.
  *
  * Every chat turn is wrapped in control tokens (ChatML `<|im_start|>`, Claude turn tags, Gemini
- * `<start_of_turn>`), so each input/history turn adds `turnFramingTokens` from
- * `tokenizer-lookup.json`. Attachments (images, files) add a fixed estimate per attachment from
- * the same file. The provider tokenizers ignore whitespace, so line breaks and indentation runs
- * are added here (~1 token per run, like real BPE vocabularies).
+ * `<start_of_turn>`), so each input/history turn adds `turnFramingTokens` from `config.json`
+ * (`tokenizer.<provider>`). Attachments (images, files) add a fixed estimate per attachment from
+ * the same config section. The provider tokenizers ignore whitespace, so line breaks and
+ * indentation runs are added here (~1 token per run, like real BPE vocabularies).
  *
  * Context: background
  * Docs: docs/modules.md#tokenizer-service, docs/pipeline.md
  */
 
+import { tokenizer } from '../../config/config.json';
+import type { TokenizerConfig } from '../../config/config.types';
 import type {
   AttachmentKind,
   ChatCaptureDto,
@@ -20,7 +22,8 @@ import type {
 import { countAnthropicTextTokens } from './anthropic.tokenizer';
 import { countGoogleTextTokens } from './google.tokenizer';
 import { countOpenAiTextTokens } from './openai.tokenizer';
-import tokenizerLookup from './tokenizer-lookup.json';
+
+const TOKENIZER_CONFIG: TokenizerConfig = tokenizer;
 
 export interface VisibleTokenizationResult {
   /** Incl. turn framing and attachments. */
@@ -33,18 +36,8 @@ export interface VisibleTokenizationResult {
   approximate: boolean;
 }
 
-interface ProviderLookup {
-  turnFramingTokens: number;
-  attachmentTokens: Record<AttachmentKind, number>;
-}
-
-function resolveProviderLookup(provider: Provider): ProviderLookup {
-  const providers = tokenizerLookup.providers as Partial<Record<Provider, ProviderLookup>>;
-  return providers[provider] ?? tokenizerLookup.defaults;
-}
-
 export function resolveTurnFramingTokens(provider: Provider): number {
-  return resolveProviderLookup(provider).turnFramingTokens;
+  return TOKENIZER_CONFIG[provider].turnFramingTokens;
 }
 
 /** Newline runs + leading indentation runs (≥ 2 spaces or a tab), ~1 token each. */
@@ -73,7 +66,7 @@ export function countAttachmentTokens(
   provider: Provider,
 ): number {
   if (!attachments?.length) return 0;
-  const rates = resolveProviderLookup(provider).attachmentTokens;
+  const rates = TOKENIZER_CONFIG[provider].attachmentTokens;
   return attachments.reduce((sum, kind) => sum + rates[kind], 0);
 }
 
@@ -92,7 +85,7 @@ function countTurnTokens(
 export function countInputTokens(
   userInput: string,
   provider: Provider,
-  turnFramingTokens: number = tokenizerLookup.defaults.turnFramingTokens,
+  turnFramingTokens: number = resolveTurnFramingTokens(provider),
   attachments: readonly AttachmentKind[] = [],
 ): number {
   return countTurnTokens(userInput, attachments, provider, turnFramingTokens);
@@ -112,7 +105,7 @@ export function countOutputTokens(
 export function countHistoryTokens(
   chatHistory: readonly ChatTurn[],
   provider: Provider,
-  turnFramingTokens: number = tokenizerLookup.defaults.turnFramingTokens,
+  turnFramingTokens: number = resolveTurnFramingTokens(provider),
 ): number {
   let total = 0;
   for (const turn of chatHistory) {

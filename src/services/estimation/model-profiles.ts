@@ -1,120 +1,27 @@
 /**
- * Per-model rates for hidden tokens and energy (internal to EstimationService).
+ * Per-model rates from `config.json` (`estimation.models`), internal to EstimationService.
  *
  * Context: background
  * Docs: docs/modules.md#estimation-service
  */
 
-import type { ModelInfo, Provider, ThinkingEffort, ToolCallKind } from '../../dto/chat-capture.dto';
-import energyLookup from './energy-lookup.json';
+import { estimation } from '../../config/config.json';
+import type { EstimationConfig, ModelRates } from '../../config/config.types';
+import type { ModelInfo, Provider } from '../../dto/chat-capture.dto';
 
-export interface HiddenTokenRates {
-  /** System prompt + tool-definition tokens sent with every prompt. */
-  systemPromptTokens: number;
-  /** Thinking tokens per ms of `thinkingTimeMs`, i.e. output speed (0.075 ≈ 75 tokens/s). */
-  tokensPerMsThinking: number;
-}
+export const ESTIMATION_CONFIG: EstimationConfig = estimation;
 
-export interface HiddenTokenProfile extends HiddenTokenRates {
-  /** False if the model is unknown and the provider default was used. */
+export interface ModelProfile extends ModelRates {
+  /** False if the model family is unknown and the provider default was used. */
   exactModelMatch: boolean;
 }
 
-/** `models` is keyed by `ModelInfo.name`. */
-const HIDDEN_TOKEN_PROFILES: Record<
-  Provider,
-  { default: HiddenTokenRates; models: Record<string, HiddenTokenRates> }
-> = {
-  openai: {
-    default: { systemPromptTokens: 1400, tokensPerMsThinking: 0.075 },
-    models: {
-      gpt: { systemPromptTokens: 1400, tokensPerMsThinking: 0.065 },
-      'openai-o': { systemPromptTokens: 1600, tokensPerMsThinking: 0.095 },
-    },
-  },
-  anthropic: {
-    default: { systemPromptTokens: 1800, tokensPerMsThinking: 0.07 },
-    models: {
-      'claude-sonnet': { systemPromptTokens: 1800, tokensPerMsThinking: 0.075 },
-      'claude-opus': { systemPromptTokens: 2000, tokensPerMsThinking: 0.055 },
-      'claude-haiku': { systemPromptTokens: 1200, tokensPerMsThinking: 0.1 },
-    },
-  },
-  google: {
-    default: { systemPromptTokens: 1500, tokensPerMsThinking: 0.08 },
-    models: {
-      'gemini-pro': { systemPromptTokens: 1600, tokensPerMsThinking: 0.075 },
-      'gemini-flash': { systemPromptTokens: 1300, tokensPerMsThinking: 0.11 },
-    },
-  },
-};
-
-/** `medium` = 1. `unknown` hedges between thinking and not thinking. */
-export const THINKING_EFFORT_MULTIPLIERS: Record<ThinkingEffort, number> = {
-  none: 0,
-  low: 0.6,
-  medium: 1.0,
-  high: 1.4,
-  unknown: 0.5,
-};
-
-/** Subtracted from `thinkingTimeMs` so plain round-trip latency isn't counted as reasoning. */
-export const THINKING_BASELINE_MS = 250;
-
-/**
- * Hidden tokens per tool call (rough placeholders): `search` = fetched result snippets fed back
- * as input, `code` = generated code + execution output, `other` = arguments + a typical result.
- */
-export const TOOL_CALL_TOKENS: Record<Provider, Record<ToolCallKind, number>> = {
-  openai: { search: 3000, code: 600, other: 800 },
-  anthropic: { search: 3000, code: 600, other: 800 },
-  google: { search: 2500, code: 600, other: 800 },
-};
-
-export function resolveHiddenTokenProfile(
-  provider: Provider,
-  model: ModelInfo,
-): HiddenTokenProfile {
-  const providerProfile = HIDDEN_TOKEN_PROFILES[provider];
-  const modelRates = providerProfile.models[model.name];
+/** Rates of `model.name`, or the provider default if the family has no entry. */
+export function resolveModelProfile(provider: Provider, model: ModelInfo): ModelProfile {
+  const providerModels = ESTIMATION_CONFIG.models[provider];
+  const familyRates = providerModels.families[model.name];
   return {
-    ...(modelRates ?? providerProfile.default),
-    exactModelMatch: modelRates !== undefined,
-  };
-}
-
-/** Rates per 1M tokens from `energy-lookup.json`. Water covers cooling and power generation. */
-export interface ResourceRatePer1M {
-  energyWhPer1M: number;
-  waterMlPer1M: number;
-  co2GramsPer1M: number;
-  exactModelMatch: boolean;
-}
-
-export function resolveEnergyProfile(provider: Provider, model: ModelInfo): ResourceRatePer1M {
-  const providerTable = energyLookup.providers[provider];
-  if (!providerTable) {
-    return {
-      ...energyLookup.defaults,
-      exactModelMatch: false,
-    };
-  }
-
-  const modelsMap = providerTable.models as Record<
-    string,
-    { energyWhPer1M: number; waterMlPer1M: number; co2GramsPer1M: number } | undefined
-  >;
-  const modelEntry = modelsMap[model.name];
-
-  if (modelEntry) {
-    return {
-      ...modelEntry,
-      exactModelMatch: true,
-    };
-  }
-
-  return {
-    ...providerTable.default,
-    exactModelMatch: false,
+    ...(familyRates ?? providerModels.default),
+    exactModelMatch: familyRates !== undefined,
   };
 }

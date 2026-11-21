@@ -33,17 +33,19 @@ esbuild build into `dist/waister/` (the unpacked extension you load in the brows
   ([ADR 0010](decisions/0010-react-popup.md)).
 - **Static files** are copied after each successful build by the `copy-static` plugin
   (`[source, destination]`, skipped if the source doesn't exist):
-  `src/ui/popup.html` → `popup/index.html`, everything in `public/`, and
-  `node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm` → `sqlite3.wasm` (next to
-  `background.js`).
+  `src/ui/popup/popup.html` → `popup/index.html`, `src/ui/app/app.html` → `app/index.html`,
+  everything in `public/`, and `node_modules/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm` →
+  `sqlite3.wasm` (next to `background.js`).
 - Entries: `src/entries/background.entry.ts` → `background.js`,
   `src/entries/content.entry.ts` → `content.js`, `src/entries/popup.entry.tsx` →
-  `popup/index.js` (React app, compiled from TSX by esbuild with no plugin).
-- **Popup CSS is bundled, not copied:** `popup.entry.tsx` imports `src/ui/popup.css` and the
-  Fontsource font CSS, so esbuild emits `popup/index.css` next to `popup/index.js`. In watch
-  mode a CSS change triggers a rebuild. Font files go through the `file` loader
-  (`.woff2`, `.woff`) and land in `popup/fonts/` (`assetNames: 'popup/fonts/[name]'`). See
-  [styling.md](styling.md#fonts).
+  `popup/index.js`, `src/entries/app.entry.tsx` → `app/index.js` (both React apps, compiled from
+  TSX by esbuild with no plugin). Each IIFE bundle contains its own copy of React.
+- **UI CSS is bundled, not copied:** each UI entry imports `src/ui/base.css`,
+  `src/ui/components/components.css` and its own layout CSS. esbuild emits `popup/index.css` /
+  `app/index.css` next to the JS. `base.css` `@import`s the Fontsource CSS from `node_modules`. In
+  watch mode a CSS change triggers a rebuild. Font files go through the `file` loader
+  (`.woff2`, `.woff`) and land once in `fonts/` at the extension root
+  (`assetNames: 'fonts/[name]'`), shared by both pages. See [styling.md](styling.md#css-files).
 - Watch mode keeps one esbuild context per build alive.
 - **Manifest per browser:** after each build, `writeManifest()` writes
   `dist/waister/manifest.json` from `src/manifest.json`. By default (Chrome) it is copied
@@ -106,10 +108,12 @@ yet), via `no-restricted-imports` per folder:
 | `src/handlers/**`                 | `readers/`, `ui/`                           |
 | `src/services/**`                 | `handlers/`, `readers/`, `ui/`, `messages/` |
 | `src/messages/**`                 | everything except `dto/`                    |
+| `src/config/**`                   | everything except `dto/` (types only)       |
 | `src/dto/**`                      | everything                                  |
 | `src/entries/content.entry.ts`    | `handlers/`, `services/`, `ui/`             |
 | `src/entries/background.entry.ts` | `readers/`, `ui/`                           |
 | `src/entries/popup.entry.tsx`     | `readers/`, `handlers/`, `services/`        |
+| `src/entries/app.entry.tsx`       | `readers/`, `handlers/`, `services/`        |
 
 ## Formatting and editor
 

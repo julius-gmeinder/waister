@@ -1,0 +1,20 @@
+/* Popup layout only. Tokens: ../base.css, component styles: ../components/components.css.
+   Docs: docs/styling.md */
+
+body {
+  min-width: 260px;
+}
+
+/* The card fills the whole popup window: no wrapper, border or radius. */
+.popup {
+  display: grid;
+  gap: 12px;
+  /* Less on top: the logo SVG already has some empty space above the artwork. */
+  padding: 10px 16px 16px;
+}
+
+.period {
+  margin: -8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}

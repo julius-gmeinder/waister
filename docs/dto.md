@@ -48,7 +48,7 @@ as a `PromptRecordDto`.
 | ------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `totalTokens` | `number`              | **The single token total:** sum of all breakdown fields (`input + history + output + thinking + tools + overhead`) |
 | `breakdown`   | `TokenBreakdown`      | `{ input, history, output, thinking, tools, overhead }` (see [pipeline.md](pipeline.md#thinking-vs-overhead))      |
-| `impact`      | `EnvironmentalImpact` | `{ energyWh, waterMl, co2Grams }` from `energy-lookup.json`. Saved, but not shown in the popup                     |
+| `impact`      | `EnvironmentalImpact` | `{ energyWh, waterMl, co2Grams }` from `config/config.json`. Saved, but not shown in the popup                     |
 | `provider`    | `Provider`            | Echoed from the capture                                                                                            |
 | `model`       | `ModelInfo`           | Echoed from the capture                                                                                            |
 | `timings`     | object                | `{ latencyMs, thinkingTimeMs }` echoed from the capture                                                            |

@@ -1,6 +1,7 @@
 # 0010: Popup built with React + TSX components
 
-**Status:** Accepted (2026-11-21)
+**Status:** Accepted (2026-11-21). The `ui/` layout part is superseded by
+[0011](0011-app-page.md) (the popup now lives in `ui/popup/`).
 
 ## Context
 

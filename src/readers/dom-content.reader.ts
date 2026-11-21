@@ -11,7 +11,7 @@
  * - `readArtifactText`: artifact / canvas side panels belonging to the latest answer.
  *
  * Context: content script
- * Docs: docs/modules.md#dom-content-reader, docs/decisions/0011-rich-message-content.md
+ * Docs: docs/modules.md#dom-content-reader, docs/decisions/0013-rich-message-content.md
  */
 
 import type { AttachmentKind, ToolCallKind } from '../dto/chat-capture.dto';

@@ -1,0 +1,57 @@
+/* Shared by the popup and the app page: fonts, color/font tokens, element defaults.
+   Docs: docs/styling.md */
+@import '@fontsource-variable/inter/opsz.css';
+@import '@fontsource/libre-baskerville/400.css';
+@import '@fontsource/libre-baskerville/700.css';
+
+:root {
+  --font-sans: 'Inter Variable', system-ui, sans-serif;
+  --font-serif: 'Libre Baskerville', Georgia, serif;
+
+  --bg: #fbf8ee;
+  --surface: #ffffff;
+  --border: #efe8cf;
+  /* The logo's brand yellow. Too loud for UI surfaces, so it's for small brand highlights only. */
+  --brand: #fde100;
+  /* Soft yellow for the selected item, a lighter version of --brand, with darker steps towards it
+     for hover and pressed. */
+  --accent: #fef199;
+  --accent-hover: #fdeb7a;
+  --accent-pressed: #fce45c;
+  /* States of neutral (not selected) interactive items on --bg: tints between --bg and
+     --border. Docs: docs/styling.md#interaction-states */
+  --neutral-hover: #f3edd9;
+  --neutral-pressed: #eae2c6;
+  --focus: var(--contrast-bright);
+  --contrast: #2e2a8c;
+  --contrast-bright: #4f46e5;
+  /* Follows the OS/browser theme, see the media query below. */
+  --frame: #ede5ca;
+  --text: #1c1917;
+  --text-muted: #57534e;
+}
+
+/* Theme overrides. --frame currently has the same value in both modes. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --frame: #ede5ca;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.4 var(--font-sans);
+  /* Inter is loaded with its optical-size axis (opsz 14–32), so small text gets wider spacing. */
+  font-optical-sizing: auto;
+}
+
+/* lucide-react renders <svg class="lucide lucide-<name>">. Size and color come from here, not
+   from the SVG attributes, so icons follow the surrounding text. */
+.lucide {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  stroke: currentColor;
+}

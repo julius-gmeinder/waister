@@ -32,7 +32,13 @@ the tokens and saves every prompt to a SQLite database, and the popup reads that
                             │ chrome.runtime message GET_USAGE_SUMMARY
                             │
 ┌─ popup ───────────────────────────────────────────────────────────────────┐
-│  ui/popup.app.tsx (React)          shows the last 24h of token usage      │
+│  ui/popup/popup.app.tsx (React)    shows the last 24h of token usage      │
+│  ui/components/tab-bar             opens a route in a new browser tab ──┐ │
+└─────────────────────────────────────────────────────────────────────────┼─┘
+                                                     chrome.tabs.create   │
+┌─ app page (full browser tab, app/index.html#/<route>) ──────────────────▼─┐
+│  ui/app/app.app.tsx (React)        Sidebar + Analytics · Facts · Tips ·   │
+│                                    History (hash routes, empty for now)   │
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -42,15 +48,20 @@ The code is organized **by layer** ([ADR 0001](decisions/0001-layered-structure.
 belongs to exactly one runtime context (or is shared). That keeps the extension's hard context
 boundaries visible even without one folder per context.
 
-| Layer       | Context    | Purpose                                  | May import                       |
-| ----------- | ---------- | ---------------------------------------- | -------------------------------- |
-| `entries/`  | each       | esbuild entry points, wiring only        | the layers of its own context    |
-| `readers/`  | content    | DOM → `ChatCaptureDto`                   | `dto/`, `messages/`              |
-| `handlers/` | background | Orchestration                            | `services/`, `dto/`, `messages/` |
-| `services/` | background | Domain logic (tokenize, estimate, store) | `dto/`                           |
-| `ui/`       | popup      | Presentation (React + TSX)               | `dto/`, `messages/`              |
-| `messages/` | shared     | `chrome.runtime` message contracts       | `dto/`                           |
-| `dto/`      | shared     | Data contracts                           | nothing                          |
+| Layer       | Context         | Purpose                                  | May import                       |
+| ----------- | --------------- | ---------------------------------------- | -------------------------------- |
+| `entries/`  | each            | esbuild entry points, wiring only        | the layers of its own context    |
+| `readers/`  | content         | DOM → `ChatCaptureDto`                   | `dto/`, `messages/`, `config/`   |
+| `handlers/` | background      | Orchestration                            | `services/`, `dto/`, `messages/` |
+| `services/` | background      | Domain logic (tokenize, estimate, store) | `dto/`, `config/`                |
+| `ui/`       | popup, app page | Presentation (React + TSX)               | `dto/`, `messages/`, `config/`   |
+| `messages/` | shared          | `chrome.runtime` message contracts       | `dto/`                           |
+| `config/`   | shared          | `config.json`: all tunable values        | `dto/` (types only)              |
+| `dto/`      | shared          | Data contracts                           | nothing                          |
+
+`config/` ([ADR 0012](decisions/0012-central-config.md)) is imported by section
+(`import { capture } from '…/config/config.json'`), so esbuild bundles only that section into
+the importing context.
 
 Entry → layer mapping:
 
@@ -59,6 +70,11 @@ Entry → layer mapping:
 | `entries/content.entry.ts`    | content    | `readers/`, `messages/` |
 | `entries/background.entry.ts` | background | `handlers/`             |
 | `entries/popup.entry.tsx`     | popup      | `ui/`                   |
+| `entries/app.entry.tsx`       | app page   | `ui/`                   |
+
+The popup and the app page are both extension pages (same origin, same `chrome.*` APIs), so
+`ui/` serves both. `ui/popup/` and `ui/app/` hold each surface's root, and `ui/components/` is
+shared ([ADR 0011](decisions/0011-app-page.md)).
 
 **Why the boundaries matter:** each context is a separate JS world. esbuild bundles every entry
 on its own, so a wrong import doesn't fail the build. It just silently copies background code
@@ -71,11 +87,12 @@ and will be enforced by ESLint (see [build-and-tooling.md](build-and-tooling.md#
   "EstimationHandler", "TokenizerService" etc. are module names, not classes.
 - **File names:** kebab-case plus a role suffix: `*.entry.ts(x)`, `*.reader.ts`, `*.site.ts`,
   `*.strategy.ts`, `*.handler.ts`, `*.service.ts`, `*.tokenizer.ts`, `*.dto.ts`, `*.types.ts`,
-  and in `ui/` `*.app.tsx` (root component) and `*.component.tsx`
-  ([ADR 0010](decisions/0010-react-popup.md)).
+  and in `ui/` `*.app.tsx` (root component of a surface), `*.page.tsx` (one app page route) and
+  `*.component.tsx` ([ADR 0010](decisions/0010-react-popup.md),
+  [ADR 0011](decisions/0011-app-page.md)).
 - **React components** are function components with a PascalCase export
-  (`breakdown-row.component.tsx` → `BreakdownRow`). Only the app component fetches data, and
-  the other components only render props.
+  (`breakdown-row.component.tsx` → `BreakdownRow`). Only the `*.app.tsx` root components fetch
+  data, and the other components only render props.
 - **Service facades:** other layers import a service only through its `*.service.ts`.
 - **DTOs are plain data:** structured-clone safe, no logic.
 - **Handlers orchestrate, services compute.** A handler never contains a formula, and a service
@@ -94,7 +111,9 @@ the estimation pipeline: estimation writes rows, the popup asks the database for
 | New chat site                         | `readers/sites/<site>.site.ts` + register in `entries/content.entry.ts` + host in manifest |
 | Different read timing                 | `readers/strategies/<x>.strategy.ts` + swap in `entries/content.entry.ts`                  |
 | New provider tokenizer                | `services/tokenizer/<provider>.tokenizer.ts` + route in `tokenizer.service.ts`             |
-| New model / version                   | entry in `services/estimation/model-profiles.ts`                                           |
+| New model / version                   | entry in `config/config.json` (`estimation.models`) + the site adapter's label parser      |
+| Tune a rate, heuristic or timing      | `config/config.json` only                                                                  |
 | New saved field / popup query         | `services/prompt-store/prompt-store.service.ts` (schema + query) + DTO + message           |
-| New popup element                     | `ui/components/<name>.component.tsx`, rendered from `ui/popup.app.tsx`                     |
+| New popup element                     | `ui/components/<name>.component.tsx`, rendered from `ui/popup/popup.app.tsx`               |
+| New app page (route)                  | entry in `ui/app-routes.ts` + `ui/app/pages/<name>.page.tsx` + `PAGES` in `app.app.tsx`    |
 | New runtime context (e.g. side panel) | `entries/<ctx>.entry.ts` + its layer folder + `scripts/build.mjs` + manifest               |

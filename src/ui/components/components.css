@@ -1,0 +1,173 @@
+/* Styles of the shared components in this folder, one block per component.
+   Docs: docs/styling.md */
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: center;
+}
+
+/* The SVG is 155×71. Fixed width, height follows the aspect ratio. */
+.header-logo {
+  display: block;
+  width: 120px;
+  height: auto;
+}
+
+/* Total */
+.total {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--contrast);
+}
+
+.total .lucide {
+  width: 24px;
+  height: 24px;
+  color: var(--contrast-bright);
+}
+
+.total-value {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Breakdown + BreakdownRow */
+.breakdown {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.breakdown li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.breakdown li .lucide {
+  color: var(--contrast-bright);
+}
+
+.breakdown-value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* TabBar (popup): one equal column per app page */
+.tab-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  /* No divider: extra space on top (plus the popup's 12px gap) separates it from the breakdown. */
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tab-bar-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.tab-bar-link .lucide {
+  width: 18px;
+  height: 18px;
+  color: var(--contrast-bright);
+}
+
+/* Sidebar (app page): full-height --bg column, set apart from the --surface content by color
+   alone. Sticky, so it stays in view while a long page scrolls. */
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  height: 100vh;
+  padding: 16px 12px;
+  background: var(--bg);
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: var(--text);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.sidebar-link .lucide {
+  width: 18px;
+  height: 18px;
+  color: var(--contrast-bright);
+}
+
+/* Interaction states, shared by TabBar and Sidebar links (docs/styling.md#interaction-states).
+   Neutral items: --neutral-hover / --neutral-pressed. The current page (aria-current) is
+   --accent with its own hover/pressed steps. The current-page rules come last, so they win over
+   the neutral ones at equal specificity. */
+.tab-bar-link,
+.sidebar-link {
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.tab-bar-link:hover,
+.sidebar-link:hover {
+  background: var(--neutral-hover);
+  color: var(--text);
+}
+
+.tab-bar-link:active,
+.sidebar-link:active {
+  background: var(--neutral-pressed);
+}
+
+.sidebar-link[aria-current='page'] {
+  background: var(--accent);
+}
+
+.sidebar-link[aria-current='page']:hover {
+  background: var(--accent-hover);
+}
+
+.sidebar-link[aria-current='page']:active {
+  background: var(--accent-pressed);
+}
+
+/* Keyboard focus only (not on mouse click). */
+.tab-bar-link:focus-visible,
+.sidebar-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
