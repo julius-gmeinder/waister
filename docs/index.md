@@ -7,6 +7,7 @@ All project documentation lives in this folder.
 
 | Document                                     | What it covers                                                           |
 | -------------------------------------------- | ------------------------------------------------------------------------ |
+| [development.md](development.md)             | Setup, loading and debugging the extension in Chrome and Firefox         |
 | [architecture.md](architecture.md)           | Layers, runtime contexts, import rules, data flow                        |
 | [modules.md](modules.md)                     | Reference for every folder and file in `src/`                            |
 | [pipeline.md](pipeline.md)                   | The estimation pipeline step by step, and how the single number is built |
@@ -15,7 +16,26 @@ All project documentation lives in this folder.
 | [styling.md](styling.md)                     | Look of the popup and app page: colors, fonts, icons, layout, motion     |
 | [decisions/](#architecture-decision-records) | Architecture decision records (ADRs)                                     |
 
-Using and debugging the extension in Chrome and Firefox: root [README.md](../README.md).
+## Project structure
+
+`src/` is organized by layer. Each layer belongs to one runtime context (details in
+[architecture.md](architecture.md), per-file reference in [modules.md](modules.md)):
+
+```
+src/
+  entries/          esbuild entry points, one per context (wiring only)
+  readers/          content:    DOM → ChatCaptureDto (sites/ = where, strategies/ = when)
+  handlers/         background: message routing, EstimationHandler, UsageHandler
+  services/         background: tokenizer/, estimation/, conversion/, prompt-store/ (SQLite)
+  ui/               popup + app page (React + TSX): popup/ = 24h dashboard, app/ = full-page
+                                dashboard · analytics · facts · tips · history, components/ = shared
+  dto/              shared:     ChatCaptureDto, TokenEstimateDto, PromptRecordDto, UsageSummaryDto
+  messages/         shared:     chrome.runtime message contracts
+  config/           shared:     config.json (every tunable rate, heuristic and timing)
+docs/               architecture, pipeline, DTOs, build/tooling, development, ADRs
+public/             static assets copied verbatim into dist/waister/ (e.g. icons/)
+scripts/            build.mjs (esbuild), zip.mjs (store package), test.mjs (Node tests)
+```
 
 ## Architecture decision records
 

@@ -4,17 +4,20 @@ Build scripts and configs of the repo. Requirements: Node.js 20+, npm.
 
 ## npm scripts (`package.json`)
 
-| Script                                                  | Runs                                     |
-| ------------------------------------------------------- | ---------------------------------------- |
-| `npm run dev`                                           | `scripts/build.mjs --watch`              |
-| `npm run build`                                         | `scripts/build.mjs` (minified)           |
-| `npm run typecheck`                                     | `tsc --noEmit`                           |
-| `npm run lint`                                          | `eslint .`                               |
-| `npm run format`                                        | `prettier --write .`                     |
-| `npm run format:check`                                  | `prettier --check .`                     |
-| `npm run check`                                         | typecheck + lint + format check          |
-| `npm run zip`                                           | build, then `scripts/zip.mjs`            |
-| `npm run dev:firefox` / `build:firefox` / `zip:firefox` | same with `--firefox` (Firefox manifest) |
+| Script                                                  | Runs                                                                |
+| ------------------------------------------------------- | ------------------------------------------------------------------- |
+| `npm run dev`                                           | `scripts/build.mjs --watch` (inline source maps, Chrome manifest)   |
+| `npm run dummy`                                         | like `dev`, plus `--dummy`: seeds fake prompts up to ~12M tokens    |
+| `npm run build`                                         | `scripts/build.mjs` (minified) into `dist/waister/`                 |
+| `npm run typecheck`                                     | `tsc --noEmit`                                                      |
+| `npm run lint`                                          | `eslint .`                                                          |
+| `npm run format`                                        | `prettier --write .`                                                |
+| `npm run format:check`                                  | `prettier --check .`                                                |
+| `npm run check`                                         | typecheck + lint + format check                                     |
+| `npm run test`                                          | `scripts/test.mjs` (Node test runner on the estimation modules)     |
+| `npm run zip`                                           | build, then `scripts/zip.mjs` → `dist/waister-<version>-chrome.zip` |
+| `npm run dev:firefox` / `build:firefox` / `zip:firefox` | same with `--firefox` (Firefox manifest), zip → `…-firefox.zip`     |
+| `npm run dummy:firefox`                                 | `dummy` with `--firefox`                                            |
 
 ## `scripts/build.mjs`
 
@@ -60,7 +63,7 @@ MV3.
 - **Popup:** `action.default_popup` = `popup/index.html`.
 - **Background:** `background.js` as ES module (`"type": "module"`). The source declares only
   `service_worker` (Chrome warns about `scripts` in MV3). The `--firefox` build swaps it for
-  `scripts`, because Firefox has no background service workers (see root README).
+  `scripts`, because Firefox has no background service workers (see [development.md](development.md#firefox)).
 - **Content script:** `content.js` at `document_idle`, only on `https://chatgpt.com/*`,
   `https://claude.ai/*`, `https://gemini.google.com/*`.
 - **Permissions:** only `unlimitedStorage`, so the SQLite snapshot in IndexedDB is not evicted
@@ -128,5 +131,18 @@ imports of any depth are caught. A violation fails `npm run lint` with the block
 ## `public/`
 
 Copied verbatim into `dist/waister/`. `public/icons/` holds the extension icon PNGs (rendered
-from `public/logo/waister.svg`), and `public/logo/` the logo SVGs. See the root README
-(_Extension icon_).
+from `public/logo/waister.svg`), and `public/logo/` the logo SVGs.
+
+### Extension icon
+
+The browser draws the toolbar button, the extensions page and the store listing itself, so it
+takes the extension icon from `src/manifest.json` (`icons`, plus `action.default_icon` for the
+toolbar). This is separate from the lucide-react icons inside the popup.
+
+`public/icons/icon{16,32,48,128}.png` are rendered from `public/logo/waister.svg`. Manifest
+icons must be PNG (Chrome doesn't accept SVG there). To regenerate them after changing the logo,
+render the SVG at each size, e.g. with headless Chrome:
+
+```sh
+chrome --headless=new --hide-scrollbars --force-device-scale-factor=1   --default-background-color=00000000 --window-size=128,128   --screenshot=public/icons/icon128.png page-showing-the-svg-at-128px.html
+```

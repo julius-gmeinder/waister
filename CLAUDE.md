@@ -50,8 +50,8 @@ shared:      dto/, messages/, config/ (config.json: every tunable rate, heuristi
 entries/:    one esbuild entry per context, wiring only
 ```
 
-All docs live in `docs/` only. Start at `docs/README.md`. The per-module reference is
-`docs/modules.md`, and decisions are in `docs/decisions/`. Don't add README files inside `src/`.
+All docs live in `docs/` only. Start at `docs/index.md`. The per-module reference is
+`docs/modules.md`, and decisions are in `docs/decisions/`. Don't add README files inside `src/` or `docs/`.
 
 ## Rules
 
@@ -120,4 +120,4 @@ npm run check      # typecheck + lint + prettier check, run before committing
 npm run zip        # package for store upload
 ```
 
-Using and debugging the extension in Chrome/Firefox: root `README.md`.
+Using and debugging the extension in Chrome/Firefox: `docs/development.md`.
