@@ -10,6 +10,11 @@ Waister is a browser extension that tracks you conversations on the big three (C
 
 **Our primary goal is to raise awareness about the environmental cost of AI**
 
+<img width="502" height="672" alt="image" src="https://github.com/user-attachments/assets/f5806427-79b2-4c5c-b81b-b17c7d6a183b" />
+<img width="1890" height="901" alt="image" src="https://github.com/user-attachments/assets/36b08e2a-caf9-4923-b3dc-2f6b9309638f" />
+<img width="1895" height="897" alt="image" src="https://github.com/user-attachments/assets/b2f08c45-f1e9-45c0-9024-1c141eb19d11" />
+<img width="1896" height="901" alt="image" src="https://github.com/user-attachments/assets/1b6d5df4-4f97-442c-a8c8-bce1a82488a9" />
+
 ## how it works
 
 We estimate your token usage from:
