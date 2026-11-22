@@ -38,7 +38,7 @@ Using the token estimate we infer a environmental footprint consisting of:
 
 - Download the newest Release
 - Build from source:
-  1. `https://github.com/julius-gmeinder/waister.git wastier`
+  1. `git clone https://github.com/julius-gmeinder/waister.git wastier`
   2. `cd wastier`
   3. `npm i`
   4. `npm run build`
