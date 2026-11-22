@@ -36,8 +36,8 @@ page also reshuffled on every visit and had a manual Shuffle button.
   up. Plain-language comparisons ("~2.4× as much water as"). The pick is seeded per
   `ui.facts.shuffleIntervalMinutes` (60): the same facts within an interval, no manual shuffle.
 - **Page open:** tiles fade and lift in, staggered (`tile-enter`), on every page with tiles.
-- **Navigation:** sidebar and tab bar icon + label share one color, neutral at rest, indigo on
-  hover, press and the current page.
+- **Navigation:** sidebar and tab bar icon + label share one color, muted at rest, `--text` on
+  the current page; hover and press only change the background.
 
 - **Analytics** (added later) follows the same rules: KPI and chart tiles (ChartCard), Chips
   for every toggle, TokenCount for token values, ImpactBadge for energy / water / CO₂, the token

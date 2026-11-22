@@ -153,7 +153,8 @@ export function TipsPage({ records }: TipsPageProps) {
             <Lightbulb aria-hidden="true" />
             <p className="tips-empty-title">All habits in this view are adopted</p>
             <p className="tips-empty-text">
-              Nice work—turn off &ldquo;Hide adopted&rdquo; or pick another category to review them.
+              Nice work! Turn off &ldquo;Hide adopted&rdquo; or pick another category to review
+              them.
             </p>
             <button
               type="button"

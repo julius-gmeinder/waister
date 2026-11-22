@@ -29,12 +29,12 @@ anchors (`grep -rn "Docs: docs/modules.md#" src`).
 `src/entries/`: one file per runtime context. These are the esbuild entry points and contain
 **wiring only**: no logic, just "pick the parts, connect them, register listeners".
 
-| File                  | Bundle                  | Context    | Wires up                                        |
-| --------------------- | ----------------------- | ---------- | ----------------------------------------------- |
-| `content.entry.ts`    | `content.js` (IIFE)     | content    | `startDomCaptureStrategy()`                     |
-| `background.entry.ts` | `background.js` (ESM)   | background | `chrome.runtime.onMessage` → message handler    |
-| `popup.entry.tsx`     | `popup/index.js` (IIFE) | popup      | imports popup CSS + fonts, mounts `<PopupApp/>` |
-| `app.entry.tsx`       | `app/index.js` (IIFE)   | app page   | imports app CSS + fonts, mounts `<App/>`        |
+| File                  | Bundle                  | Context    | Wires up                                                                                |
+| --------------------- | ----------------------- | ---------- | --------------------------------------------------------------------------------------- |
+| `content.entry.ts`    | `content.js` (IIFE)     | content    | `startDomCaptureStrategy()`                                                             |
+| `background.entry.ts` | `background.js` (ESM)   | background | `chrome.runtime.onMessage` → message handler, dummy-data seed in `npm run dummy` builds |
+| `popup.entry.tsx`     | `popup/index.js` (IIFE) | popup      | imports popup CSS + fonts, mounts `<PopupApp/>`                                         |
+| `app.entry.tsx`       | `app/index.js` (IIFE)   | app page   | imports app CSS + fonts, mounts `<App/>`                                                |
 
 `css-imports.d.ts` is type-only: it declares `*.css` modules so that `tsc` accepts the CSS
 imports in the `.entry.tsx` files (TypeScript 6 checks side-effect imports).
@@ -121,20 +121,20 @@ Contract (`site-adapter.types.ts`):
 
 #### Selectors per site
 
-1. **ChatGPT (`chatgpt.site.ts` — `chatgpt.com`)**: ChatGPT serves different frontend shells depending on authentication state, and every selector covers all of them: the **logged-in** React / Codex app-shell (`#root`), the **logged-out** "web-mobile" Octane shell (`#web-mobile-root`), and the legacy classic app.
+1. **ChatGPT (`chatgpt.site.ts`, `chatgpt.com`)**: ChatGPT serves different frontend shells depending on authentication state, and every selector covers all of them: the **logged-in** React / Codex app-shell (`#root`), the **logged-out** "web-mobile" Octane shell (`#web-mobile-root`), and the legacy classic app.
    - **Turns**: role nodes are `[data-user-message-bubble]` (user) and `[data-response-body]` (assistant) in the logged-in shell, `li[data-message-role]` in the logged-out web-mobile shell, or `[data-message-author-role]` in the classic app. Consecutive role nodes of the same author are merged into one turn, and role nodes nested inside another role node are skipped. Counts, response, user input and history all work on these turns. History = all turns before the latest user turn.
    - **Composer / send button**: `.ProseMirror[data-composer-markdown]` inside `form[data-chatgpt-composer]` (logged-in), `textarea#mobile-composer-prompt` (logged-out), or `#prompt-textarea` (classic); and `form[data-chatgpt-composer] button[type="submit"]` (logged-in), `button[data-composer-submit]:not([data-stop-generating])` (logged-out), or `button[data-testid="send-button"]` / `#composer-submit-button` (classic).
    - **Active generation / streaming**: composer stop button (`form[data-chatgpt-composer] button[aria-label="Stop"]`, `button[data-composer-submit][data-stop-generating]`, or `button[data-testid="stop-button"]`), page/turn streaming markers (`[data-response-starting]` during pre-token thinking, `[data-d-streaming-reveal]` during DIL token streaming, `[data-loading-indicator]`, `form[data-octane-followup-submitting]`, `.result-streaming`), or a logged-out assistant message (`[data-message-role="assistant"]`) with `data-message-streaming` or without `data-message-complete`.
    - **Visible text**: the latest assistant turn has text in a `[data-markdown-text-style="assistant-message"]` / `[data-dil-response]` (logged-in), `[data-assistant-markdown-root]` (logged-out), or `.markdown` (classic) block (the `[data-response-starting]` "Thinking" placeholder doesn't count). User text reads from `[data-user-message-bubble]`.
    - **Model**: `data-message-model-slug` of the latest answer when present, else the label of `[data-model-selection-label]` / `button[aria-label="Select ChatGPT model"]` / `[data-testid="model-switcher-dropdown-button"]` plus the composer `Think` toggle (`form[data-chatgpt-composer] button[aria-pressed="true"]`), else `unknown` (e.g. logged out).
 
-2. **Claude (`claude.site.ts` — `claude.ai`)**:
+2. **Claude (`claude.site.ts`, `claude.ai`)**:
    - **Composer / send button**: `div.ProseMirror[contenteditable="true"]` and `button[aria-label="Send Message"]`.
    - **Active generation / streaming**: Checks for `[data-is-streaming="true"]` or `button[aria-label="Stop Response"]`.
    - **Visible text**: the latest `.font-claude-message` / `.font-claude-response` container has text.
    - **Turns & model**: Reads user turns from `[data-testid="user-message"]`, assistant turns from `.font-claude-message` / `.font-claude-response`, and model info from `[data-testid="model-selector-dropdown"]` plus `[data-testid*="thinking"]`.
 
-3. **Gemini (`gemini.site.ts` — `gemini.google.com`)**:
+3. **Gemini (`gemini.site.ts`, `gemini.google.com`)**:
    - **Composer / send button**: `rich-textarea .ql-editor` and `button.send-button:not(.stop)` / `button[aria-label="Send message"]`.
    - **Active generation / streaming**: Checks for `button.send-button.stop` or a `stop` icon in the send button (locale-independent), `button[aria-label="Stop response"]` (English UI only), `model-response[is-streaming="true"]`, or a spinner inside `<model-response>`.
    - **Visible text**: the latest `<model-response>` has text inside `<message-content>` / `.model-response-text` (excluding `<model-thoughts>` drawers).
@@ -248,7 +248,7 @@ All rates and constants come from [`config.json`](#config) → `estimation`.
   (**hidden tool context**: web search result snippets, code execution inputs/outputs, and other tool calls).
 - `overhead` = `systemPromptTokens` of the model
   (**hidden input**: the provider's invisible system prompt, safety/formatting instructions, and built-in tool definitions like web search, code execution, or canvas/artifacts sent with every turn; fixed per model profile).
-- See [pipeline.md — Thinking vs. Overhead](pipeline.md#thinking-vs-overhead) for a full comparison.
+- See [pipeline.md: Thinking vs. Overhead](pipeline.md#thinking-vs-overhead) for a full comparison.
 - `totalTokens` = input + history + output + thinking + tools + overhead. The handler passes the visible
   counts in, so the services don't call each other.
 
@@ -275,11 +275,12 @@ the EstimationHandler right after `buildTokenEstimateDto`.
 `prompts` table, and the popup's queries are answered from it
 ([ADR 0009](decisions/0009-sqlite-prompt-store.md)). **Metrics only, no chat text.**
 
-| File                      | Role                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `prompt-store.service.ts` | Schema + SQL. `createPromptRecord(capture, estimate)` (adds `crypto.randomUUID()` and `conversationUrl`), `savePromptRecord(record)`, `getUsageSummary(sinceMs)` (token, breakdown and impact sums, oldest `captured_at`), `getPromptHistory(query)` (one page of rows + the sums of the same filter), `getPromptRecords(sinceMs)` (all rows, validated), `clearPromptRecords()` / `clearLegacyPromptRecords()` |
-| `record-validator.ts`     | Internal. `validateAndNormalizeRecord(s)`: drops corrupt rows, re-resolves the model family, reconciles the breakdown sum, recomputes `impact` against the current config (`CURRENT_ESTIMATION_VERSION`) and flags rows without a breakdown as `isLegacy`                                                                                                                                                       |
-| `sqlite-database.ts`      | Internal. Inits `@sqlite.org/sqlite-wasm` once, restores/saves the IndexedDB snapshot, `getDatabase(schema)`, `writeAndPersist(schema, write)`                                                                                                                                                                                                                                                                  |
+| File                      | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prompt-store.service.ts` | Schema + SQL. `createPromptRecord(capture, estimate)` (adds `crypto.randomUUID()` and `conversationUrl`), `savePromptRecord(record)`, `getUsageSummary(sinceMs)` (token, breakdown and impact sums, oldest `captured_at`), `getPromptHistory(query)` (one page of rows + the sums of the same filter), `getPromptRecords(sinceMs)` (all rows, validated), `clearPromptRecords()` / `clearLegacyPromptRecords()`, `seedDummyPromptRecords(targetTokens)` (dev only, see below) |
+| `record-validator.ts`     | Internal. `validateAndNormalizeRecord(s)`: drops corrupt rows, re-resolves the model family, reconciles the breakdown sum, recomputes `impact` against the current config (`CURRENT_ESTIMATION_VERSION`) and flags rows without a breakdown as `isLegacy`                                                                                                                                                                                                                     |
+| `dummy-data.ts`           | Internal, dev only. `generateDummyRecords(targetTokens, beforeMs)`, `DUMMY_ID_PREFIX`, `DUMMY_TARGET_TOKENS`: fake conversations over the 45 days before `beforeMs`, with growing history                                                                                                                                                                                                                                                                                     |
+| `sqlite-database.ts`      | Internal. Inits `@sqlite.org/sqlite-wasm` once, restores/saves the IndexedDB snapshot, `getDatabase(schema)`, `writeAndPersist(schema, write)`                                                                                                                                                                                                                                                                                                                                |
 
 - **Persistence:** MV3 service workers can't use the OPFS VFSes, so the database runs in memory.
   After every insert the whole database is exported and written to IndexedDB (`waister` →
@@ -294,6 +295,7 @@ the EstimationHandler right after `buildTokenEstimateDto`.
   `history_tokens`, `output_tokens`, `thinking_tokens`, `tool_tokens`, `overhead_tokens`, `total_tokens`,
   `latency_ms`, `thinking_time_ms`, `approximate` (0/1), `energy_wh`, `water_ml`, `co2_grams`.
 - **History query:** `getPromptHistory` and the summary share one `WHERE` builder (`captured_at >= $sinceMs`, optional `provider IN (…)` with bound values), so the History's totals always cover the same rows as its pages. The order comes from a whitelist (`HISTORY_ORDER`, unknown sort → newest), with `captured_at DESC, id` as tie-breakers so `LIMIT`/`OFFSET` paging never repeats or skips a row. `toPromptRecord` maps a row back to a `PromptRecordDto`.
+- **Dummy data (dev only):** `npm run dummy` (Firefox: `npm run dummy:firefox`) is `npm run dev` plus the `--dummy` flag, which sets `process.env.WAISTER_DUMMY`. On startup `background.entry.ts` then calls `seedDummyPromptRecords()`: fake prompts up to `DUMMY_TARGET_TOKENS` (12M) in total, dated before the oldest stored row, inserted in one transaction. Their ids start with `dummy-`: existing dummy rows count toward the target, so a rerun only tops up, and they can be removed with `DELETE FROM prompts WHERE id LIKE 'dummy-%'`. Other builds strip the call.
 - The schema runs on every start (`applySchema`) and must stay idempotent (`CREATE TABLE IF NOT EXISTS` plus `pragma_table_info('prompts')` checks that run `ALTER TABLE` for columns in `ADDED_COLUMNS` such as `tool_tokens`).
 
 ---
@@ -329,7 +331,7 @@ Neither surface talks to the estimation pipeline.
 ```
 base.css                              shared: fonts, color/font tokens (incl. --power* / --water* / --co2*), element defaults
 app-routes.ts                         shared: APP_ROUTES (id, label, icon), hash ↔ route, extension URLs
-usage-api.ts                          shared: fetchUsageSummary + useUsageSummary, fetchPromptHistory + usePromptHistory (paging), fetchPromptRecords + usePromptRecords (Analytics, with reset callbacks) — hooks for roots only; fills fields a stale worker lacks
+usage-api.ts                          shared: fetchUsageSummary + useUsageSummary, fetchPromptHistory + usePromptHistory (paging), fetchPromptRecords + usePromptRecords (Analytics, with reset callbacks); hooks for roots only; fills fields a stale worker lacks
 format.helpers.ts                     shared: formatCount, formatMetric (tachos), formatEnergy / formatWater / formatCo2 (auto-scaled Quantity, cards), formatProvider / formatModel / formatEffort, formatDuration, formatClock / formatShortDate / formatDateTime
 timeframe.helpers.ts                  app page: TIMEFRAMES (Today, Last week, Last 30 days, All time), timeframeSinceMs
 history.helpers.ts                    app page: HistoryView (timeframe, providers, sort) + default, HISTORY_TIMEFRAMES (chip order), HISTORY_SORTS, HISTORY_PROVIDERS, toggleProvider, isChronological, groupByDay
@@ -337,7 +339,7 @@ components/                           shared components (used by either surface)
   components.css                      styles of all components, one block each
   header.component.tsx                Header: full logo, centered (/logo/waister-full.svg), popup and app page
   total.component.tsx                 Total: Coins icon + summed token count (a <div>)
-  token-total-card.component.tsx      TokenTotalCard (dashboard, analytics, popup): full-width token tile or compact horizontal popup row (`variant="compact"`), optional coins skipping along the bottom
+  token-total-card.component.tsx      TokenTotalCard (dashboard, analytics, popup): full-width token tile or compact horizontal popup row (`variant="compact"`), optional token pulse (`spitMs` / `coinCount`: the number beats and spits a coin per beat, which skips along the bottom; three resting on it at 0 tokens)
   token-count.component.tsx           TokenCount: every token number (serif, --tokens), optional "tokens" unit, approximate note on hover, sizes inline / large / hero
   token-category.helpers.ts           TOKEN_CATEGORIES: order, label, icon and visible/hidden of the six breakdown parts
   breakdown.component.tsx             Breakdown: the six rows (from TOKEN_CATEGORIES)
@@ -359,11 +361,11 @@ components/                           shared components (used by either surface)
   token-bar.component.tsx             TokenBar (history): one rounded pill per breakdown part with a hover label, thin (row) or thick with hatched hidden parts (modal)
   impact-figures.component.tsx        ImpactFigures (history): energy / water / CO2 as small icon + value pairs
   history-row.component.tsx           HistoryRow (history): one prompt as a clickable row (time, ProviderIcon + model, impact, total; full-width TokenBar below)
-  provider-icon.component.tsx         ProviderIcon (history): inline SVG mark per chat app (Claude, ChatGPT, Gemini), name as <title>
+  provider-icon.component.tsx         ProviderIcon (history, analytics): inline SVG mark per chat app (Claude, ChatGPT, Gemini), name as <title>
   impact-badge.component.tsx          ImpactBadge (dashboard, facts, modal): corner tab, -soft fill, solid icon + label (Energy, Water, CO₂)
   prompt-detail-modal.component.tsx   PromptDetailModal (history): native <dialog> with breakdown legend, impact tiles (ImpactBadge), model & timings, full-width conversation link, ← / → stepping
   fact-card.component.tsx             FactCard (facts): benchmark tile, ImpactBadge, multiplier + plain phrase, one-sentence fact, SVG watermark top right
-  chart-card.component.tsx            ChartCard (analytics): tile with solid title + indigo InfoTooltip, one-line insight, optional header action (chips, legend)
+  chart-card.component.tsx            ChartCard (analytics): tile with solid title + InfoTooltip, one-line insight, optional header action (chips, legend)
   info-tooltip.component.tsx          InfoTooltip (analytics): quiet ⓘ button, explanation popover on hover, focus or click
   category-filter-bar.component.tsx   CategoryFilterBar (tips): category ChipGroup + "Hide adopted" checkbox toggle
   featured-tip-card.component.tsx     FeaturedTipCard (tips): personalized or starter hero tile: muted data-backed hook, larger title, TipCard's tabs + actions
@@ -378,8 +380,8 @@ app/
   app.app.tsx                         App: reads the hash route, holds the dashboard timeframe and the HistoryView, fetches summaries, history pages and the Analytics records, renders Sidebar + the page
   pages/
     dashboard.page.tsx                DashboardPage: title, picker, TokenTotalCard, PowerCard + WaterCard + Co2Card, a new fact seed per visit
-    dashboard.helpers.ts              dashboardAnimation(summary): pulse / drip / puff period, pond fill, cloud count from config; dashboardFacts(summary, timeframe, random)
-    analytics.page.tsx                AnalyticsPage: metric + timeframe chips, KPI tiles, breakdown TokenBar, model donut + comparison, chat memory chart, eco-insight, export / reset footer
+    dashboard.helpers.ts              dashboardAnimation(summary): spit / pulse / drip / puff period, pond fill, coin and cloud counts from config; dashboardFacts(summary, timeframe, random)
+    analytics.page.tsx                AnalyticsPage: metric + timeframe chips, KPI tiles, breakdown TokenBar, model donut + comparison (ProviderIcon per model, also on the top model tile), chat memory chart, eco-insight, export / reset footer
     analytics.helpers.ts              aggregateAnalytics(records, metric, timeframe, …) → view models (KPIs, breakdown, donut, comparison, series, eco-insight), CSV / JSON export
     facts.page.tsx                    FactsPage: Daily, Weekly and All-Time everyday perspective benchmarks, seeded per shuffle interval
     facts.helpers.ts                  shuffleFactsBoard, pickFactComparison (also Dashboard), factsShuffleSeed + seededRandom (ui.facts), smart-window filtering (0.25..15), multiplier & raw KPI formatting
@@ -411,10 +413,10 @@ app/
 - **Dashboard:** `App` holds the `TimeframeId` (starts on Today, not remembered) and fetches
   `useUsageSummary(timeframeSinceMs(timeframe))`. The `sinceMs` is fixed per selection, so a
   rolling window doesn't refetch on every render. `DashboardPage` turns the summary into
-  `pulseMs` / `dripMs` / `pondFill` (`dashboard.helpers.ts`, formula and values in
+  `spitMs` / `coinCount` / `pulseMs` / `dripMs` / `pondFill` (`dashboard.helpers.ts`, formula and values in
   `config.json` → `ui.dashboard`, field docs in `DashboardConfig`). `null` periods mean no usage,
   so the card stands still. The motion itself is pure CSS driven by custom properties
-  (`--pulse`, `--drip`, `--puff`), see [styling.md](styling.md#motion). Each card ends with an
+  (`--spit`, `--pulse`, `--drip`, `--puff`), see [styling.md](styling.md#motion). Each card ends with an
   ImpactFact: `dashboardFacts` picks one benchmark per KPI with the Facts page's logic
   (`pickFactComparison`, timeframe mapped to a Facts section for the zero-usage tiers), seeded
   once per visit, so every opening shows other facts but a refresh keeps them.

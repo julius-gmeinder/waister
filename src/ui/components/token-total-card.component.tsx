@@ -1,8 +1,10 @@
 /**
  * TokenTotalCard: the full-width token total tile on the Dashboard and Analytics (big TokenCount,
  * label, muted detail) and the compact horizontal token row in the popup (`variant="compact"`).
- * With `coins`, coins pop out of the number, drop to the card's bottom edge, skip along it and
- * roll off. Pure CSS (`token-coin-*` keyframes).
+ * With `spitMs` (token pulse), the number beats once per `spitMs` and spits a coin out on every
+ * beat, which drops to the card's bottom edge, skips along it and rolls off. The rate comes in as
+ * props, the motion is CSS (`--spit`, `token-spit` / `token-coin-*` keyframes). At 0 tokens three
+ * coins lie still on the bottom edge instead, so the tile isn't empty.
  *
  * Context: popup, app page
  * Docs: docs/modules.md#ui
@@ -12,18 +14,23 @@ import { Coins } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { TokenCount } from './token-count.component';
 
-/** Coins per cycle; their delays split the cycle evenly (`--coin-count`, components.css). */
-const COIN_COUNT = 3;
+/** Resting coins at 0 tokens (placed one by one in components.css, `.token-coin-rest`). */
+const RESTING_COIN_COUNT = 3;
 
 interface TokenTotalCardProps {
-  /** `undefined` while loading. No coins while loading or at 0. */
+  /** `undefined` while loading. No coins while loading. */
   tokens: number | undefined;
   label: string;
   detail?: ReactNode;
   /** Optional pill in the top-right corner (Analytics: change vs. the previous period). */
   corner?: ReactNode;
-  /** Coin animation on (Dashboard, popup). Off on Analytics, where the tile sits among quiet KPI tiles. */
-  coins?: boolean;
+  /**
+   * Token pulse (Dashboard, popup): time between two coins the number spits out. `null` = no
+   * usage, resting coins. Omitted = no coins at all (Analytics, among quiet KPI tiles).
+   */
+  spitMs?: number | null;
+  /** Coins in the loop. Each one restarts after `coinCount × spitMs`, which keeps the beat even. */
+  coinCount?: number;
   /** `card` = Dashboard / Analytics tile; `compact` = popup horizontal tile with left badge strip. */
   variant?: 'card' | 'compact';
   /** Position in the page-open stagger (`tile-enter`). */
@@ -46,18 +53,24 @@ export function TokenTotalCard({
   label,
   detail,
   corner,
-  coins = false,
+  spitMs,
+  coinCount = 0,
   variant = 'card',
   enterIndex = 0,
 }: TokenTotalCardProps) {
-  const moving = coins && tokens !== undefined && tokens > 0;
+  const moving = typeof spitMs === 'number' && coinCount > 0 && tokens !== undefined && tokens > 0;
+  const resting = spitMs !== undefined && tokens === 0;
   const compact = variant === 'compact';
+  const classes = ['token-total-card'];
+  if (compact) classes.push('token-total-card--compact');
+  if (moving) classes.push('token-total-card--spitting');
+  const style = {
+    '--enter-index': enterIndex,
+    ...(moving && { '--spit': `${spitMs}ms`, '--coin-count': coinCount }),
+  } as CSSProperties;
 
   return (
-    <article
-      className={compact ? 'token-total-card token-total-card--compact' : 'token-total-card'}
-      style={{ '--enter-index': enterIndex } as CSSProperties}
-    >
+    <article className={classes.join(' ')} style={style}>
       {compact ? (
         <>
           <h2 className="token-total-card-badge">
@@ -80,12 +93,8 @@ export function TokenTotalCard({
       )}
       {/* The track is the card's last column: from the reading to the right edge, full height. */}
       {moving && (
-        <span
-          className="token-coins"
-          style={{ '--coin-count': COIN_COUNT } as CSSProperties}
-          aria-hidden="true"
-        >
-          {Array.from({ length: COIN_COUNT }, (_, index) => (
+        <span className="token-coins" aria-hidden="true">
+          {Array.from({ length: coinCount }, (_, index) => (
             <span
               key={index}
               className="token-coin-run"
@@ -94,6 +103,15 @@ export function TokenTotalCard({
               <span className="token-coin-hop">
                 <Coin />
               </span>
+            </span>
+          ))}
+        </span>
+      )}
+      {resting && (
+        <span className="token-coins token-coins--rest" aria-hidden="true">
+          {Array.from({ length: RESTING_COIN_COUNT }, (_, index) => (
+            <span key={index} className="token-coin-rest">
+              <Coin />
             </span>
           ))}
         </span>

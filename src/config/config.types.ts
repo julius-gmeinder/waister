@@ -252,16 +252,16 @@ export interface AnimationPeriodRange {
 
 /**
  * Dashboard animations. Intensity = ((usage ÷ active days) ÷ `busyDay`) ^ `intensityExponent`,
- * clamped to 0..1, separately for energy, water and CO2. Active days = from the oldest prompt in
- * the timeframe until now, at least 1. 0 usage = no pulse / drip / puff.
+ * clamped to 0..1, separately for tokens, energy, water and CO2. Active days = from the oldest prompt in
+ * the timeframe until now, at least 1. 0 usage = no spit / pulse / drip / puff.
  *
  * Assumptions: `busyDay` is about 1M tokens a day (e.g. 50 prompts with 20k tokens of context
  * each) at the default rates of ~400 Wh / ~1400 mL / ~120 g CO2 (vendor average) per 1M tokens. The exponent < 1 lifts low
  * usage, so a light day still visibly moves.
  */
 export interface DashboardConfig {
-  /** Usage per day that counts as intensity 1 (fastest pulse / drip, fullest pond). */
-  busyDay: { energyWh: number; waterMl: number; co2Grams: number };
+  /** Usage per day that counts as intensity 1 (fastest spit / pulse / drip, fullest pond). */
+  busyDay: { tokens: number; energyWh: number; waterMl: number; co2Grams: number };
   intensityExponent: number;
   /** Time between two power pulses (one lightning strike + gear step each). */
   pulseMs: AnimationPeriodRange;
@@ -271,6 +271,13 @@ export interface DashboardConfig {
   puffMs: AnimationPeriodRange;
   /** Time one cloud takes from a stack to fading out (constant, only the frequency changes). */
   cloudRiseMs: number;
+  /** Time between two coins the token number spits out (one beat of the number each). */
+  spitMs: AnimationPeriodRange;
+  /**
+   * About how long one coin's loop lasts (pop out, skip, roll off, wait). Enough coins circle to
+   * spit one every `spitMs`, so a coin's speed barely changes with the rate.
+   */
+  coinLoopMs: number;
   /** Pond water size, as a fraction of the pond's banks, at intensity 0 and 1. */
   pondFill: { min: number; max: number };
 }

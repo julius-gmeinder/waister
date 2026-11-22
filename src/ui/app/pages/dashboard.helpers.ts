@@ -1,6 +1,6 @@
 /**
- * Dashboard helpers: turn a usage summary into animation speeds, the pond level and the cloud
- * count (formula in `DashboardConfig`, config.types.ts), and pick the cards' fun facts.
+ * Dashboard helpers: turn a usage summary into animation speeds, the pond level and the coin and
+ * cloud counts (formula in `DashboardConfig`, config.types.ts), and pick the cards' fun facts.
  *
  * Context: popup, app page
  * Docs: docs/modules.md#ui
@@ -20,6 +20,10 @@ import {
 const { dashboard: DASHBOARD } = ui;
 
 export interface DashboardAnimation {
+  /** `null` = no usage, the token number stands still and spits no coins. */
+  spitMs: number | null;
+  /** Coins in the token card's loop: enough to spit one every `spitMs` over `coinLoopMs`. */
+  coinCount: number;
   /** `null` = no usage, the power card stands still. */
   pulseMs: number | null;
   /** `null` = no usage, no drops. */
@@ -44,9 +48,10 @@ function intensity(usage: number, days: number, busyDay: number): number {
   return Math.min(1, usage / days / busyDay) ** DASHBOARD.intensityExponent;
 }
 
-function cloudCount(puffMs: number | null): number {
-  if (puffMs === null) return 0;
-  return Math.ceil(DASHBOARD.cloudRiseMs / puffMs);
+/** Copies of a looping element so one starts every `periodMs` and each loop lasts `loopMs`. */
+function loopCount(loopMs: number, periodMs: number | null): number {
+  if (periodMs === null) return 0;
+  return Math.ceil(loopMs / periodMs);
 }
 
 function period(range: AnimationPeriodRange, level: number): number | null {
@@ -59,6 +64,8 @@ export function dashboardAnimation(
 ): DashboardAnimation {
   if (!summary) {
     return {
+      spitMs: null,
+      coinCount: 0,
       pulseMs: null,
       dripMs: null,
       pondFill: DASHBOARD.pondFill.min,
@@ -68,18 +75,22 @@ export function dashboardAnimation(
   }
 
   const days = activeDays(summary);
+  const tokens = intensity(summary.totalTokens, days, DASHBOARD.busyDay.tokens);
   const energy = intensity(summary.impact.energyWh, days, DASHBOARD.busyDay.energyWh);
   const water = intensity(summary.impact.waterMl, days, DASHBOARD.busyDay.waterMl);
   const co2 = intensity(summary.impact.co2Grams, days, DASHBOARD.busyDay.co2Grams);
   const { min, max } = DASHBOARD.pondFill;
   const puffMs = period(DASHBOARD.puffMs, co2);
+  const spitMs = period(DASHBOARD.spitMs, tokens);
 
   return {
+    spitMs,
+    coinCount: loopCount(DASHBOARD.coinLoopMs, spitMs),
     pulseMs: period(DASHBOARD.pulseMs, energy),
     dripMs: period(DASHBOARD.dripMs, water),
     pondFill: min + (max - min) * water,
     puffMs,
-    cloudCount: cloudCount(puffMs),
+    cloudCount: loopCount(DASHBOARD.cloudRiseMs, puffMs),
   };
 }
 

@@ -1210,8 +1210,8 @@ describe('8. Workload-Normalized Model Comparison, Natural Equivalences & Reader
         'App instructions',
       ],
     );
-    assert.equal(vmPower.modelDonut.impactToggleLabel, 'Energy (%)');
-    assert.equal(vmPower.modelDonut.messagesToggleLabel, 'Messages (%)');
+    assert.equal(vmPower.modelDonut.impactToggleLabel, 'Energy');
+    assert.equal(vmPower.modelDonut.messagesToggleLabel, 'Messages');
     assert.equal(
       vmPower.kpis.find((k) => k.id === 'hidden-cost-share').label,
       'Behind-the-scenes energy',
@@ -1221,12 +1221,12 @@ describe('8. Workload-Normalized Model Comparison, Natural Equivalences & Reader
     // Water & CO2 tab plain-English copy
     const vmWater = aggregateAnalytics([rec], 'water', '7d', 'impact', NOW, 'normalized', false);
     assert.equal(vmWater.breakdown.title, 'Where your water goes');
-    assert.equal(vmWater.modelDonut.impactToggleLabel, 'Water (%)');
+    assert.equal(vmWater.modelDonut.impactToggleLabel, 'Water');
     assert.equal(vmWater.kpis.find((k) => k.id === 'top-model').label, 'Top water user');
 
     const vmCo2 = aggregateAnalytics([rec], 'co2', '7d', 'impact', NOW, 'normalized', false);
     assert.equal(vmCo2.breakdown.title, 'Where your CO₂ goes');
-    assert.equal(vmCo2.modelDonut.impactToggleLabel, 'CO₂ (%)');
+    assert.equal(vmCo2.modelDonut.impactToggleLabel, 'CO₂');
     assert.equal(vmCo2.kpis.find((k) => k.id === 'top-model').label, 'Top CO₂ user');
 
     // Natural equivalences & factSheet email benchmark

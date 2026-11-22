@@ -86,6 +86,8 @@ export interface AnalyticsKpiCardViewModel {
   comparisonText: string;
   /** Set when the value is a token count, so the page renders it with TokenCount. */
   tokens?: number;
+  /** Set when the value is a model, so the page shows its chat app's ProviderIcon. */
+  provider?: Provider;
 }
 
 export interface CategoryBreakdownSegment {
@@ -1567,7 +1569,7 @@ export function buildModelEfficiency(
     };
   }
 
-  // MODE: Normalized (Default — "Equal Length": Impact per 1,000 words, or per 1k work in technical mode)
+  // MODE: Normalized (Default, "Equal Length": Impact per 1,000 words, or per 1k work in technical mode)
   if (mode === 'normalized') {
     const shortUnit = metric === 'water' ? 'mL' : metric === 'co2' ? 'g' : 'Wh';
     const unitSuffix = showTechnicalDetails ? `${shortUnit} / 1k work` : `${shortUnit} / 1k words`;
@@ -2213,6 +2215,7 @@ export function buildKpiCards(
       label: metricNames.topUserLabel,
       tone: 'neutral',
       value: topModel ? topModel.label : 'None',
+      ...(topModel && topModel.provider !== 'other' && { provider: topModel.provider }),
       unit: topModel ? `${topModel.impactSharePct}%` : '',
       deltaText: null,
       deltaTrend: null,

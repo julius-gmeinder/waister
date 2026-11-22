@@ -26,7 +26,8 @@ period, and makes the numbers tangible instead of abstract.
   0..1. Active days run from the oldest prompt in the window until the query, at least 1, so a
   new install isn't diluted over 30 empty days. All values live in `config.json` → `ui.dashboard`
   ([ADR 0012](0012-central-config.md)). Intensity sets the pulse period, the drip period and the
-  pool level. Intensity 0 = no pulse and no drops.
+  pool level. Intensity 0 = no pulse and no drops. (Added later: the TokenTotalCard's token
+  pulse, a coin spat out per beat, uses the same formula with `busyDay.tokens`.)
 - **Motion in CSS, not JS:** the cards pass `--pulse` / `--drip` / `--drop-fall` as custom
   properties. Glow, bolts, sparks and gear steps all derive from the same `--pulse`, so they stay
   in sync when it changes. SVG scenes are inline in the components (gear outlines are generated

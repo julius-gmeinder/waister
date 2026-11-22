@@ -144,6 +144,7 @@ deletes it.
 | ----------------------- | --------------------------------------------------------------- |
 | `npm run dev`           | Watch mode with inline source maps (Chrome manifest)            |
 | `npm run dev:firefox`   | Same, with the Firefox manifest                                 |
+| `npm run dummy`         | Like `dev`, plus fake prompts up to ~12M tokens in total        |
 | `npm run build`         | Production build (minified) into `dist/waister/`                |
 | `npm run build:firefox` | Same, with the Firefox manifest                                 |
 | `npm run typecheck`     | Type-check with `tsc`                                           |

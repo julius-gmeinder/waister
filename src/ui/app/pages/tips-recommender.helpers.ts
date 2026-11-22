@@ -298,7 +298,7 @@ export function recommendTips(
   } else {
     const unadoptedFallback = pickStarterItems(
       adoptedSet,
-      () => `${prefix} · Your usage looks balanced—here is a high-impact habit to keep`,
+      () => `${prefix} · Your usage looks balanced, so here is a high-impact habit to keep`,
     );
     const allAdopted = adoptedSet.size >= TIPS_CATALOG.length;
     if (allAdopted && uniqueCandidates.length > 0) {

@@ -170,7 +170,7 @@
 }
 
 .history-day-label {
-  color: var(--contrast);
+  color: var(--text);
   font-family: var(--font-serif);
   font-size: 16px;
   font-weight: 700;
@@ -304,7 +304,7 @@ body:has(.prompt-detail[open]) {
   font-family: var(--font-serif);
   font-size: 20px;
   font-weight: 700;
-  color: var(--contrast);
+  color: var(--text);
 }
 
 .facts-section-meta {
@@ -466,10 +466,17 @@ body:has(.prompt-detail[open]) {
   font-size: 40px;
 }
 
+/* Top model tile: the chat app's mark before the model name, centered on the serif value. */
+.analytics-kpi-reading .provider-icon {
+  align-self: center;
+  width: 24px;
+  height: 24px;
+}
+
 .analytics-kpi-value {
   overflow: hidden;
   min-width: 0;
-  color: var(--kpi-strong, var(--contrast));
+  color: var(--kpi-strong, var(--text));
   font-family: var(--font-serif);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -695,7 +702,7 @@ body:has(.prompt-detail[open]) {
 }
 
 .analytics-donut-center-value {
-  color: var(--contrast);
+  color: var(--text);
   font-family: var(--font-serif);
   font-size: 20px;
   font-weight: 700;
@@ -717,13 +724,35 @@ body:has(.prompt-detail[open]) {
   list-style: none;
 }
 
+/* Two lines per model: dot, ProviderIcon + name and share on the first, the value muted under the
+   name, so the name gets the narrow legend's full width. */
 .analytics-donut-row {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-areas:
+    'dot model pct'
+    '. meta pct';
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  column-gap: 10px;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
+}
+
+.analytics-donut-row .analytics-donut-dot {
+  grid-area: dot;
+}
+
+.analytics-donut-model {
+  display: flex;
+  grid-area: model;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.analytics-donut-model .provider-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .analytics-donut-label {
@@ -734,10 +763,13 @@ body:has(.prompt-detail[open]) {
 }
 
 .analytics-donut-meta {
+  grid-area: meta;
   color: var(--text-muted);
+  font-size: 12px;
 }
 
 .analytics-donut-pct {
+  grid-area: pct;
   min-width: 38px;
   color: var(--text);
   font-weight: 600;
@@ -1253,7 +1285,7 @@ body:has(.prompt-detail[open]) {
 
 .tips-section-title {
   margin: 0;
-  color: var(--contrast);
+  color: var(--text);
   font-family: var(--font-serif);
   font-size: 20px;
   font-weight: 700;

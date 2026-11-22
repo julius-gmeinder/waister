@@ -23,6 +23,7 @@ import {
   validateAndNormalizeRecords,
   resolveStoredModelInfo,
 } from './record-validator';
+import { DUMMY_ID_PREFIX, DUMMY_TARGET_TOKENS, generateDummyRecords } from './dummy-data';
 import { getDatabase, writeAndPersist } from './sqlite-database';
 
 export {
@@ -185,34 +186,65 @@ export async function savePromptRecord(record: PromptRecordDto): Promise<void> {
     throw new Error('Cannot save corrupt or invalid prompt record');
   }
   await writeAndPersist(applySchema, (db: Database) => {
-    db.exec({
-      sql: INSERT_PROMPT,
-      bind: {
-        $id: normalized.id,
-        $conversationUrl: normalized.conversationUrl,
-        $capturedAt: normalized.capturedAt,
-        $provider: normalized.provider,
-        $modelName: normalized.model.name,
-        $modelVersion: normalized.model.version,
-        $thinkingEffort: normalized.model.thinkingEffort,
-        $modelRawLabel: normalized.model.rawLabel,
-        $input: normalized.breakdown.input,
-        $history: normalized.breakdown.history,
-        $output: normalized.breakdown.output,
-        $thinking: normalized.breakdown.thinking,
-        $tools: normalized.breakdown.tools,
-        $overhead: normalized.breakdown.overhead,
-        $totalTokens: normalized.totalTokens,
-        $latencyMs: normalized.timings.latencyMs,
-        $thinkingTimeMs: normalized.timings.thinkingTimeMs,
-        $approximate: normalized.approximate ? 1 : 0,
-        $energyWh: normalized.impact.energyWh,
-        $waterMl: normalized.impact.waterMl,
-        $co2Grams: normalized.impact.co2Grams,
-        $estimationVersion: normalized.estimationVersion ?? CURRENT_ESTIMATION_VERSION,
-      },
-    });
+    db.exec({ sql: INSERT_PROMPT, bind: bindRecord(normalized) });
   });
+}
+
+/**
+ * Development only (`npm run dummy`): inserts about `targetTokens` of fake prompts dated before
+ * the oldest stored row, in one transaction with one snapshot. Tops up: dummy rows that already
+ * exist count toward the target, so a rerun adds only what is missing (or nothing). Returns how many rows and tokens were added.
+ */
+export async function seedDummyPromptRecords(
+  targetTokens = DUMMY_TARGET_TOKENS,
+): Promise<{ records: number; totalTokens: number }> {
+  return writeAndPersist(applySchema, (db: Database) => {
+    const existing = db.selectValue(
+      'SELECT COALESCE(SUM(total_tokens), 0) FROM prompts WHERE id LIKE $prefix',
+      { $prefix: `${DUMMY_ID_PREFIX}%` },
+    );
+    const missing = targetTokens - num(existing);
+    if (missing <= 0) return { records: 0, totalTokens: 0 };
+    const oldest = db.selectValue('SELECT MIN(captured_at) FROM prompts');
+    const records = validateAndNormalizeRecords(
+      generateDummyRecords(missing, oldest == null ? Date.now() : num(oldest)),
+    );
+    db.transaction(() => {
+      for (const record of records) db.exec({ sql: INSERT_PROMPT, bind: bindRecord(record) });
+    });
+    return {
+      records: records.length,
+      totalTokens: records.reduce((sum, record) => sum + record.totalTokens, 0),
+    };
+  });
+}
+
+/** Named parameters of `INSERT_PROMPT` for one already normalized record. */
+function bindRecord(normalized: PromptRecordDto): Record<string, SqlValue> {
+  return {
+    $id: normalized.id,
+    $conversationUrl: normalized.conversationUrl,
+    $capturedAt: normalized.capturedAt,
+    $provider: normalized.provider,
+    $modelName: normalized.model.name,
+    $modelVersion: normalized.model.version,
+    $thinkingEffort: normalized.model.thinkingEffort,
+    $modelRawLabel: normalized.model.rawLabel,
+    $input: normalized.breakdown.input,
+    $history: normalized.breakdown.history,
+    $output: normalized.breakdown.output,
+    $thinking: normalized.breakdown.thinking,
+    $tools: normalized.breakdown.tools,
+    $overhead: normalized.breakdown.overhead,
+    $totalTokens: normalized.totalTokens,
+    $latencyMs: normalized.timings.latencyMs,
+    $thinkingTimeMs: normalized.timings.thinkingTimeMs,
+    $approximate: normalized.approximate ? 1 : 0,
+    $energyWh: normalized.impact.energyWh,
+    $waterMl: normalized.impact.waterMl,
+    $co2Grams: normalized.impact.co2Grams,
+    $estimationVersion: normalized.estimationVersion ?? CURRENT_ESTIMATION_VERSION,
+  };
 }
 
 /** `sinceMs` is epoch ms, inclusive. */

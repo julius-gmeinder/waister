@@ -248,6 +248,7 @@
     },
     "dashboard": {
       "busyDay": {
+        "tokens": 1000000,
         "energyWh": 400,
         "waterMl": 1400,
         "co2Grams": 120
@@ -266,6 +267,11 @@
         "fastest": 1000
       },
       "cloudRiseMs": 4800,
+      "spitMs": {
+        "slowest": 2400,
+        "fastest": 500
+      },
+      "coinLoopMs": 4200,
       "pondFill": {
         "min": 0.8,
         "max": 0.97

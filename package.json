@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "node scripts/build.mjs --watch",
     "dev:firefox": "node scripts/build.mjs --watch --firefox",
+    "dummy": "node scripts/build.mjs --watch --dummy",
+    "dummy:firefox": "node scripts/build.mjs --watch --dummy --firefox",
     "build": "node scripts/build.mjs",
     "build:firefox": "node scripts/build.mjs --firefox",
     "typecheck": "tsc --noEmit",

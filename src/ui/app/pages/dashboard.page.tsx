@@ -1,5 +1,5 @@
 /**
- * DashboardPage: tokens (TokenTotalCard), energy, water and CO2 of the selected timeframe, each
+ * DashboardPage: tokens (TokenTotalCard with the token pulse), energy, water and CO2 of the selected timeframe, each
  * impact card with a fun fact. The App root owns the timeframe and the fetched summary, this page
  * only renders them. The facts are drawn fresh every time the page opens.
  *
@@ -52,7 +52,8 @@ export function DashboardPage({ timeframe, onTimeframeChange, summary }: Dashboa
         tokens={summary === null ? 0 : summary?.totalTokens}
         label="Total tokens"
         detail={describeUsage(summary)}
-        coins
+        spitMs={animation.spitMs}
+        coinCount={animation.coinCount}
       />
       <div className="dashboard-cards">
         <PowerCard

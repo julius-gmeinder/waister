@@ -281,7 +281,7 @@
 /* PageTitle (app page) */
 .page-title {
   margin: 0 0 8px;
-  color: var(--contrast);
+  color: var(--text);
   font-family: var(--font-serif);
   font-size: 28px;
   font-weight: 700;
@@ -2265,14 +2265,8 @@
   border: none;
   border-radius: 999px;
   background: transparent;
-  color: var(--contrast-bright);
+  color: var(--text);
   cursor: pointer;
-}
-
-/* Stays indigo on hover (only the neutral background of the shared states applies). The extra
-   class beats the shared hover rule further down. */
-.info-tooltip .info-tooltip-trigger:hover {
-  color: var(--contrast-bright);
 }
 
 .info-tooltip-trigger .lucide {
@@ -2387,10 +2381,25 @@
   padding: 24px 28px;
 }
 
-.token-total-card-reading,
+.token-total-card-reading {
+  grid-row: 1;
+  grid-column: 1;
+}
+
+/* Label and detail run under the coin track too, so the first column is only as wide as the
+   number and the coins start right at it. Rows are explicit, or the track (column 2, rows 1-3)
+   would push the spanning items below it. */
 .token-total-card-label,
 .token-total-card-detail {
-  grid-column: 1;
+  grid-column: 1 / -1;
+}
+
+.token-total-card-label {
+  grid-row: 2;
+}
+
+.token-total-card-detail {
+  grid-row: 3;
 }
 
 .token-total-card-reading {
@@ -2478,20 +2487,54 @@
   margin: 0 0 0 8px;
 }
 
-.token-total-card--compact .token-coin-hop {
-  width: 20px;
-  height: 20px;
+.token-total-card--compact .token-coins {
+  --coin-size: 20px;
 }
 
-/* Coin run (Dashboard). The track is the card's second column, stretched over the padding to the
+/* Token pulse (Dashboard, popup). One beat every --spit: the number gathers (anchored on its left
+   edge, so it swells toward the coins), spits a coin out at --spit-at of the beat and jiggles
+   back. A coin restarts after --coin-count beats, and the coins are one beat apart, so one pops
+   out on every beat. */
+.token-total-card--spitting .token-total-card-reading {
+  transform-origin: 0% 60%;
+  animation: token-spit var(--spit) infinite;
+}
+
+@keyframes token-spit {
+  0%,
+  36%,
+  100% {
+    transform: scale(1);
+    text-shadow: 0 0 0 transparent;
+  }
+  12% {
+    transform: scale(1.04, 0.98);
+    text-shadow: 0 0 6px color-mix(in srgb, var(--tokens) 30%, transparent);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  16% {
+    transform: scale(0.97, 1.03);
+    text-shadow: 3px 0 4px color-mix(in srgb, var(--tokens) 45%, transparent);
+  }
+  23% {
+    transform: scale(1.015, 0.99);
+  }
+  30% {
+    transform: scale(0.995, 1.005);
+  }
+}
+
+/* Coin run. The track is the card's second column, stretched over the padding to the
    card's top, right and bottom edges. Each coin is three layers on one --coin-cycle:
    .token-coin-run moves it across (its translateX % = the track width, plus a coin, so it leaves
    the tile, which clips it), .token-coin-hop drops it from the number's height (a % of the track)
    to the card's bottom edge and skips it along there with ever lower hops, .token-coin pops it in
-   and spins it. A run takes the first 70% of the cycle; the coins start --coin-count evenly
-   spaced delays apart. */
+   and spins it. A run takes the first 70% of the cycle. */
 .token-coins {
-  --coin-cycle: 4.8s;
+  --coin-cycle: calc(var(--spit) * var(--coin-count));
+  /* The spit moment within a beat (the 16% of token-spit). */
+  --spit-at: 0.16;
+  --coin-size: 26px;
   /* Ground: the coin's bottom, just above the card's bottom edge. */
   --coin-ground: 8px;
   position: relative;
@@ -2505,7 +2548,7 @@
   position: absolute;
   inset: 0;
   animation: token-coin-run var(--coin-cycle) linear infinite;
-  animation-delay: calc(var(--coin-cycle) * var(--coin-index) / var(--coin-count));
+  animation-delay: calc(var(--spit) * (var(--coin-index) + var(--spit-at)));
 }
 
 .token-coin-hop {
@@ -2513,8 +2556,8 @@
   bottom: var(--coin-ground);
   left: 0;
   display: block;
-  width: 26px;
-  height: 26px;
+  width: var(--coin-size);
+  height: var(--coin-size);
   transform-origin: 50% 100%;
   animation: token-coin-hop var(--coin-cycle) infinite;
   animation-delay: inherit;
@@ -2549,13 +2592,43 @@
   stroke-linecap: round;
 }
 
+/* Resting coins (0 tokens): the same coins lying still on the ground at the right end of the
+   track, where the run's coins would have rolled to. Uneven gaps and turns (the mark shows the
+   turn), so they look dropped rather than lined up. */
+.token-coin-rest {
+  position: absolute;
+  bottom: var(--coin-ground);
+  width: var(--coin-size);
+  height: var(--coin-size);
+}
+
+.token-coin-rest:nth-child(1) {
+  right: calc(var(--coin-size) * 2.4 + 24px);
+  transform: rotate(-35deg);
+}
+
+.token-coin-rest:nth-child(2) {
+  right: calc(var(--coin-size) + 26px);
+  transform: rotate(20deg);
+}
+
+.token-coin-rest:nth-child(3) {
+  right: 24px;
+  transform: rotate(80deg);
+}
+
+.token-coins--rest .token-coin {
+  opacity: 1;
+  animation: none;
+}
+
 @keyframes token-coin-run {
   0% {
     transform: translateX(0);
   }
   70%,
   100% {
-    transform: translateX(calc(100% + 26px));
+    transform: translateX(calc(100% + var(--coin-size)));
   }
 }
 
@@ -2908,7 +2981,11 @@
     animation: none;
   }
 
-  .token-coins {
+  .token-total-card--spitting .token-total-card-reading {
+    animation: none;
+  }
+
+  .token-coins:not(.token-coins--rest) {
     display: none;
   }
 
@@ -2994,18 +3071,11 @@
   color: var(--text);
 }
 
-/* Navigation links: icon + label in one color (the icon is currentColor), neutral at rest and
-   indigo when hovered, pressed or current. */
+/* Navigation links: icon + label in one color (the icon is currentColor), --text-muted at rest
+   and --text when current. Hover and pressed only change the background. */
 .tab-bar-link:hover,
 .sidebar-link:hover {
   background: var(--neutral-hover);
-  color: var(--contrast-bright);
-}
-
-.tab-bar-link:active,
-.sidebar-link:active,
-.sidebar-link[aria-current='page'] {
-  color: var(--contrast-bright);
 }
 
 .chip[aria-pressed='true'],

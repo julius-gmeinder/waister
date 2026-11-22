@@ -42,7 +42,7 @@ the hex value.
 | `--neutral-hover`   | `#F3EDD9`             | unselected item on `--bg`, hovered                             |
 | `--neutral-pressed` | `#EAE2C6`             | unselected item on `--bg`, pressed                             |
 | `--focus`           | = `--contrast-bright` | keyboard focus ring                                            |
-| `--contrast`        | `#2E2A8C`             | emphasized text (page titles, headings)                        |
+| `--contrast`        | `#2E2A8C`             | the PromptDetailModal's conversation link                      |
 | `--contrast-bright` | `#4F46E5`             | icons                                                          |
 | `--text`            | `#1C1917`             | body text                                                      |
 | `--text-muted`      | `#57534E`             | secondary text (period line, tab labels, placeholders)         |
@@ -123,8 +123,9 @@ Every clickable item uses the same steps. Yellow means "selected", never "hovere
 current page stays recognizable. The sidebar (`aria-current="page"` on `.sidebar-link`) and the
 Chips (`aria-pressed="true"` on `.chip`, used by the TimeframePicker and the ProviderFilter) have
 a selected state. The popup tab bar always opens a new tab, so it has none. Navigation links
-(sidebar, tab bar) keep icon and label in one color: `--text-muted` at rest, `--contrast-bright`
-when hovered, pressed or current (the icon is `currentColor`). The History adds the
+(sidebar, tab bar) keep icon and label in one color: `--text-muted` at rest, `--text` when
+current (the icon is `currentColor`); hover and press only change the background. Headings
+(PageTitle, section titles, History day labels) use `--text`. The History adds the
 SortPicker select, HistoryRows, the "Load more" button and the modal's icon buttons and
 conversation link (neutral states only). The Analytics page uses Chips for its metric,
 timeframe and mode toggles and adds the InfoTooltip button and its action buttons (neutral
@@ -134,7 +135,7 @@ states only). Disabled buttons
 | State                       | Unselected item (tab bar, sidebar link, chip)              | Selected (current page / pressed chip) |
 | --------------------------- | ---------------------------------------------------------- | -------------------------------------- |
 | rest                        | transparent (chip: `--bg`), text `--text-muted` / `--text` | `--accent`                             |
-| `:hover`                    | `--neutral-hover`, text `--text`                           | `--accent-hover`                       |
+| `:hover`                    | `--neutral-hover`, text `--text` (nav links: unchanged)    | `--accent-hover`                       |
 | `:active` (pressed)         | `--neutral-pressed`                                        | `--accent-pressed`                     |
 | `:focus-visible` (keyboard) | 2px `--focus` outline, 2px offset                          | same                                   |
 
@@ -154,9 +155,9 @@ Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `b
   (logo left, prompt count + `TimeframeSelect` dropdown pill right, offering the Dashboard's
   timeframes in a floating `--surface` / `--border` / `--shadow` menu with `--accent` on the active
   option), four stacked horizontal `84px`-tall tiles (`TokenTotalCard`, `PowerCard`, `WaterCard`,
-  `Co2Card`, all `variant="compact"` with a flush full-height `74px` coloured left badge strip —
-  centered icon over label in `--tokens-soft`/`--tokens`, `--power-soft`/`--power-strong`,
-  `--water-soft`/`--water-strong`, `--co2-soft`/`--co2-strong` — a vertically centered 26px serif
+  `Co2Card`, all `variant="compact"` with a flush full-height `74px` coloured left badge strip
+  (centered icon over label in `--tokens-soft`/`--tokens`, `--power-soft`/`--power-strong`,
+  `--water-soft`/`--water-strong`, `--co2-soft`/`--co2-strong`), a vertically centered 26px serif
   value beside it and the animation as a strip from the number to the tile's right edge) and the
   `TabBar`. Every tab is 68px wide (fits
   "Dashboard"), spare width goes between them. The tab bar has no divider; whitespace separates it
@@ -199,7 +200,9 @@ Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `b
 - **ProviderIcon:** inline SVG look-alikes of the chat app logos (Claude sunburst, ChatGPT knot,
   Gemini sparkle), 18px, colored by `--provider-claude` / `--provider-openai` /
   `--provider-gemini-start` → `-end`. They replace the name chip in the HistoryRow and the modal
-  title (the name is the SVG's `<title>` / `aria-label`).
+  title (the name is the SVG's `<title>` / `aria-label`). Analytics puts them before every model
+  name (donut legend at 16px, model comparison rows, 24px on the top model KPI tile; "Other" has
+  none).
 - **SortPicker:** the select uses `appearance: none` with a lucide `ChevronDown` laid over it, so
   the arrow keeps the same inset from the rounded edge as the text on the left.
 - **PromptDetailModal:** native `<dialog>` (max 620px wide), the second exception to "no floating
@@ -237,10 +240,11 @@ Both surfaces are flat: no wrappers, floating cards or rounded outer corners. `b
   water or CO₂ and leave the same top padding without one, so values line up; token values use
   TokenCount; the change vs. the previous period is a small pill in the top-right
   corner. A ChartCard has a solid `--text` title (sans 650, like the FactCard sentence) with an
-  indigo InfoTooltip (ⓘ, the third floating box: border + `--shadow`), a muted one-line insight and optional Chips or a legend on the right. The breakdown
+  `--text` InfoTooltip (ⓘ, the third floating box: border + `--shadow`), a muted one-line insight and optional Chips or a legend on the right. The breakdown
   is one thick TokenBar (token category colors, hidden parts hatched, a 12px gap instead of a
   divider between the visible and the behind-the-scenes group) with a swatch legend per group. The
-  model donut takes the token palette in its order (Other in `--token-other`), the model
+  model donut takes the token palette in its order (Other in `--token-other`); its legend rows
+  have two lines (dot, ProviderIcon + name and share, the value muted below the name). The model
   comparison bars one indigo that gets stronger the more a model uses, and the chat memory chart
   `--token-history` / `--token-input` columns over faint solid gridlines. Impact accents are only
   for energy, water and CO₂. The eco-insight is a tile with an ImpactBadge for the selected
@@ -273,27 +277,34 @@ Reduced motion turns it off.
 The Dashboard cards animate with CSS only (keyframes in `components.css`). The components set
 custom properties, and every animation derives from them:
 
-| Property                                        | Set by    | Drives                                                                                            |
-| ----------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------- |
-| `--pulse`                                       | PowerCard | number glow, gear step (one tooth per pulse), bolts (3 bolts take turns over 3 pulses)            |
-| `--drip`                                        | WaterCard | number wobble, drop (swell, stretch, arc), plop (crown droplets, rebound jet, two rings)          |
-| `offset-path` (inline)                          | WaterCard | the drop's arc in stage px, measured from the number's left edge (popup: fixed, from its right)   |
-| `--pond-fill`                                   | WaterCard | pond water size (share of the banks), eases over 900ms                                            |
-| `--gear-step`                                   | PowerCard | per gear: one tooth (360° / teeth), sign alternating along the train, so teeth stay meshed        |
-| `--gear-teeth`, `--gear-turn`                   | PowerCard | outer layer: one tooth ahead per pulse (`steps`), so the inner ratchet's restart never snaps back |
-| `--puff`                                        | Co2Card   | number haze (lime glow rising off it), average time between two clouds                            |
-| `--cloud-count`                                 | Co2Card   | clouds in the loop; each loops every count × `--puff` ≈ `cloudRiseMs`                             |
-| `--cloud-index`                                 | Co2Card   | start delay in `--puff`s: slot number plus a random head start                                    |
-| `--cloud-rise`, `--cloud-drift`, `--cloud-grow` | Co2Card   | where a cloud ends and how much it swells, re-rolled per loop with its stack                      |
-| `--bulge-rise`, `--bulge-w0` … `--bulge-w3`     | Co2Card   | the bulge's way up its stack and its width at four stops (shares of its widest size)              |
+| Property                                        | Set by         | Drives                                                                                            |
+| ----------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------- |
+| `--pulse`                                       | PowerCard      | number glow, gear step (one tooth per pulse), bolts (3 bolts take turns over 3 pulses)            |
+| `--drip`                                        | WaterCard      | number wobble, drop (swell, stretch, arc), plop (crown droplets, rebound jet, two rings)          |
+| `offset-path` (inline)                          | WaterCard      | the drop's arc in stage px, measured from the number's left edge (popup: fixed, from its right)   |
+| `--pond-fill`                                   | WaterCard      | pond water size (share of the banks), eases over 900ms                                            |
+| `--gear-step`                                   | PowerCard      | per gear: one tooth (360° / teeth), sign alternating along the train, so teeth stay meshed        |
+| `--gear-teeth`, `--gear-turn`                   | PowerCard      | outer layer: one tooth ahead per pulse (`steps`), so the inner ratchet's restart never snaps back |
+| `--spit`                                        | TokenTotalCard | number beat (swell, squash), one coin spat out per beat                                           |
+| `--coin-count`                                  | TokenTotalCard | coins in the loop; each loops every count × `--spit` ≈ `coinLoopMs`                               |
+| `--puff`                                        | Co2Card        | number haze (lime glow rising off it), average time between two clouds                            |
+| `--cloud-count`                                 | Co2Card        | clouds in the loop; each loops every count × `--puff` ≈ `cloudRiseMs`                             |
+| `--cloud-index`                                 | Co2Card        | start delay in `--puff`s: slot number plus a random head start                                    |
+| `--cloud-rise`, `--cloud-drift`, `--cloud-grow` | Co2Card        | where a cloud ends and how much it swells, re-rolled per loop with its stack                      |
+| `--bulge-rise`, `--bulge-w0` … `--bulge-w3`     | Co2Card        | the bulge's way up its stack and its width at four stops (shares of its widest size)              |
 
-- **TokenTotalCard coins** (Dashboard only, the `coins` prop; Analytics stays still): three
-  coins per 4.8s cycle (`--coin-cycle`, delays `--coin-index` / `--coin-count`) pop out next to
-  the number, drop to the card's bottom edge (`--coin-ground`), skip along it in ever lower hops
-  (squash on each landing), then roll off the right edge, where the tile clips them. The track is
-  the card's second grid column, stretched over the padding to the card's edges. Three layers
-  per coin: run (translateX), hop (`bottom`, so the drop can start at a % of the card height),
-  coin (pop-in scale + spin). Fixed timing, not usage-driven; no coins while loading or at 0.
+- **TokenTotalCard token pulse** (Dashboard and popup, the `spitMs` / `coinCount` props;
+  Analytics stays still): the number beats once per `--spit` (`token-spit`: it swells to the
+  right, anchored on its left edge, then squashes and jiggles back) and spits a coin out at the
+  squash (`--spit-at`, 16% of the beat). The coin drops to the card's bottom edge
+  (`--coin-ground`), skips along it in ever lower hops (squash on each landing), then rolls off the
+  right edge, where the tile clips them. `--coin-count` coins loop every count × `--spit`
+  (`--coin-cycle` ≈ `coinLoopMs`), one beat apart (`--coin-index`), so more tokens per day means
+  more coins at about the same speed, like the CO2 clouds. The track is the card's second grid
+  column, stretched over the padding to the card's edges; label and detail span both columns, so
+  the first column is only as wide as the number and the coin pops out right next to it. Three
+  layers per coin: run (translateX), hop (`bottom`, so the drop can start at a % of the card
+  height), coin (pop-in scale + spin). No coins while loading, three lying still at 0.
 - The periods come from `config.json` → `ui.dashboard` (via `dashboard.helpers.ts`). More CO2
   means more clouds at the same rise speed, not faster clouds. No usage means no smoke, no
   `--pulse` / `--drip` and an `--idle` modifier class that removes the animations.

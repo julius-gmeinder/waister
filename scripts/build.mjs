@@ -4,6 +4,8 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 const watch = process.argv.includes('--watch');
 /** Target browser. src/manifest.json is the Chrome manifest, `--firefox` patches it. */
 const firefox = process.argv.includes('--firefox');
+/** Seeds fake prompts into the database on startup (`npm run dummy`), see dummy-data.ts. */
+const dummy = process.argv.includes('--dummy');
 /** The unpacked extension. Load this folder in the browser. */
 const outdir = 'dist/waister';
 
@@ -69,7 +71,10 @@ const shared = {
   minify: !watch,
   logLevel: 'info',
   // React strips its dev-only checks when this is 'production'.
-  define: { 'process.env.NODE_ENV': JSON.stringify(watch ? 'development' : 'production') },
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(watch ? 'development' : 'production'),
+    'process.env.WAISTER_DUMMY': JSON.stringify(dummy ? 'true' : 'false'),
+  },
 };
 
 /** @type {esbuild.BuildOptions[]} */

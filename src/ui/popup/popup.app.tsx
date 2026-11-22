@@ -49,7 +49,8 @@ export function PopupApp() {
           variant="compact"
           tokens={summary === null ? 0 : summary?.totalTokens}
           label="Tokens"
-          coins
+          spitMs={animation.spitMs}
+          coinCount={animation.coinCount}
           enterIndex={0}
         />
         <PowerCard

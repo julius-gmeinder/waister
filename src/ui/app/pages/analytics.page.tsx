@@ -17,6 +17,7 @@ import { Chip } from '../../components/chip.component';
 import { ChipGroup } from '../../components/chip-group.component';
 import { ImpactBadge, type ImpactKind } from '../../components/impact-badge.component';
 import { PageTitle } from '../../components/page-title.component';
+import { ProviderIcon } from '../../components/provider-icon.component';
 import { TokenCount } from '../../components/token-count.component';
 import { TokenTotalCard } from '../../components/token-total-card.component';
 import { formatCount } from '../../format.helpers';
@@ -136,6 +137,7 @@ function KpiCard({
           <TokenCount value={card.tokens} />
         ) : (
           <>
+            {card.provider && <ProviderIcon provider={card.provider} />}
             <span className="analytics-kpi-value" title={card.value}>
               {card.value}
             </span>
@@ -333,7 +335,10 @@ function ModelDonutSection({
             {donut.slices.map((slice) => (
               <li key={slice.id} className="analytics-donut-row">
                 <span className={`analytics-donut-dot analytics-donut-dot--${slice.colorIndex}`} />
-                <span className="analytics-donut-label">{slice.label}</span>
+                <span className="analytics-donut-model">
+                  {slice.provider !== 'other' && <ProviderIcon provider={slice.provider} />}
+                  <span className="analytics-donut-label">{slice.label}</span>
+                </span>
                 <span className="analytics-donut-meta">{slice.formattedValue}</span>
                 <span className="analytics-donut-pct">{slice.percentage}%</span>
               </li>
@@ -401,6 +406,7 @@ function ModelEfficiencySection({
                   <div className="analytics-efficiency-identity">
                     <div className="analytics-efficiency-name-wrap">
                       <span className="analytics-efficiency-rank">#{index + 1}</span>
+                      <ProviderIcon provider={row.provider} />
                       <span className="analytics-efficiency-name">{row.label}</span>
                       {row.isLowSample && (
                         <span

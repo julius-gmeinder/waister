@@ -68,7 +68,7 @@ export const TIPS_CATALOG: readonly TipItem[] = [
     category: 'chat-habits',
     impact: 'high',
     summary:
-      'Every reply re-reads the entire conversation—starting fresh saves energy and gives sharper, less confused answers.',
+      'Every reply re-reads the entire conversation. Starting fresh saves energy and gives sharper, less confused answers.',
     example: {
       insteadOf: 'Keeping 40 messages about travel, recipes, and work in one endless thread.',
       tryThis: 'Click "New Chat" whenever you switch to a new topic.',
@@ -80,7 +80,7 @@ export const TIPS_CATALOG: readonly TipItem[] = [
     category: 'before-asking',
     impact: 'high',
     summary:
-      'Heavy flagship models use up to 10× more energy—fast standard models handle everyday writing and summaries just as well.',
+      'Heavy flagship models use up to 10× more energy, while fast standard models handle everyday writing and summaries just as well.',
     example: {
       insteadOf: 'Using the heaviest model to fix grammar or draft a quick email.',
       tryThis:
@@ -93,7 +93,7 @@ export const TIPS_CATALOG: readonly TipItem[] = [
     category: 'before-asking',
     impact: 'high',
     summary:
-      'Extended reasoning burns extra energy thinking step-by-step before replying—great for tough decisions, wasted on simple lookups.',
+      'Extended reasoning burns extra energy thinking step-by-step before replying: great for tough decisions, wasted on simple lookups.',
     example: {
       insteadOf: 'Leaving deep reasoning turned on for every casual question.',
       tryThis: 'Turn reasoning on only for complex analysis, math, or multi-step planning.',
@@ -105,7 +105,7 @@ export const TIPS_CATALOG: readonly TipItem[] = [
     category: 'how-to-ask',
     impact: 'high',
     summary:
-      'AI replies use the most energy per word—requesting bullet points or a word limit gives you the same facts without filler.',
+      'AI replies use the most energy per word. Requesting bullet points or a word limit gives you the same facts without filler.',
     example: {
       insteadOf: '"Explain how solar panels work."',
       tryThis: '"Explain how solar panels work in 5 concise bullet points."',
