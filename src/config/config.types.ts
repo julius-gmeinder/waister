@@ -314,11 +314,20 @@ export interface UiConfig {
   facts: FactsConfig;
 }
 
+/** Privacy notice (ADR 0017). */
+export interface PrivacyConfig {
+  /** Version of PRIVACY.md. Changing it makes every stored answer `unset`: users are asked again. */
+  policyVersion: string;
+  /** Where the notice links the full privacy policy. */
+  policyUrl: string;
+}
+
 export interface WaisterConfig {
   estimation: EstimationConfig;
   tokenizer: TokenizerConfig;
   capture: CaptureConfig;
   ui: UiConfig;
+  privacy: PrivacyConfig;
 }
 
 /**

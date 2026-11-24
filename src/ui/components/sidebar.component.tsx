@@ -1,19 +1,21 @@
 /**
- * Sidebar: logo plus one link per app page. Links only change the hash, so switching
- * pages doesn't reload.
+ * Sidebar: logo plus one link per app page, and a Privacy button at the bottom that reopens the
+ * privacy notice. Links only change the hash, so switching pages doesn't reload.
  *
  * Context: app page
  * Docs: docs/modules.md#ui
  */
 
+import { ShieldCheck } from 'lucide-react';
 import { APP_ROUTES, routeHash, type AppRouteId } from '../app-routes';
 import { Header } from './header.component';
 
 interface SidebarProps {
   activeRoute: AppRouteId;
+  onOpenPrivacy: () => void;
 }
 
-export function Sidebar({ activeRoute }: SidebarProps) {
+export function Sidebar({ activeRoute, onOpenPrivacy }: SidebarProps) {
   return (
     <aside className="sidebar">
       <Header />
@@ -33,6 +35,10 @@ export function Sidebar({ activeRoute }: SidebarProps) {
           ))}
         </ul>
       </nav>
+      <button type="button" className="sidebar-privacy" onClick={onOpenPrivacy}>
+        <ShieldCheck />
+        Privacy
+      </button>
     </aside>
   );
 }

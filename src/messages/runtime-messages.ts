@@ -7,6 +7,7 @@
 
 import type { ChatCaptureDto } from '../dto/chat-capture.dto';
 import type { PromptHistoryDto, PromptHistoryQuery } from '../dto/prompt-history.dto';
+import type { PrivacyConsentDto } from '../dto/privacy-consent.dto';
 import type { PromptRecordDto } from '../dto/prompt-record.dto';
 import type { UsageSummaryDto } from '../dto/usage-summary.dto';
 
@@ -46,16 +47,34 @@ export interface GetPromptHistoryMessage {
   payload: PromptHistoryQuery;
 }
 
+/** Content, popup and app page -> background: may capture run, should the notice show? */
+export interface GetPrivacyConsentMessage {
+  type: 'GET_PRIVACY_CONSENT';
+}
+
+/** Popup / app page (privacy notice) -> background. */
+export interface SetPrivacyConsentMessage {
+  type: 'SET_PRIVACY_CONSENT';
+  payload: {
+    accepted: boolean;
+  };
+}
+
 export type RuntimeMessage =
   | EstimatePromptMessage
   | GetUsageSummaryMessage
   | GetPromptRecordsMessage
   | ClearPromptRecordsMessage
-  | GetPromptHistoryMessage;
+  | GetPromptHistoryMessage
+  | GetPrivacyConsentMessage
+  | SetPrivacyConsentMessage;
 
 export type UsageSummaryResponse = UsageSummaryDto;
 export type PromptRecordsResponse = PromptRecordDto[];
 export type PromptHistoryResponse = PromptHistoryDto;
+export type PrivacyConsentResponse = PrivacyConsentDto;
+/** `null`: not saved, because the user has not accepted the privacy notice. */
+export type EstimatePromptResponse = PromptRecordDto | null;
 export interface ClearPromptRecordsResponse {
   cleared: true;
 }

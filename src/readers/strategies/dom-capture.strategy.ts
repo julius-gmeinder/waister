@@ -58,10 +58,14 @@ export function startDomCaptureStrategy(
   return observeTurns(adapter, (timings) => {
     const dto = buildChatCaptureDto(adapter, timings);
     if (!dto.response && !dto.userInput && !dto.artifactText) {
-      console.info(LOG_PREFIX, 'capture dropped: prompt and response text are empty', dto);
+      console.info(LOG_PREFIX, 'capture dropped: prompt and response text are empty');
       return;
     }
-    console.info(LOG_PREFIX, 'captured prompt', dto);
+    // No DTO in the log: it holds the chat text, and the page's console is not ours.
+    console.info(LOG_PREFIX, 'captured prompt', {
+      provider: dto.provider,
+      latencyMs: dto.latencyMs,
+    });
     onCapture(dto);
   });
 }

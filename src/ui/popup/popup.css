@@ -59,3 +59,40 @@ body {
 .popup-impacts .co2-card {
   --enter-index: 3;
 }
+
+/* Shield button next to the timeframe select: reopens the privacy notice. */
+.popup-privacy {
+  display: inline-flex;
+  padding: 5px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.popup-privacy:hover {
+  background: var(--neutral-hover);
+}
+
+.popup-privacy .lucide {
+  width: 16px;
+  height: 16px;
+}
+
+.popup-privacy-off {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.popup-privacy-off button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--contrast-bright);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

@@ -26,6 +26,8 @@ const staticFiles = [
  */
 function writeManifest() {
   const manifest = JSON.parse(readFileSync('src/manifest.json', 'utf8'));
+  // package.json is the one version source, so the store version and the zip name never drift.
+  manifest.version = JSON.parse(readFileSync('package.json', 'utf8')).version;
   if (firefox) {
     const { service_worker: worker, ...background } = manifest.background;
     manifest.background = { ...background, scripts: [worker] };

@@ -27,6 +27,11 @@ the tokens and saves every prompt to a SQLite database, and the popup reads that
 │  services/prompt-store/            SQLite WASM (in memory, IndexedDB      │
 │                                    snapshot after every insert)           │
 │                                                                           │
+│  handlers/privacy.handler.ts       GET/SET_PRIVACY_CONSENT                │
+│     └─ services/privacy-consent/   answer in IndexedDB (ADR 0017); the    │
+│                                    content script and EstimationHandler   │
+│                                    only run / save when it is accepted    │
+│                                                                           │
 │  handlers/usage.handler.ts         handleGetUsageSummary(sinceMs)         │
 │     └─ services/prompt-store/      SELECT SUM(...) → UsageSummaryDto      │
 │                                    handleGetPromptHistory(query)          │

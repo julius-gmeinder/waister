@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Waister",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Estimates the total token usage of each prompt on ChatGPT, Claude, and Gemini.",
   "icons": {
     "16": "icons/icon16.png",

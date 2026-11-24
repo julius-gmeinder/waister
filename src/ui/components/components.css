@@ -3116,3 +3116,233 @@
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
+
+/* PrivacyNotice: a dialog like PromptDetailModal on the app page, an inline tile in the popup. */
+.privacy-notice--dialog {
+  box-sizing: border-box;
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.privacy-notice--dialog::backdrop {
+  background: var(--backdrop);
+}
+
+.privacy-notice--dialog[open] {
+  animation: prompt-detail-in 180ms ease-out;
+}
+
+.privacy-notice--inline {
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.privacy-notice-body {
+  display: grid;
+  gap: 14px;
+  box-sizing: border-box;
+  max-height: calc(100vh - 66px);
+  padding: 24px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.privacy-notice--inline .privacy-notice-body {
+  max-height: none;
+  padding: 18px;
+  /* The popup page scrolls, not the notice, so the sticky actions below stick to the window. */
+  overflow: visible;
+}
+
+.privacy-notice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.privacy-notice-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.privacy-notice-title .lucide {
+  width: 20px;
+  height: 20px;
+  color: var(--contrast-bright);
+}
+
+.privacy-notice-close {
+  display: inline-flex;
+  padding: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.privacy-notice-close:hover {
+  background: var(--neutral-hover);
+}
+
+.privacy-notice-close .lucide {
+  width: 18px;
+  height: 18px;
+}
+
+.privacy-notice-lead,
+.privacy-notice-legal,
+.privacy-notice-status,
+.privacy-notice-note {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.privacy-notice-legal,
+.privacy-notice-note {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.privacy-notice-legal a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--contrast-bright);
+}
+
+.privacy-notice-legal a .lucide {
+  width: 12px;
+  height: 12px;
+}
+
+.privacy-notice-status {
+  font-weight: 500;
+}
+
+.privacy-notice-facts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.privacy-notice-fact {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.privacy-notice-fact dt {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.privacy-notice-fact dd {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.privacy-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Pill buttons like Analytics' action buttons. Accept and Decline share one size and weight, so
+   neither answer is nudged. */
+.privacy-notice-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.privacy-notice-btn:hover {
+  background: var(--neutral-hover);
+}
+
+.privacy-notice-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.privacy-notice-btn .lucide {
+  width: 14px;
+  height: 14px;
+}
+
+.privacy-notice-btn--primary {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.privacy-notice-btn--primary:hover {
+  background: var(--accent-hover);
+}
+
+.privacy-notice-btn--danger {
+  border-color: var(--power-soft);
+  background: var(--power-soft);
+  color: var(--power-strong);
+}
+
+/* Sidebar / popup entry points that reopen the notice. */
+.sidebar-privacy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-privacy:hover {
+  background: var(--neutral-hover);
+}
+
+.sidebar-privacy .lucide {
+  width: 18px;
+  height: 18px;
+}
+
+/* Chrome caps the popup at 600px, so the notice scrolls: keep its answer buttons in view. */
+.privacy-notice--inline .privacy-notice-actions {
+  position: sticky;
+  bottom: 0;
+  margin: 0 -18px -18px;
+  padding: 12px 18px;
+  border-radius: 0 0 12px 12px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}

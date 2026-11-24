@@ -29,12 +29,12 @@ anchors (`grep -rn "Docs: docs/modules.md#" src`).
 `src/entries/`: one file per runtime context. These are the esbuild entry points and contain
 **wiring only**: no logic, just "pick the parts, connect them, register listeners".
 
-| File                  | Bundle                  | Context    | Wires up                                                                                |
-| --------------------- | ----------------------- | ---------- | --------------------------------------------------------------------------------------- |
-| `content.entry.ts`    | `content.js` (IIFE)     | content    | `startDomCaptureStrategy()`                                                             |
-| `background.entry.ts` | `background.js` (ESM)   | background | `chrome.runtime.onMessage` → message handler, dummy-data seed in `npm run dummy` builds |
-| `popup.entry.tsx`     | `popup/index.js` (IIFE) | popup      | imports popup CSS + fonts, mounts `<PopupApp/>`                                         |
-| `app.entry.tsx`       | `app/index.js` (IIFE)   | app page   | imports app CSS + fonts, mounts `<App/>`                                                |
+| File                  | Bundle                  | Context    | Wires up                                                                                                                                      |
+| --------------------- | ----------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `content.entry.ts`    | `content.js` (IIFE)     | content    | `GET_PRIVACY_CONSENT`, then `startDomCaptureStrategy()` only if `accepted`                                                                    |
+| `background.entry.ts` | `background.js` (ESM)   | background | `chrome.runtime.onMessage` → message handler, opens the app page (privacy notice) on first install, dummy-data seed in `npm run dummy` builds |
+| `popup.entry.tsx`     | `popup/index.js` (IIFE) | popup      | imports popup CSS + fonts, mounts `<PopupApp/>`                                                                                               |
+| `app.entry.tsx`       | `app/index.js` (IIFE)   | app page   | imports app CSS + fonts, mounts `<App/>`                                                                                                      |
 
 `css-imports.d.ts` is type-only: it declares `*.css` modules so that `tsc` accepts the CSS
 imports in the `.entry.tsx` files (TypeScript 6 checks side-effect imports).
@@ -179,11 +179,12 @@ The detection timings (settle, text-stable, check delay, poll, stale prompt) com
 right order and return a result. They hold no domain logic of their own (no tokenizing, no
 estimation formulas).
 
-| File                    | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `message.handler.ts`    | Routes each `chrome.runtime` message by `type` to the matching handler: `ESTIMATE_PROMPT` → EstimationHandler, `GET_USAGE_SUMMARY`, `GET_PROMPT_HISTORY`, `GET_PROMPT_RECORDS` and `CLEAR_PROMPT_RECORDS` → UsageHandler. Returns `undefined` for an unknown type, so `background.entry.ts` answers `false` and doesn't keep the channel open.                                                                                                                                                                                                                                             |
-| `estimation.handler.ts` | **EstimationHandler**: `ChatCaptureDto` → `PromptRecordDto`. Gets visible counts from the TokenizerService and hidden counts from the EstimationService, has the EstimationService build the `TokenEstimateDto` (`totalTokens`), delegates to the ConversionService (`convertTokensToImpact`) to compute energy/water/CO2 impact, then has the PromptStoreService add a UUID + the conversation URL and save the row. `normalizeCaptureDto` first trims the text, clamps negative times, drops attachment and tool kinds it doesn't know (they count 0) and throws on an unknown provider. |
-| `usage.handler.ts`      | **UsageHandler**: `handleGetUsageSummary(sinceMs)` → `UsageSummaryDto`, `handleGetPromptHistory(query)` → `PromptHistoryDto`, `handleGetPromptRecords(sinceMs)` → `PromptRecordDto[]` (Analytics) and `handleClearPromptRecords(legacyOnly)` → `{ cleared: true }` (Analytics reset), straight through the PromptStoreService. No link to the estimation pipeline.                                                                                                                                                                                                                         |
+| File                    | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `message.handler.ts`    | Routes each `chrome.runtime` message by `type` to the matching handler: `ESTIMATE_PROMPT` → EstimationHandler, `GET_USAGE_SUMMARY`, `GET_PROMPT_HISTORY`, `GET_PROMPT_RECORDS` and `CLEAR_PROMPT_RECORDS` → UsageHandler, `GET_PRIVACY_CONSENT` / `SET_PRIVACY_CONSENT` → PrivacyHandler. Returns `undefined` for an unknown type, so `background.entry.ts` answers `false` and doesn't keep the channel open.                                                                                                                                                                                                                                                                |
+| `estimation.handler.ts` | **EstimationHandler**: `ChatCaptureDto` → `PromptRecordDto` (or `null` without privacy consent, [ADR 0017](decisions/0017-privacy-consent.md)). Gets visible counts from the TokenizerService and hidden counts from the EstimationService, has the EstimationService build the `TokenEstimateDto` (`totalTokens`), delegates to the ConversionService (`convertTokensToImpact`) to compute energy/water/CO2 impact, then has the PromptStoreService add a UUID + the conversation URL and save the row. `normalizeCaptureDto` first trims the text, clamps negative times, drops attachment and tool kinds it doesn't know (they count 0) and throws on an unknown provider. |
+| `privacy.handler.ts`    | **PrivacyHandler**: `handleGetPrivacyConsent()` / `handleSetPrivacyConsent(accepted)` → `PrivacyConsentDto`, straight through the PrivacyConsentService.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `usage.handler.ts`      | **UsageHandler**: `handleGetUsageSummary(sinceMs)` → `UsageSummaryDto`, `handleGetPromptHistory(query)` → `PromptHistoryDto`, `handleGetPromptRecords(sinceMs)` → `PromptRecordDto[]` (Analytics) and `handleClearPromptRecords(legacyOnly)` → `{ cleared: true }` (Analytics reset), straight through the PromptStoreService. No link to the estimation pipeline.                                                                                                                                                                                                                                                                                                            |
 
 Style: plain exported functions (no classes). Services are imported directly. Pipeline details:
 [pipeline.md](pipeline.md).
@@ -298,6 +299,15 @@ the EstimationHandler right after `buildTokenEstimateDto`.
 - **Dummy data (dev only):** `npm run dummy` (Firefox: `npm run dummy:firefox`) is `npm run dev` plus the `--dummy` flag, which sets `process.env.WAISTER_DUMMY`. On startup `background.entry.ts` then calls `seedDummyPromptRecords()`: fake prompts up to `DUMMY_TARGET_TOKENS` (12M) in total, dated before the oldest stored row, inserted in one transaction. Their ids start with `dummy-`: existing dummy rows count toward the target, so a rerun only tops up, and they can be removed with `DELETE FROM prompts WHERE id LIKE 'dummy-%'`. Other builds strip the call.
 - The schema runs on every start (`applySchema`) and must stay idempotent (`CREATE TABLE IF NOT EXISTS` plus `pragma_table_info('prompts')` checks that run `ALTER TABLE` for columns in `ADDED_COLUMNS` such as `tool_tokens`).
 
+### Privacy consent service
+
+`src/services/privacy-consent/`: the user's answer to the privacy notice
+([ADR 0017](decisions/0017-privacy-consent.md)).
+
+| File                         | Role                                                                                                                                                                                                       |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `privacy-consent.service.ts` | `getPrivacyConsent()` (an answer to an older `privacy.policyVersion` reads as `unset`), `setPrivacyConsent(accepted)`, `hasPrivacyConsent()`. IndexedDB `waister-settings` → `settings` → `privacyConsent` |
+
 ---
 
 ## UI
@@ -346,7 +356,7 @@ components/                           shared components (used by either surface)
   breakdown-row.component.tsx         BreakdownRow: icon, label, count of one part
   tacho.component.tsx                 ImpactTachos: three semi-circular tacho gauges for energy (Wh), water (mL), CO2 (g)
   tab-bar.component.tsx               TabBar (popup): one fixed-width tab per route, opens it in a new browser tab
-  sidebar.component.tsx               Sidebar (app page): logo + one hash link per route
+  sidebar.component.tsx               Sidebar (app page): logo + one hash link per route, Privacy button (reopens the PrivacyNotice)
   page-title.component.tsx            PageTitle (app page): serif headline of every page
   chip.component.tsx                  Chip (app page): pill toggle button (aria-pressed), yellow when selected
   chip-group.component.tsx            ChipGroup (app page): labelled, wrapping row of Chips (role="group")
@@ -363,6 +373,7 @@ components/                           shared components (used by either surface)
   history-row.component.tsx           HistoryRow (history): one prompt as a clickable row (time, ProviderIcon + model, impact, total; full-width TokenBar below)
   provider-icon.component.tsx         ProviderIcon (history, analytics): inline SVG mark per chat app (Claude, ChatGPT, Gemini), name as <title>
   impact-badge.component.tsx          ImpactBadge (dashboard, facts, modal): corner tab, -soft fill, solid icon + label (Energy, Water, CO₂)
+  privacy-notice.component.tsx        PrivacyNotice (popup inline, app page <dialog>): disclosure, accept / decline (can't be dismissed while unset), change answer, delete all prompts, policy link
   prompt-detail-modal.component.tsx   PromptDetailModal (history): native <dialog> with breakdown legend, impact tiles (ImpactBadge), model & timings, full-width conversation link, ← / → stepping
   fact-card.component.tsx             FactCard (facts): benchmark tile, ImpactBadge, multiplier + plain phrase, one-sentence fact, SVG watermark top right
   chart-card.component.tsx            ChartCard (analytics): tile with solid title + InfoTooltip, one-line insight, optional header action (chips, legend)
@@ -494,13 +505,15 @@ May import: nothing.
 `src/messages/` (shared): the contract for every `chrome.runtime` message, a discriminated union
 on `type`, plus the response type of each message.
 
-| `type`                 | Sender               | Receiver   | Payload              | Response                                           |
-| ---------------------- | -------------------- | ---------- | -------------------- | -------------------------------------------------- |
-| `ESTIMATE_PROMPT`      | content              | background | `ChatCaptureDto`     | `PromptRecordDto` (the content script ignores it)  |
-| `GET_USAGE_SUMMARY`    | popup, app page      | background | `{ sinceMs }`        | `UsageSummaryDto` (`UsageSummaryResponse`)         |
-| `GET_PROMPT_HISTORY`   | app page (History)   | background | `PromptHistoryQuery` | `PromptHistoryDto` (`PromptHistoryResponse`)       |
-| `GET_PROMPT_RECORDS`   | app page (Analytics) | background | `{ sinceMs }`        | `PromptRecordDto[]` (`PromptRecordsResponse`)      |
-| `CLEAR_PROMPT_RECORDS` | app page (Analytics) | background | `{ legacyOnly? }`    | `{ cleared: true }` (`ClearPromptRecordsResponse`) |
+| `type`                 | Sender                               | Receiver   | Payload              | Response                                                                          |
+| ---------------------- | ------------------------------------ | ---------- | -------------------- | --------------------------------------------------------------------------------- |
+| `ESTIMATE_PROMPT`      | content                              | background | `ChatCaptureDto`     | `PromptRecordDto`, `null` without privacy consent (the content script ignores it) |
+| `GET_USAGE_SUMMARY`    | popup, app page                      | background | `{ sinceMs }`        | `UsageSummaryDto` (`UsageSummaryResponse`)                                        |
+| `GET_PROMPT_HISTORY`   | app page (History)                   | background | `PromptHistoryQuery` | `PromptHistoryDto` (`PromptHistoryResponse`)                                      |
+| `GET_PROMPT_RECORDS`   | app page (Analytics)                 | background | `{ sinceMs }`        | `PromptRecordDto[]` (`PromptRecordsResponse`)                                     |
+| `CLEAR_PROMPT_RECORDS` | app page (Analytics), privacy notice | background | `{ legacyOnly? }`    | `{ cleared: true }` (`ClearPromptRecordsResponse`)                                |
+| `GET_PRIVACY_CONSENT`  | content, popup, app page             | background | none                 | `PrivacyConsentDto` (`PrivacyConsentResponse`)                                    |
+| `SET_PRIVACY_CONSENT`  | popup, app page (privacy notice)     | background | `{ accepted }`       | `PrivacyConsentDto` (`PrivacyConsentResponse`)                                    |
 
 On a handler failure the listener answers `{ error: string }`. An unknown `type` gets no answer
 (the listener returns `false`).
@@ -538,6 +551,7 @@ The field list, units and calibration notes live in `config.types.ts`, not here.
 | `capture.models.chatgpt`           | ChatGPT adapter                      | `families`, `effortWords`, `slug.*` and `label.*` (regex sources for the model slug and picker label)                        |
 | `ui`                               | PopupApp, ImpactTachos               | `usageWindowHours`, `tachoMax` (`energyWh`, `waterMl`, `co2Grams`)                                                           |
 | `ui.dashboard`                     | Dashboard (`dashboard.helpers.ts`)   | `busyDay` (Wh / mL / g per day = intensity 1), `intensityExponent`, `pulseMs`, `dripMs`, `puffMs`, `cloudRiseMs`, `pondFill` |
+| `privacy`                          | PrivacyConsentService, PrivacyNotice | `policyVersion` (re-asks consent when changed), `policyUrl`                                                                  |
 | `ui.history`                       | History (`usePromptHistory`)         | `pageSize`: prompts per page / "Load more"; `otherSegmentShare`: TokenBar "Other" merge                                      |
 | `ui.facts`                         | Facts (`facts.helpers.ts`)           | `shuffleIntervalMinutes`: how long one random pick of benchmarks stays                                                       |
 

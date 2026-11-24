@@ -1,6 +1,7 @@
 /**
  * EstimationHandler: orchestrates one captured prompt: count tokens, estimate hidden tokens, save
- * to the database.
+ * to the database. Does nothing without the user's privacy consent: a tab opened before the user
+ * declined still runs its content script, so the check belongs here, at the single write path.
  *
  * Context: background
  * Docs: docs/modules.md#handlers, docs/pipeline.md
@@ -18,6 +19,7 @@ import {
   buildTokenEstimateDto,
   estimateHiddenTokens,
 } from '../services/estimation/estimation.service';
+import { hasPrivacyConsent } from '../services/privacy-consent/privacy-consent.service';
 import {
   createPromptRecord,
   savePromptRecord,
@@ -75,7 +77,10 @@ export function normalizeCaptureDto(captureDto: ChatCaptureDto): ChatCaptureDto 
   };
 }
 
-export async function handleEstimation(captureDto: ChatCaptureDto): Promise<PromptRecordDto> {
+export async function handleEstimation(
+  captureDto: ChatCaptureDto,
+): Promise<PromptRecordDto | null> {
+  if (!(await hasPrivacyConsent())) return null;
   const cleanedCapture = normalizeCaptureDto(captureDto);
   const visible = countVisibleTokens(cleanedCapture);
   const hidden = estimateHiddenTokens(cleanedCapture);

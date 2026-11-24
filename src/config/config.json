@@ -284,5 +284,9 @@
     "facts": {
       "shuffleIntervalMinutes": 60
     }
+  },
+  "privacy": {
+    "policyVersion": "2026-11-24",
+    "policyUrl": "https://github.com/julius-gmeinder/waister/blob/main/PRIVACY.md"
   }
 }

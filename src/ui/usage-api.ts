@@ -1,6 +1,7 @@
 /**
- * UsageApi: the UI side of `GET_USAGE_SUMMARY` and `GET_PROMPT_HISTORY`. Shared by the popup and
- * the app page, so the `*.app.tsx` roots only pick the window or filter.
+ * UsageApi: the UI side of `GET_USAGE_SUMMARY`, `GET_PROMPT_HISTORY` and the privacy consent
+ * messages. Shared by the popup and the app page, so the `*.app.tsx` roots only pick the window
+ * or filter.
  *
  * Context: popup, app page
  * Docs: docs/modules.md#ui
@@ -8,16 +9,20 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { estimation, ui } from '../config/config.json';
+import type { PrivacyConsentDto } from '../dto/privacy-consent.dto';
 import type { PromptHistoryQuery } from '../dto/prompt-history.dto';
 import type { PromptRecordDto } from '../dto/prompt-record.dto';
 import type { UsageSummaryDto } from '../dto/usage-summary.dto';
 import type {
   ClearPromptRecordsMessage,
   GetPromptHistoryMessage,
+  GetPrivacyConsentMessage,
   GetPromptRecordsMessage,
   GetUsageSummaryMessage,
+  PrivacyConsentResponse,
   PromptHistoryResponse,
   PromptRecordsResponse,
+  SetPrivacyConsentMessage,
   UsageSummaryResponse,
 } from '../messages/runtime-messages';
 import { timeframeSinceMs } from './timeframe.helpers';
@@ -337,4 +342,56 @@ export function usePromptRecords(onCleared?: () => void): {
   }, [onCleared]);
 
   return { records, resetHistory, clearLegacyHistory };
+}
+
+/** `undefined` while loading, `null` if the background had no answer. */
+export type PrivacyConsentState = PrivacyConsentDto | null | undefined;
+
+function asConsent(response: unknown): PrivacyConsentDto | null {
+  if (!response || typeof response !== 'object' || !('status' in response)) return null;
+  return response as PrivacyConsentResponse;
+}
+
+export async function fetchPrivacyConsent(): Promise<PrivacyConsentDto | null> {
+  const message: GetPrivacyConsentMessage = { type: 'GET_PRIVACY_CONSENT' };
+  try {
+    return asConsent(await chrome.runtime.sendMessage(message));
+  } catch {
+    return null;
+  }
+}
+
+export async function savePrivacyConsent(accepted: boolean): Promise<PrivacyConsentDto | null> {
+  const message: SetPrivacyConsentMessage = { type: 'SET_PRIVACY_CONSENT', payload: { accepted } };
+  try {
+    return asConsent(await chrome.runtime.sendMessage(message));
+  } catch {
+    return null;
+  }
+}
+
+/** The privacy notice's answer plus `decide` to store a new one. Only for `*.app.tsx` roots. */
+export function usePrivacyConsent(): {
+  consent: PrivacyConsentState;
+  decide: (accepted: boolean) => Promise<boolean>;
+} {
+  const [consent, setConsent] = useState<PrivacyConsentState>(undefined);
+
+  useEffect(() => {
+    let ignore = false;
+    void fetchPrivacyConsent().then((result) => {
+      if (!ignore) setConsent(result);
+    });
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const decide = useCallback(async (accepted: boolean): Promise<boolean> => {
+    const saved = await savePrivacyConsent(accepted);
+    if (saved) setConsent(saved);
+    return saved !== null;
+  }, []);
+
+  return { consent, decide };
 }

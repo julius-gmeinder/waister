@@ -71,6 +71,18 @@ All fields of `TokenEstimateDto`, plus:
 
 No chat text (`userInput`, `response`, `chatHistory`) is saved.
 
+## PrivacyConsentDto
+
+`src/dto/privacy-consent.dto.ts`. The user's answer to the privacy notice
+([ADR 0017](decisions/0017-privacy-consent.md)), stored by the PrivacyConsentService. Response of
+`GET_PRIVACY_CONSENT` and `SET_PRIVACY_CONSENT`.
+
+| Field           | Type                                  | Description                                                  |
+| --------------- | ------------------------------------- | ------------------------------------------------------------ |
+| `status`        | `'unset' \| 'accepted' \| 'declined'` | `unset` until answered, and again after a new policy version |
+| `policyVersion` | `string`                              | `config.json` → `privacy.policyVersion` the answer refers to |
+| `decidedAt`     | `number \| null`                      | Epoch ms of the answer, `null` while `unset`                 |
+
 ## UsageSummaryDto
 
 `src/dto/usage-summary.dto.ts`. Built by `getUsageSummary(sinceMs)` in the PromptStoreService,

@@ -1,5 +1,7 @@
 /**
  * Background entry: registers the runtime listener and forwards messages to message.handler.
+ * On first install it opens the app page, whose privacy notice asks for consent before anything
+ * is captured.
  *
  * Context: background
  * Docs: docs/modules.md#entries
@@ -19,6 +21,12 @@ if (process.env.WAISTER_DUMMY === 'true') {
     (err: unknown) => console.error('[waister] dummy data failed', err),
   );
 }
+
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  // Install only: an update must not open a tab (a new policy version is asked in the popup).
+  if (reason !== 'install') return;
+  void chrome.tabs.create({ url: chrome.runtime.getURL('app/index.html') });
+});
 
 chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResponse) => {
   const pending = handleRuntimeMessage(message);

@@ -61,3 +61,4 @@ _Superseded by NNNN_ instead.
 | 0014 | [Dashboard page with timeframes and animated impact cards](decisions/0014-dashboard-page.md)             | Accepted, card look by 0016         |
 | 0015 | [History page with paged prompt list and detail modal](decisions/0015-history-page.md)                   | Accepted, row details by 0016       |
 | 0016 | [One UI look: shared tile, token, badge and chip components](decisions/0016-unified-ui-look.md)          | Accepted                            |
+| 0017 | [Ask for privacy consent before reading any chat page](decisions/0017-privacy-consent.md)                | Accepted                            |

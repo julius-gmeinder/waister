@@ -1,7 +1,8 @@
 /**
  * App: root component of the full-screen app page (app/index.html). Reads the route from the
  * URL hash, renders the Sidebar plus the matching page, fetches the dashboard's summary for the
- * selected timeframe and pages through the History's prompts for its filter.
+ * selected timeframe and pages through the History's prompts for its filter. Shows the privacy
+ * notice until the user has answered it, and again from the Sidebar's Privacy button.
  *
  * Context: app page
  * Docs: docs/modules.md#ui
@@ -9,11 +10,13 @@
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { parseRouteHash } from '../app-routes';
+import { PrivacyNotice } from '../components/privacy-notice.component';
 import { Sidebar } from '../components/sidebar.component';
 import { DEFAULT_HISTORY_VIEW, type HistoryView } from '../history.helpers';
 import { DEFAULT_TIMEFRAME, timeframeSinceMs, type TimeframeId } from '../timeframe.helpers';
 import {
   useFactsSummaries,
+  usePrivacyConsent,
   usePromptHistory,
   usePromptRecords,
   useUsageSummary,
@@ -47,6 +50,8 @@ export function App() {
   const summary = useUsageSummary(sinceMs, dataRevision);
   const factsSummaries = useFactsSummaries(dataRevision);
   const { records, resetHistory, clearLegacyHistory } = usePromptRecords(handleHistoryCleared);
+  const { consent, decide } = usePrivacyConsent();
+  const [privacyOpen, setPrivacyOpen] = useState(false);
 
   const [historyView, setHistoryView] = useState<HistoryView>(DEFAULT_HISTORY_VIEW);
   // Memoized like `sinceMs`: a new filter object restarts the paging.
@@ -88,8 +93,18 @@ export function App() {
 
   return (
     <div className="app">
-      <Sidebar activeRoute={route.id} />
+      <Sidebar activeRoute={route.id} onOpenPrivacy={() => setPrivacyOpen(true)} />
       <main className="app-content">{page}</main>
+      {consent && (
+        <PrivacyNotice
+          variant="dialog"
+          consent={consent}
+          open={privacyOpen}
+          onDecide={decide}
+          onClose={() => setPrivacyOpen(false)}
+          onDeleteData={resetHistory}
+        />
+      )}
     </div>
   );
 }

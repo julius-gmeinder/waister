@@ -12,11 +12,12 @@ const out = resolve(`dist/${name}-${version}-${browser}.zip`);
 rmSync(out, { force: true });
 
 if (process.platform === 'win32') {
-  execFileSync('powershell', [
-    '-NoProfile',
-    '-Command',
-    `Compress-Archive -Path '${extensionDir.replaceAll('/', '\\')}\\*' -DestinationPath '${out}'`,
-  ]);
+  // Windows' bsdtar, not Compress-Archive: PowerShell 5.1 writes backslash entry names, which
+  // the stores can reject.
+  execFileSync(`${process.env.SystemRoot}\\System32\\tar.exe`, ['-a', '-cf', out, '*'], {
+    cwd: extensionDir,
+    stdio: 'inherit',
+  });
 } else {
   execFileSync('zip', ['-r', out, '.'], { cwd: extensionDir, stdio: 'inherit' });
 }

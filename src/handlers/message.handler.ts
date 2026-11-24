@@ -9,6 +9,7 @@
 
 import type { RuntimeMessage } from '../messages/runtime-messages';
 import { handleEstimation } from './estimation.handler';
+import { handleGetPrivacyConsent, handleSetPrivacyConsent } from './privacy.handler';
 import {
   handleClearPromptRecords,
   handleGetPromptHistory,
@@ -28,6 +29,10 @@ export function handleRuntimeMessage(message: RuntimeMessage): Promise<unknown> 
       return handleClearPromptRecords(Boolean(message.payload?.legacyOnly));
     case 'GET_PROMPT_HISTORY':
       return handleGetPromptHistory(message.payload);
+    case 'GET_PRIVACY_CONSENT':
+      return handleGetPrivacyConsent();
+    case 'SET_PRIVACY_CONSENT':
+      return handleSetPrivacyConsent(Boolean(message.payload.accepted));
     default:
       return undefined;
   }
