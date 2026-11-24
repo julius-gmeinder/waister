@@ -18,6 +18,7 @@ Waister is a browser extension that tracks you conversations on the big three (C
 ## how it works
 
 We estimate your token usage from:
+
 - Prompt Input
 - Output
 - Thinking Time
@@ -26,6 +27,7 @@ We estimate your token usage from:
 - Model and Effort
 
 Using the token estimate we infer a environmental footprint consisting of:
+
 - Electricity used
 - Water used
 - Carbon output
